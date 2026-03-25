@@ -13,3 +13,9 @@
 - Sistema de autenticación para usuarios registrados.
 - API REST para gestionar datos del equipo y partidos.
 - Despliegue en Vercel para el frontend y Heroku para el backend (futuro).
+
+## DDBB.
+
+- Jugador: id, nombre, dorsal, posición, foto_url.
+- Partidos: id, nombre_rival, fecha, hora, lugar, resultado, local (boolean).
+- Estadisticas (Jugador <-> Partidos): id, jugador_id, partido_id, goles, asistencias, amarillas, rojas.

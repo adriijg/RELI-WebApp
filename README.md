@@ -1,5 +1,11 @@
 # RELI-WebApp
 
+## Documento de Diseño Técnico (TDD)
+
+¡Perfecto! Vamos a formalizar el Documento de Diseño Técnico (TDD). Tener esto en tu repositorio de GitHub es lo que diferencia a un "picacódigo" de un desarrollador profesional.
+
+Se ha creado el archivo `DOCUMENTACION.md` en la raíz del proyecto con la descripción del sistema, modelo de datos, roles y permisos, roadmap y guía de flujo de Git.
+
 ## Descripción
 
 RELI-WebApp es una aplicación web dedicada al equipo de fútbol sala RELI. Esta aplicación proporciona información sobre el equipo, incluyendo jugadores, partidos, resultados, noticias y más. Está diseñada para mantener a los aficionados actualizados y conectados con su equipo favorito. Utiliza una arquitectura de microservicios con backend en Spring Boot y frontend en Angular, respaldada por una base de datos en Firebase o Supabase.
