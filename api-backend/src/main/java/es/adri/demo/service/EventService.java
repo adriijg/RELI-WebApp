@@ -27,11 +27,12 @@ public class EventService {
                 .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado"));
 
         Event event = new Event();
-        event.setHomeTeam(eventCreateDTO.getHomeTeam());
-        event.setAwayTeam(eventCreateDTO.getAwayTeam());
+        event.setTitle(eventCreateDTO.getTitle());
+        event.setDescription(eventCreateDTO.getDescription());
         event.setDate(eventCreateDTO.getDate());
         event.setLocation(eventCreateDTO.getLocation());
-        event.setScore(eventCreateDTO.getScore());
+        event.setImageUrl(eventCreateDTO.getImageUrl());
+        event.setType(eventCreateDTO.getType());
         event.setCreatedBy(adminUser);
 
         return toDto(eventRepository.save(event));
@@ -47,11 +48,12 @@ public class EventService {
     private EventDTO toDto(Event event) {
         return new EventDTO(
                 event.getId(),
-                event.getHomeTeam(),
-                event.getAwayTeam(),
+                event.getTitle(),
+                event.getDescription(),
                 event.getDate(),
                 event.getLocation(),
-                event.getScore(),
+                event.getImageUrl(),
+                event.getType(),
                 event.getCreatedBy().getId(),
                 event.getCreatedBy().getUsername()
         );

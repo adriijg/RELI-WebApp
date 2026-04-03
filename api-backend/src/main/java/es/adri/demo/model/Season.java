@@ -2,8 +2,6 @@ package es.adri.demo.model;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -16,8 +14,8 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @Entity
-@Table(name = "players")
-public class Player extends BaseEntity {
+@Table(name = "seasons")
+public class Season extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -26,18 +24,6 @@ public class Player extends BaseEntity {
     @Column(nullable = false)
     private String name;
 
-    private String nickname;
-
     @Column(nullable = false)
-    private Integer jerseyNumber;
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private Position position;
-
-    @Column(nullable = false)
-    private String photoUrl;
-
-    @Column(nullable = false)
-    private boolean active = true;
+    private boolean current;
 }

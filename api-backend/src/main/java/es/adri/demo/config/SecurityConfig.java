@@ -11,7 +11,6 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 
 @Configuration
@@ -26,6 +25,10 @@ public class SecurityConfig {
                         .requestMatchers("/api/users/register", "/api/users/login").permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/events/**").permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/players/**").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/seasons/**").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/competitions/**").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/matches/**").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/stats/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .httpBasic(Customizer.withDefaults());

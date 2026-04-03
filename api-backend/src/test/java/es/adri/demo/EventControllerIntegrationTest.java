@@ -1,6 +1,7 @@
 package es.adri.demo;
 
 import es.adri.demo.dto.EventCreateDTO;
+import es.adri.demo.model.EventType;
 import es.adri.demo.model.Role;
 import es.adri.demo.model.User;
 import es.adri.demo.repository.EventRepository;
@@ -63,11 +64,12 @@ class EventControllerIntegrationTest {
     void createEventAllowsAdminRole() throws Exception {
         User admin = createUser("admin", "admin@example.com", "Password123", Role.ROLE_ADMIN);
         EventCreateDTO request = new EventCreateDTO(
-                "Madrid",
-                "Barca",
+                "Entrenamiento semanal",
+                "Sesion tactica y fisica",
                 LocalDateTime.now().plusDays(2),
-                "Bernabeu",
-                "0-0"
+                "Pabellon Municipal",
+                "https://example.com/training.jpg",
+                EventType.TRAINING
         );
 
         mockMvc.perform(post("/api/events")
@@ -75,8 +77,8 @@ class EventControllerIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.homeTeam").value("Madrid"))
-                .andExpect(jsonPath("$.awayTeam").value("Barca"))
+                .andExpect(jsonPath("$.title").value("Entrenamiento semanal"))
+                .andExpect(jsonPath("$.type").value("TRAINING"))
                 .andExpect(jsonPath("$.createdByUsername").value("admin"));
     }
 
@@ -84,11 +86,12 @@ class EventControllerIntegrationTest {
     void createEventRejectsUserRole() throws Exception {
         User user = createUser("user1", "user1@example.com", "Password123", Role.ROLE_USER);
         EventCreateDTO request = new EventCreateDTO(
-                "Madrid",
-                "Barca",
+                "Reunion de equipo",
+                "Planificacion del torneo",
                 LocalDateTime.now().plusDays(2),
-                "Bernabeu",
-                "0-0"
+                "Club",
+                "https://example.com/meeting.jpg",
+                EventType.MEETING
         );
 
         mockMvc.perform(post("/api/events")
