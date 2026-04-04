@@ -69,9 +69,9 @@ class PlayerControllerIntegrationTest {
 
         mockMvc.perform(get("/api/players"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].name").value("Jugador Activo"))
-                .andExpect(jsonPath("$[0].active").value(true))
-                .andExpect(jsonPath("$.length()").value(1));
+                .andExpect(jsonPath("$.content[0].name").value("Jugador Activo"))
+                .andExpect(jsonPath("$.content[0].active").value(true))
+                .andExpect(jsonPath("$.totalElements").value(1));
     }
 
     @Test

@@ -96,9 +96,9 @@ class StatControllerIntegrationTest {
 
         mockMvc.perform(get("/api/stats"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].playerName").value("Juan"))
-                .andExpect(jsonPath("$[0].matchRival").value("Rival FC"))
-                .andExpect(jsonPath("$[0].goals").value(2));
+                .andExpect(jsonPath("$.content[0].playerName").value("Juan"))
+                .andExpect(jsonPath("$.content[0].matchRival").value("Rival FC"))
+                .andExpect(jsonPath("$.content[0].goals").value(2));
     }
 
     @Test
@@ -109,7 +109,7 @@ class StatControllerIntegrationTest {
 
         mockMvc.perform(get("/api/stats").param("playerId", player.getId().toString()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].playerId").value(player.getId()));
+                .andExpect(jsonPath("$.content[0].playerId").value(player.getId()));
     }
 
     @Test

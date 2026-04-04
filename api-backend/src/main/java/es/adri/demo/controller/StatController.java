@@ -1,10 +1,13 @@
 package es.adri.demo.controller;
 
+import es.adri.demo.dto.PagedResponseDTO;
 import es.adri.demo.dto.StatDTO;
 import es.adri.demo.dto.StatRequestDTO;
 import es.adri.demo.service.StatService;
 import jakarta.validation.Valid;
-import java.util.List;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -29,17 +32,22 @@ public class StatController {
     }
 
     @GetMapping
-    public ResponseEntity<List<StatDTO>> getStats(
+    public ResponseEntity<PagedResponseDTO<StatDTO>> getStats(
             @RequestParam(required = false) Long playerId,
-            @RequestParam(required = false) Long matchId
+            @RequestParam(required = false) Long matchId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "id") String sortBy,
+            @RequestParam(defaultValue = "asc") String direction
     ) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.fromString(direction), sortBy));
         if (playerId != null) {
-            return ResponseEntity.ok(statService.findStatsByPlayerId(playerId));
+            return ResponseEntity.ok(statService.findStatsByPlayerId(playerId, pageable));
         }
         if (matchId != null) {
-            return ResponseEntity.ok(statService.findStatsByMatchId(matchId));
+            return ResponseEntity.ok(statService.findStatsByMatchId(matchId, pageable));
         }
-        return ResponseEntity.ok(statService.findAllStats());
+        return ResponseEntity.ok(statService.findAllStats(pageable));
     }
 
     @GetMapping("/{id}")

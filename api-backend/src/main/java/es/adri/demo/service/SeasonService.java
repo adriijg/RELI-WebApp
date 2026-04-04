@@ -1,5 +1,6 @@
 package es.adri.demo.service;
 
+import es.adri.demo.dto.PagedResponseDTO;
 import es.adri.demo.dto.SeasonDTO;
 import es.adri.demo.dto.SeasonRequestDTO;
 import es.adri.demo.exception.ResourceNotFoundException;
@@ -7,6 +8,8 @@ import es.adri.demo.model.Season;
 import es.adri.demo.repository.SeasonRepository;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -18,11 +21,10 @@ public class SeasonService {
         this.seasonRepository = seasonRepository;
     }
 
-    public List<SeasonDTO> findAllSeasons() {
-        return seasonRepository.findAll()
-                .stream()
-                .map(this::toDto)
-                .collect(Collectors.toList());
+    public PagedResponseDTO<SeasonDTO> findAllSeasons(Pageable pageable) {
+        Page<SeasonDTO> page = seasonRepository.findAll(pageable)
+                .map(this::toDto);
+        return toPagedResponse(page);
     }
 
     public SeasonDTO findSeasonById(Long id) {
@@ -57,5 +59,16 @@ public class SeasonService {
 
     private SeasonDTO toDto(Season season) {
         return new SeasonDTO(season.getId(), season.getName(), season.isCurrent());
+    }
+
+    private PagedResponseDTO<SeasonDTO> toPagedResponse(Page<SeasonDTO> page) {
+        return new PagedResponseDTO<>(
+                page.getContent(),
+                page.getNumber(),
+                page.getSize(),
+                page.getTotalElements(),
+                page.getTotalPages(),
+                page.isLast()
+        );
     }
 }

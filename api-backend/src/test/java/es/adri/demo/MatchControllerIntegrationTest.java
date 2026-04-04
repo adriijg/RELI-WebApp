@@ -92,8 +92,8 @@ class MatchControllerIntegrationTest {
 
         mockMvc.perform(get("/api/matches"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].rival").value("Rival FC"))
-                .andExpect(jsonPath("$[0].competitionName").value("Liga"));
+                .andExpect(jsonPath("$.content[0].rival").value("Rival FC"))
+                .andExpect(jsonPath("$.content[0].competitionName").value("Liga"));
     }
 
     @Test

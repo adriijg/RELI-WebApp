@@ -1,5 +1,6 @@
 package es.adri.demo.service;
 
+import es.adri.demo.dto.PagedResponseDTO;
 import es.adri.demo.dto.PlayerDTO;
 import es.adri.demo.dto.PlayerRequestDTO;
 import es.adri.demo.exception.ResourceNotFoundException;
@@ -7,6 +8,8 @@ import es.adri.demo.model.Player;
 import es.adri.demo.repository.PlayerRepository;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -18,11 +21,10 @@ public class PlayerService {
         this.playerRepository = playerRepository;
     }
 
-    public List<PlayerDTO> findAllActivePlayers() {
-        return playerRepository.findAllByActiveTrue()
-                .stream()
-                .map(this::toDto)
-                .collect(Collectors.toList());
+    public PagedResponseDTO<PlayerDTO> findAllActivePlayers(Pageable pageable) {
+        Page<PlayerDTO> page = playerRepository.findAllByActiveTrue(pageable)
+                .map(this::toDto);
+        return toPagedResponse(page);
     }
 
     public PlayerDTO createPlayer(PlayerRequestDTO playerRequestDTO) {
@@ -66,6 +68,17 @@ public class PlayerService {
                 player.getPosition(),
                 player.getPhotoUrl(),
                 player.isActive()
+        );
+    }
+
+    private PagedResponseDTO<PlayerDTO> toPagedResponse(Page<PlayerDTO> page) {
+        return new PagedResponseDTO<>(
+                page.getContent(),
+                page.getNumber(),
+                page.getSize(),
+                page.getTotalElements(),
+                page.getTotalPages(),
+                page.isLast()
         );
     }
 }

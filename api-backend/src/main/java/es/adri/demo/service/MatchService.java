@@ -2,6 +2,7 @@ package es.adri.demo.service;
 
 import es.adri.demo.dto.MatchDTO;
 import es.adri.demo.dto.MatchRequestDTO;
+import es.adri.demo.dto.PagedResponseDTO;
 import es.adri.demo.exception.ResourceNotFoundException;
 import es.adri.demo.model.Competition;
 import es.adri.demo.model.Match;
@@ -9,6 +10,8 @@ import es.adri.demo.repository.CompetitionRepository;
 import es.adri.demo.repository.MatchRepository;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,11 +27,10 @@ public class MatchService {
         this.competitionRepository = competitionRepository;
     }
 
-    public List<MatchDTO> findAllMatches() {
-        return matchRepository.findAll()
-                .stream()
-                .map(this::toDto)
-                .collect(Collectors.toList());
+    public PagedResponseDTO<MatchDTO> findAllMatches(Pageable pageable) {
+        Page<MatchDTO> page = matchRepository.findAll(pageable)
+                .map(this::toDto);
+        return toPagedResponse(page);
     }
 
     public MatchDTO findMatchById(Long id) {
@@ -85,6 +87,17 @@ public class MatchService {
                 match.getRivalGoals(),
                 match.getCompetition().getId(),
                 match.getCompetition().getName()
+        );
+    }
+
+    private PagedResponseDTO<MatchDTO> toPagedResponse(Page<MatchDTO> page) {
+        return new PagedResponseDTO<>(
+                page.getContent(),
+                page.getNumber(),
+                page.getSize(),
+                page.getTotalElements(),
+                page.getTotalPages(),
+                page.isLast()
         );
     }
 }

@@ -82,7 +82,7 @@ class SeasonControllerIntegrationTest {
 
         mockMvc.perform(get("/api/seasons"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].name").value("2025/2026"));
+                .andExpect(jsonPath("$.content[0].name").value("2025/2026"));
     }
 
     @Test

@@ -2,6 +2,7 @@ package es.adri.demo.service;
 
 import es.adri.demo.dto.CompetitionDTO;
 import es.adri.demo.dto.CompetitionRequestDTO;
+import es.adri.demo.dto.PagedResponseDTO;
 import es.adri.demo.exception.ResourceNotFoundException;
 import es.adri.demo.model.Competition;
 import es.adri.demo.model.Season;
@@ -9,6 +10,8 @@ import es.adri.demo.repository.CompetitionRepository;
 import es.adri.demo.repository.SeasonRepository;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,11 +27,10 @@ public class CompetitionService {
         this.seasonRepository = seasonRepository;
     }
 
-    public List<CompetitionDTO> findAllCompetitions() {
-        return competitionRepository.findAll()
-                .stream()
-                .map(this::toDto)
-                .collect(Collectors.toList());
+    public PagedResponseDTO<CompetitionDTO> findAllCompetitions(Pageable pageable) {
+        Page<CompetitionDTO> page = competitionRepository.findAll(pageable)
+                .map(this::toDto);
+        return toPagedResponse(page);
     }
 
     public CompetitionDTO findCompetitionById(Long id) {
@@ -75,6 +77,17 @@ public class CompetitionService {
                 competition.getName(),
                 competition.getSeason().getId(),
                 competition.getSeason().getName()
+        );
+    }
+
+    private PagedResponseDTO<CompetitionDTO> toPagedResponse(Page<CompetitionDTO> page) {
+        return new PagedResponseDTO<>(
+                page.getContent(),
+                page.getNumber(),
+                page.getSize(),
+                page.getTotalElements(),
+                page.getTotalPages(),
+                page.isLast()
         );
     }
 }

@@ -1,10 +1,13 @@
 package es.adri.demo.controller;
 
+import es.adri.demo.dto.PagedResponseDTO;
 import es.adri.demo.dto.SeasonDTO;
 import es.adri.demo.dto.SeasonRequestDTO;
 import es.adri.demo.service.SeasonService;
 import jakarta.validation.Valid;
-import java.util.List;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -28,8 +31,14 @@ public class SeasonController {
     }
 
     @GetMapping
-    public ResponseEntity<List<SeasonDTO>> getAllSeasons() {
-        return ResponseEntity.ok(seasonService.findAllSeasons());
+    public ResponseEntity<PagedResponseDTO<SeasonDTO>> getAllSeasons(
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "0") int page,
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "10") int size,
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "name") String sortBy,
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "asc") String direction
+    ) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.fromString(direction), sortBy));
+        return ResponseEntity.ok(seasonService.findAllSeasons(pageable));
     }
 
     @GetMapping("/{id}")

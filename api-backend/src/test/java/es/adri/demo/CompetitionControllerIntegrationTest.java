@@ -84,8 +84,8 @@ class CompetitionControllerIntegrationTest {
 
         mockMvc.perform(get("/api/competitions"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].name").value("Liga"))
-                .andExpect(jsonPath("$[0].seasonName").value("2025/2026"));
+                .andExpect(jsonPath("$.content[0].name").value("Liga"))
+                .andExpect(jsonPath("$.content[0].seasonName").value("2025/2026"));
     }
 
     @Test

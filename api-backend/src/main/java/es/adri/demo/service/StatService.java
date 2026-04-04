@@ -1,5 +1,6 @@
 package es.adri.demo.service;
 
+import es.adri.demo.dto.PagedResponseDTO;
 import es.adri.demo.dto.StatDTO;
 import es.adri.demo.dto.StatRequestDTO;
 import es.adri.demo.exception.ResourceNotFoundException;
@@ -11,6 +12,8 @@ import es.adri.demo.repository.PlayerRepository;
 import es.adri.demo.repository.StatRepository;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,29 +31,26 @@ public class StatService {
         this.matchRepository = matchRepository;
     }
 
-    public List<StatDTO> findAllStats() {
-        return statRepository.findAll()
-                .stream()
-                .map(this::toDto)
-                .collect(Collectors.toList());
+    public PagedResponseDTO<StatDTO> findAllStats(Pageable pageable) {
+        Page<StatDTO> page = statRepository.findAll(pageable)
+                .map(this::toDto);
+        return toPagedResponse(page);
     }
 
     public StatDTO findStatById(Long id) {
         return toDto(getStatById(id));
     }
 
-    public List<StatDTO> findStatsByPlayerId(Long playerId) {
-        return statRepository.findByPlayerId(playerId)
-                .stream()
-                .map(this::toDto)
-                .collect(Collectors.toList());
+    public PagedResponseDTO<StatDTO> findStatsByPlayerId(Long playerId, Pageable pageable) {
+        Page<StatDTO> page = statRepository.findByPlayerId(playerId, pageable)
+                .map(this::toDto);
+        return toPagedResponse(page);
     }
 
-    public List<StatDTO> findStatsByMatchId(Long matchId) {
-        return statRepository.findByMatchId(matchId)
-                .stream()
-                .map(this::toDto)
-                .collect(Collectors.toList());
+    public PagedResponseDTO<StatDTO> findStatsByMatchId(Long matchId, Pageable pageable) {
+        Page<StatDTO> page = statRepository.findByMatchId(matchId, pageable)
+                .map(this::toDto);
+        return toPagedResponse(page);
     }
 
     @Transactional
@@ -111,6 +111,17 @@ public class StatService {
                 stat.getRedCards(),
                 stat.isMvp(),
                 stat.isAttended()
+        );
+    }
+
+    private PagedResponseDTO<StatDTO> toPagedResponse(Page<StatDTO> page) {
+        return new PagedResponseDTO<>(
+                page.getContent(),
+                page.getNumber(),
+                page.getSize(),
+                page.getTotalElements(),
+                page.getTotalPages(),
+                page.isLast()
         );
     }
 }

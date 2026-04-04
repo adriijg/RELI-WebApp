@@ -2,6 +2,7 @@ package es.adri.demo.service;
 
 import es.adri.demo.dto.EventCreateDTO;
 import es.adri.demo.dto.EventDTO;
+import es.adri.demo.dto.PagedResponseDTO;
 import es.adri.demo.exception.ResourceNotFoundException;
 import es.adri.demo.model.Event;
 import es.adri.demo.model.User;
@@ -9,6 +10,8 @@ import es.adri.demo.repository.EventRepository;
 import es.adri.demo.repository.UserRepository;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -38,11 +41,10 @@ public class EventService {
         return toDto(eventRepository.save(event));
     }
 
-    public List<EventDTO> findAllEvents() {
-        return eventRepository.findAll()
-                .stream()
-                .map(this::toDto)
-                .collect(Collectors.toList());
+    public PagedResponseDTO<EventDTO> findAllEvents(Pageable pageable) {
+        Page<EventDTO> page = eventRepository.findAll(pageable)
+                .map(this::toDto);
+        return toPagedResponse(page);
     }
 
     private EventDTO toDto(Event event) {
@@ -56,6 +58,17 @@ public class EventService {
                 event.getType(),
                 event.getCreatedBy().getId(),
                 event.getCreatedBy().getUsername()
+        );
+    }
+
+    private PagedResponseDTO<EventDTO> toPagedResponse(Page<EventDTO> page) {
+        return new PagedResponseDTO<>(
+                page.getContent(),
+                page.getNumber(),
+                page.getSize(),
+                page.getTotalElements(),
+                page.getTotalPages(),
+                page.isLast()
         );
     }
 }

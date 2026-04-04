@@ -1,10 +1,13 @@
 package es.adri.demo.controller;
 
+import es.adri.demo.dto.PagedResponseDTO;
 import es.adri.demo.dto.MatchDTO;
 import es.adri.demo.dto.MatchRequestDTO;
 import es.adri.demo.service.MatchService;
 import jakarta.validation.Valid;
-import java.util.List;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -28,8 +31,14 @@ public class MatchController {
     }
 
     @GetMapping
-    public ResponseEntity<List<MatchDTO>> getAllMatches() {
-        return ResponseEntity.ok(matchService.findAllMatches());
+    public ResponseEntity<PagedResponseDTO<MatchDTO>> getAllMatches(
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "0") int page,
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "10") int size,
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "date") String sortBy,
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "desc") String direction
+    ) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.fromString(direction), sortBy));
+        return ResponseEntity.ok(matchService.findAllMatches(pageable));
     }
 
     @GetMapping("/{id}")

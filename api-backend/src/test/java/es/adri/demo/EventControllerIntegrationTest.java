@@ -104,7 +104,8 @@ class EventControllerIntegrationTest {
     @Test
     void getAllEventsIsPublic() throws Exception {
         mockMvc.perform(get("/api/events"))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").isArray());
     }
 
     private User createUser(String username, String email, String rawPassword, Role role) {
