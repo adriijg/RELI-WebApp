@@ -1,0 +1,58 @@
+/* src/index.css */
+@import "tailwindcss";
+
+@theme {
+  --color-re-rojo: #E21D2C;
+  --color-re-dorado: #C19A5B;
+  --color-re-dorado-light: #F3E5AB;
+  --color-re-azul-oscuro: #020617;
+
+  /* Mapeamos las variables de CSS a clases de Tailwind */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card-bg: var(--card-bg);
+  --color-card-border: var(--card-border);
+  --shadow-card: var(--card-shadow);
+}
+
+@layer base {
+  :root {
+    --background: #F8FAFC;
+    --foreground: #020617;
+    --card-bg: #FFFFFF;
+    --card-border: rgba(0, 0, 0, 0.08);
+    --card-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+    --muted: #64748B;
+  }
+
+  .dark {
+    --background: #020617;
+    --foreground: #F8FAFC;
+    --card-bg: #0F172A;
+    --card-border: rgba(255, 255, 255, 0.08);
+    --card-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+    --muted: #94A3B8;
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    @apply transition-colors duration-300 antialiased overflow-x-hidden;
+  }
+
+  /* Aplica sombreado y borde consistente a todas las secciones tipo tarjeta */
+  section, .card-re {
+    @apply transition-all duration-300;
+  }
+}
+
+/* Utilitarios de Diseño para mayor PROFUNDIDAD */
+.card-depth {
+  background-color: var(--card-bg);
+  border: 1px solid var(--card-border);
+  box-shadow: var(--card-shadow);
+}
+
+.text-gradient-re {
+  @apply bg-clip-text text-transparent bg-gradient-to-r from-re-rojo to-re-dorado;
+}
