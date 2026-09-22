@@ -1,0 +1,68 @@
+[
+  {
+    "date": "2026-03-22T00:00:00",
+    "venue": null,
+    "home": "Jagger de Munich",
+    "away": "New Team F.S.",
+    "homeCode": "320139",
+    "awayCode": "307967",
+    "homeGoals": 6,
+    "awayGoals": 0,
+    "ours": false
+  },
+  {
+    "date": "2026-03-22T10:00:00",
+    "venue": null,
+    "home": "Caudillos FC",
+    "away": "Internacional FC",
+    "homeCode": "320157",
+    "awayCode": "320145",
+    "homeGoals": 6,
+    "awayGoals": 0,
+    "ours": false
+  },
+  {
+    "date": "2026-03-22T10:00:00",
+    "venue": "PABELLON PARLA ESTE - PISTA",
+    "home": "Real Lisiados",
+    "away": "Union Casta FC",
+    "homeCode": "320143",
+    "awayCode": "320144",
+    "homeGoals": 4,
+    "awayGoals": 1,
+    "ours": true
+  },
+  {
+    "date": "2026-03-22T10:00:00",
+    "venue": "PABELLON CASTILLEJO - PISTA",
+    "home": "Inter de Parla",
+    "away": "El Vaquilla FS",
+    "homeCode": "308256",
+    "awayCode": "320141",
+    "homeGoals": 10,
+    "awayGoals": 3,
+    "ours": false
+  },
+  {
+    "date": "2026-03-22T10:00:00",
+    "venue": "PABELLON NIDO - PISTA",
+    "home": "FS Erome",
+    "away": "Guetto FS",
+    "homeCode": "320140",
+    "awayCode": "320158",
+    "homeGoals": 3,
+    "awayGoals": 6,
+    "ours": false
+  },
+  {
+    "date": "2026-03-22T10:00:00",
+    "venue": "PABELLON CANTUEÑA - PISTA",
+    "home": "Magreb United",
+    "away": "Jeresa Instalaciones",
+    "homeCode": "307937",
+    "awayCode": "320142",
+    "homeGoals": 7,
+    "awayGoals": 3,
+    "ours": false
+  }
+]

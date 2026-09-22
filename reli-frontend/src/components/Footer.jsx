@@ -1,4 +1,5 @@
 // src/components/Footer.jsx
+import { Link } from 'react-router-dom';
 import logo from '../assets/reli-badge.png';
 
 export default function Footer() {
@@ -79,9 +80,11 @@ export default function Footer() {
                     <div className="flex flex-col gap-6">
                         <h4 className="text-re-rojo font-black uppercase tracking-widest text-xs">Club</h4>
                         <ul className="flex flex-col gap-4 text-sm font-bold">
-                            {['Historia', 'Palmarés', 'Instalaciones', 'Transparencia', 'Contacto'].map(item => (
-                                <li key={item}><a href="#" className="hover:text-re-rojo transition-colors">{item}</a></li>
-                            ))}
+                            <li><Link to="/historia" className="hover:text-re-rojo transition-colors">Historia</Link></li>
+                            <li><Link to="/jugadores" className="hover:text-re-rojo transition-colors">Palmarés</Link></li>
+                            <li><Link to="/" className="hover:text-re-rojo transition-colors">Instalaciones</Link></li>
+                            <li><Link to="/" className="hover:text-re-rojo transition-colors">Transparencia</Link></li>
+                            <li><Link to="/" className="hover:text-re-rojo transition-colors">Contacto</Link></li>
                         </ul>
                     </div>
 
@@ -89,9 +92,11 @@ export default function Footer() {
                     <div className="flex flex-col gap-6">
                         <h4 className="text-re-rojo font-black uppercase tracking-widest text-xs">Competición</h4>
                         <ul className="flex flex-col gap-4 text-sm font-bold">
-                            {['Primer Equipo', 'Resultados', 'Clasificación', 'Cantera', 'Femenino'].map(item => (
-                                <li key={item}><a href="#" className="hover:text-re-rojo transition-colors">{item}</a></li>
-                            ))}
+                            <li><Link to="/competicion" className="hover:text-re-rojo transition-colors">Clasificación</Link></li>
+                            <li><Link to="/jugadores" className="hover:text-re-rojo transition-colors">Primer Equipo</Link></li>
+                            <li><Link to="/competicion" className="hover:text-re-rojo transition-colors">Resultados</Link></li>
+                            <li><Link to="/" className="hover:text-re-rojo transition-colors">Cantera</Link></li>
+                            <li><Link to="/" className="hover:text-re-rojo transition-colors">Femenino</Link></li>
                         </ul>
                     </div>
 

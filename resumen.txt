@@ -1,0 +1,409 @@
+================================================================================
+                         RELI-WEBAPP - RESUMEN DEL PROYECTO
+================================================================================
+
+Plataforma full-stack para la gestión y seguimiento del equipo de fútbol sala
+REAL LISIADOS F.C. ("RELI"). Permite mostrar información del equipo (jugadores,
+partidos, noticias, eventos) con autenticación de usuarios y panel de gestión
+para el administrador.
+
+--------------------------------------------------------------------------------
+1. ESTRUCTURA DEL REPOSITORIO
+--------------------------------------------------------------------------------
+
+RELI-WebApp/
+├── api-backend/            # Backend Spring Boot (Java 21)
+│   ├── pom.xml             # Dependencias Maven
+│   └── src/
+│       ├── main/
+│       │   ├── java/es/adri/demo/
+│       │   │   ├── Application.java          # Punto de entrada Spring Boot
+│       │   │   ├── config/                   # Seguridad, CORS, OpenAPI, bootstrap admin
+│       │   │   ├── controller/               # Controladores REST (API)
+│       │   │   ├── dto/                      # DTOs de entrada/salida
+│       │   │   ├── exception/                # Manejo global de errores
+│       │   │   ├── model/                    # Entidades JPA
+│       │   │   ├── repository/               # Repositorios Spring Data JPA
+│       │   │   └── service/                  # Lógica de negocio
+│       │   └── resources/
+│       │       └── application.properties    # Config (Supabase PostgreSQL, admin, Swagger)
+│       └── test/java/es/adri/demo/           # Tests de integración de controllers
+│
+├── reli-frontend/           # Frontend React + Vite
+│   ├── package.json         # Dependencias npm
+│   ├── vite.config.js       # Configuración de Vite
+│   ├── tailwind.config.js   # Configuración de Tailwind CSS
+│   ├── index.html           # HTML base (título: Real Lisiados F.C.)
+│   ├── .env                 # Variables de entorno (URL API, token auth)
+│   └── src/
+│       ├── main.jsx         # Punto de entrada de React
+│       ├── App.jsx          # Componente raíz (layout, tema, sesión)
+│       ├── index.css        # Estilos globales + tema claro/oscuro
+│       ├── components/      # Componentes de interfaz
+│       │   ├── Navbar.jsx           # Barra de navegación superior
+│       │   ├── HeroMatch.jsx        # Hero con próximo partido + countdown
+│       │   ├── MatchesCarousel.jsx  # Carrusel/grid de próximos partidos
+│       │   ├── NewsSection.jsx      # Sección de noticias
+│       │   ├── AuthModal.jsx        # Modal de login/registro
+│       │   └── Footer.jsx           # Pie de página
+│       ├── services/
+│       │   └── api.js       # Cliente HTTP (fetch) para la API REST
+│       └── assets/          # Imágenes (escudo, hero, etc.)
+│
+├── README.md                # Documento de diseño técnico (TDD) / info general
+├── DOCUMENTACION.md         # Arquitectura, modelo de datos, roles, roadmap
+├── impl.md                  # Descripción de páginas + peticiones HTTP de ejemplo
+└── resumen.txt              # Este archivo
+
+--------------------------------------------------------------------------------
+2. BACKEND (api-backend/)
+--------------------------------------------------------------------------------
+
+2.1. Stack tecnológico
+  - Java 21
+  - Spring Boot 4.0.3
+  - Spring Security (autenticación y autorización)
+  - Spring Data JPA + Hibernate (acceso a datos)
+  - PostgreSQL (base de datos alojada en Supabase, vía pooler transactional)
+  - Lombok (reducción de código repetitivo)
+  - springdoc-openapi / Swagger UI (documentación interactiva de la API)
+  - Validación de datos (Bean Validation)
+  - H2 (dependencia disponible, la BD activa es PostgreSQL)
+
+2.2. Capas de la arquitectura
+  La aplicación sigue un patrón por capas típico de Spring Boot:
+
+    Controller  →  recibe peticiones HTTP, valida entrada y devuelve respuestas
+        ↓
+    Service     →  lógica de negocio (reglas, validaciones, transformaciones)
+        ↓
+    Repository  →  acceso a la base de datos (Spring Data JPA)
+        ↓
+    Model       →  entidades JPA que mapean las tablas de la BD
+
+  Además:
+    - DTO/          → objetos de transferencia para no exponer entidades directamente
+    - Exception/    → manejo centralizado de errores (@RestControllerAdvice)
+    - config/       → configuración de seguridad, CORS, admin inicial, OpenAPI
+
+2.3. Modelo de datos (entidades)
+
+  BaseEntity (superclase abstracta)
+    - createdAt, updatedAt (se rellenan automáticamente con @PrePersist/@PreUpdate)
+
+  User (tabla "users")
+    - id, username (único), email (único), password (cifrada), role
+    - Role: ROLE_USER | ROLE_ADMIN
+
+  Player (tabla "players")
+    - id, name, nickname, jerseyNumber, position, photoUrl, active
+    - Position: PORTERO | CIERRE | ALA | PIVOT
+    - "active" permite borrado lógico (soft delete)
+
+  Season (tabla "seasons")
+    - id, name (ej: "2025/26"), current (temporada actual)
+
+  Competition (tabla "competitions")
+    - id, name → ManyToOne → Season
+    - Ej: "Liga Municipal", "Copa Primavera"
+
+  Match (tabla "matches")
+    - id, rival, date, location, status, ourGoals, rivalGoals
+    - status: SCHEDULED | FINISHED | POSTPONED
+    - → ManyToOne → Competition
+
+  Stat (tabla "stats")  [tabla de hechos: relación Jugador ↔ Partido]
+    - id → ManyToOne → Player
+    - → ManyToOne → Match
+    - goals, assists, yellowCards, redCards, mvp, attended
+
+  Event (tabla "events")
+    - id, title, description (TEXT), date, location, imageUrl, type
+    - type: SOCIAL | TRAINING | MEETING | INFO
+    - → ManyToOne → User (createdBy, opcional)
+
+  Relaciones principales:
+    Season  1 ─── N  Competition  1 ─── N  Match
+    Player  1 ─── N  Stat  N ─── 1  Match
+    User    1 ─── N  Event
+
+2.4. Endpoints de la API REST
+
+  Base URL: http://localhost:8080/api
+
+  AUTENTICACIÓN / USUARIOS  (/api/users)
+    POST   /register          → Registrar usuario nuevo (público)
+    POST   /login             → Iniciar sesión con username o email (público)
+    GET    /                  → Listar usuarios (solo ADMIN)
+    GET    /{id}              → Obtener usuario por ID
+    PUT    /{id}              → Actualizar usuario
+    DELETE /{id}              → Eliminar usuario (solo ADMIN)
+
+  JUGADORES  (/api/players)
+    GET    /                  → Listar jugadores activos (público, paginado y ordenable)
+    POST   /                  → Crear jugador (solo ADMIN)
+    PUT    /{id}              → Actualizar jugador (solo ADMIN)
+    DELETE /{id}              → Borrado lógico del jugador (solo ADMIN)
+
+  TEMPORADAS  (/api/seasons)
+    GET    /                  → Listar temporadas (público, paginado)
+    GET    /{id}              → Obtener temporada
+    POST   /                  → Crear temporada (solo ADMIN)
+    PUT    /{id}              → Actualizar temporada (solo ADMIN)
+    DELETE /{id}              → Eliminar temporada (solo ADMIN)
+
+  COMPETICIONES  (/api/competitions)
+    GET    /                  → Listar competiciones (público, paginado)
+    GET    /{id}              → Obtener competición
+    POST   /                  → Crear competición (solo ADMIN)
+    PUT    /{id}              → Actualizar competición (solo ADMIN)
+    DELETE /{id}              → Eliminar competición (solo ADMIN)
+
+  PARTIDOS  (/api/matches)
+    GET    /                  → Listar partidos (público, paginado, ordenado por fecha)
+    GET    /{id}              → Obtener partido
+    POST   /                  → Crear partido (solo ADMIN)
+    PUT    /{id}              → Actualizar partido / marcar resultado (solo ADMIN)
+    DELETE /{id}              → Eliminar partido (solo ADMIN)
+
+  ESTADISTICAS  (/api/stats)
+    GET    /                  → Listar estadísticas (público; filtros: playerId, matchId)
+    GET    /{id}              → Obtener estadística
+    POST   /                  → Crear estadística (solo ADMIN)
+    PUT    /{id}              → Actualizar estadística (solo ADMIN)
+    DELETE /{id}              → Eliminar estadística (solo ADMIN)
+
+  EVENTOS  (/api/events)
+    GET    /                  → Listar eventos (público, paginado)
+    POST   /                  → Crear evento (solo ADMIN, registra autor)
+
+  GENERAL
+    GET    /                  → "¡Conexión exitosa!" (HolaController, prueba de vida)
+    GET    /swagger-ui.html   → Documentación Swagger UI
+    GET    /v3/api-docs       → Especificación OpenAPI en JSON
+
+  Todas las listadas soportan paginación y ordenación mediante parámetros:
+    ?page=0&size=10&sortBy=campo&direction=asc|desc
+
+2.5. Seguridad
+
+  - Autenticación: HTTP Basic (header Authorization).
+  - Registro y login son públicos (permitAll).
+  - Todos los GET de /api/** son públicos (lectura abierta).
+  - Escrituras (POST, PUT, DELETE) requieren estar autenticado.
+  - Endpoints marcados con @PreAuthorize("hasRole('ADMIN')") requieren rol ADMIN.
+  - Contraseñas cifradas con BCrypt (PasswordEncoder).
+  - CORS configurado para permitir el frontend en http://localhost:5173.
+  - CSRF deshabilitado (habitual en APIs con Basic Auth/JSON).
+
+  Roles:
+    ROLE_USER  →  lectura de estadísticas, calendario, confirmar asistencia (futuro)
+    ROLE_ADMIN →  CRUD completo de jugadores, partidos, temporadas, stats, etc.
+
+  Bootstrap del admin:
+    - AdminBootstrapRunner crea/actualiza el admin al arrancar la app
+      si app.bootstrap-admin.enabled=true.
+    - Credenciales tomadas de variables de entorno:
+      ADMIN_USERNAME, ADMIN_EMAIL, ADMIN_PASSWORD.
+
+2.6. Manejo de errores (GlobalExceptionHandler)
+
+  - ResourceNotFoundException      → 404 Not Found
+  - EmailAlreadyExistsException    → 409 Conflict
+  - AccessDeniedException          → 403 Forbidden
+  - MethodArgumentNotValidException→ 400 Bad Request (con detalle por campo)
+  - ResponseStatusException        → código correspondiente
+  - Exception genérica             → 500 Internal Server Error
+
+2.7. Configuración de base de datos (application.properties)
+
+  - PostgreSQL en Supabase (Supabase Pooler en modo transaction, puerto 6543).
+  - sslmode=require, prepareThreshold=0 (compatible con el pooler).
+  - Hikari: max-lifetime y keepalive ajustados para no usar conexiones muertas.
+  - JPA: ddl-auto=update (Hibernate actualiza el esquema automáticamente),
+    show-sql=true, open-in-view=false.
+  - La contraseña y credenciales sensibles se inyectan por variables de entorno
+    (DB_PASSWORD, ADMIN_*, etc.).
+
+2.8. Tests
+
+  - Tests de integración de controllers en src/test:
+    User, Player, Match, Competition, Season, Stat, Event controllers.
+  - Se usan spring-boot-starter-test, spring-security-test y starters de test.
+
+--------------------------------------------------------------------------------
+3. FRONTEND (reli-frontend/)
+--------------------------------------------------------------------------------
+
+3.1. Stack tecnológico
+  - React 19
+  - Vite 8 (bundler y servidor de desarrollo)
+  - Tailwind CSS 4 (estilos utilitarios, tema claro/oscuro)
+  - react-router-dom 7 (dependencia instalada; aún no hay rutas definidas)
+  - ESLint (linting)
+
+  Scripts npm:
+    npm run dev      → arrancar en desarrollo (Vite, por defecto puerto 5173)
+    npm run build    → generar build de producción
+    npm run preview  → previsualizar el build
+    npm run lint     → ejecutar ESLint
+
+3.2. Estructura y componentes
+
+  main.jsx
+    - Punto de entrada: monta <App /> en el elemento #root de index.html.
+
+  App.jsx  (componente raíz / layout)
+    - Gestiona el estado global de la vista:
+      · theme (claro/oscuro), persistido en localStorage ("re-theme").
+      · user (sesión activa), persistido en localStorage ("re-user").
+      · Modal de autenticación (abierto/cerrado, vista login o registro).
+    - Temporizador de cierre de sesión por inactividad:
+      · Si hay usuario logueado, tras 10 minutos sin actividad
+        (mousemove, keydown, scroll, click) cierra la sesión automáticamente.
+    - Estructura visual: Navbar → main (HeroMatch, NewsSection, MatchesCarousel)
+      → Footer → AuthModal.
+
+  Componentes:
+
+    Navbar.jsx
+      - Barra de navegación roja fija (sticky) con:
+        · Menú hamburguesa para móvil/tablet (overlay a pantalla completa).
+        · Escudo + nombre "REAL LISIADOS F.C.".
+        · Enlaces de navegación: INICIO, JUGADORES, COMPETICIÓN, HISTORIA, NOTICIAS
+          (actualmente apuntan a "#", sin rutas activas).
+        · Botones de INICIAR SESIÓN / REGISTRARSE o usuario + CERRAR SESIÓN.
+        · Botón de cambio de tema (sol/luna).
+
+    HeroMatch.jsx
+      - Sección principal con el PRÓXIMO partido:
+        · Llama a getMatches() y filtra el primer partido no terminado (status ≠ FINISHED),
+          ordenado por fecha ascendente.
+        · Muestra: logo del equipo VS rival, fecha, sede.
+        · Cronómetro en vivo (días, horas, minutos, segundos) hasta el partido.
+        · Estado de carga y fallback "POR CONFIRMAR" si no hay partido.
+
+    MatchesCarousel.jsx
+      - Sección "Próximos Partidos":
+        · Llama a getMatches() y pinta las partidas en formato grid
+          (1/2/3 columnas según pantalla).
+        · Cada tarjeta: competición, estado, Real Lisiados vs rival,
+          marcador si el partido está FINISHED, fecha y ubicación.
+        · Botones de navegación ← → (decorativos por ahora, sin lógica de scroll).
+
+    NewsSection.jsx
+      - Sección "Últimas Noticias":
+        · Noticia principal grande (tipo entrevista) + dos tarjetas secundarias
+          (entrenamiento y banner de academia/verano).
+        · Contenido estático por ahora (imágenes de Unsplash, sin conexión a API).
+
+    AuthModal.jsx
+      - Modal de autenticación con dos vistas: login y registro.
+      - Login:
+        · Campos: "identifier" (username o email) + password.
+        · Llama a loginUser() → POST /api/users/login.
+        · Si la respuesta incluye token, lo guarda en localStorage ("re-token").
+        · Al éxito, notifica a App con los datos del usuario.
+      - Registro:
+        · Campos: username (mín. 3), email, password (mín. 8, validación local
+          porque el backend lo exige).
+        · Llama a registerUser() → POST /api/users/register.
+        · Después del registro, hace login automático con los mismos datos.
+      - Muestra mensajes de error y éxito, y permite alternar entre ambas vistas.
+
+    Footer.jsx
+      - Pie de página con:
+        · Branding del club (escudo, nombre, "EST. 2018") y lema.
+        · Iconos de redes sociales (X, Instagram, TikTok, Facebook) → enlaces "#".
+        · Columnas de navegación: Club, Competición.
+        · Formulario de newsletter (email + botón UNIRSE, sin backend aún).
+        · Barra inferior: copyright y enlaces legales.
+
+3.3. Capa de acceso a datos (services/api.js)
+
+  - Utiliza la API nativa fetch.
+  - URL base desde variable de entorno: VITE_API_URL (http://localhost:8080/api).
+  - Header de autorización desde: VITE_AUTH_TOKEN (Basic ... de admin, hardcodeado
+    en .env para desarrollo).
+  - Funciones exportadas:
+      · getPlayers()   → GET  /players
+      · getMatches()   → GET  /matches
+      · loginUser()    → POST /users/login
+      · registerUser() → POST /users/register
+  - handleResponse() centraliza la comprobación de errores HTTP y parsea JSON.
+  - En las peticiones de lectura, si falla devuelve [] (array vacío) para no romper la UI.
+
+3.4. Estilos y tema
+
+  - Tailwind CSS 4 con variables de tema en index.css (@theme):
+      · Colores de marca: rojo (#E21D2C), dorado (#C19A5B), azul oscuro (#020617).
+      · Variables CSS para background, foreground, cards, bordes y sombras.
+  - Tema claro (por defecto) y oscuro (clase .dark en <html>), con transiciones.
+  - Clases utilitarias propias: .card-depth, .text-gradient-re.
+  - Diseño responsive (menú móvil, grids adaptables).
+
+3.5. Variables de entorno (.env)
+
+  VITE_API_URL=http://localhost:8080/api
+  VITE_AUTH_TOKEN=Basic <credenciales admin en base64>
+
+  Nota: el token/credenciales están en .env con fines de desarrollo local.
+  En producción deberían manejarse de forma segura (no exponer el admin).
+
+--------------------------------------------------------------------------------
+4. CÓMO FUNCIONA JUNTOS (FLUJO GENERAL)
+--------------------------------------------------------------------------------
+
+  1. El usuario abre el frontend (Vite en http://localhost:5173).
+  2. Al cargar, App.jsx lee tema y sesión de localStorage.
+  3. HeroMatch y MatchesCarousel llaman a la API (GET /api/matches) para
+     mostrar el próximo partido y el calendario.
+  4. El usuario puede registrarse o iniciar sesión desde el AuthModal:
+       - Registro → POST /api/users/register → login automático → POST /api/users/login.
+  5. La sesión se guarda en localStorage y se muestra en el Navbar.
+  6. Tras 10 minutos de inactividad, la sesión se cierra automáticamente.
+  7. El backend valida credenciales (HTTP Basic / identificador+password),
+     cifra contraseñas con BCrypt y controla el acceso por roles.
+  8. Solo el ADMIN puede crear/editar/borrar jugadores, partidos, stats, etc.
+  9. Los GET son públicos, por eso la web puede mostrar datos sin estar logueado.
+  10. Ambos se conectan en local:
+         Backend  → http://localhost:8080
+         Frontend → http://localhost:5173
+         CORS en el backend permite el origen del frontend.
+
+--------------------------------------------------------------------------------
+5. ESTADO ACTUAL / PENDIENTES
+--------------------------------------------------------------------------------
+
+  HECHO:
+  - Backend Spring Boot con CRUD de usuarios, jugadores, temporadas,
+    competiciones, partidos, estadísticas y eventos.
+  - Seguridad con roles (USER/ADMIN), login/registro y bootstrap de admin.
+  - Conexión a PostgreSQL en Supabase.
+  - Documentación Swagger/OpenAPI.
+  - Tests de integración de los controllers.
+  - Frontend con landing page (hero de partido, noticias, calendario),
+    tema claro/oscuro, modal de login/registro y gestión de sesión.
+
+  PENDIENTE / MEJORAS (según documentación y código):
+  - Más páginas/rutas en el frontend (jugadores, clasificación, historia...):
+    react-router-dom está instalado pero no se usan rutas todavía.
+  - Noticias dinámicas desde la API (ahora son estáticas).
+  - Páginas de jugadores con estadísticas individuales.
+  - Clasificación de liga y histórico por temporadas.
+  - Panel de administración en la web (CRUD desde la UI).
+  - Autenticación más robusta en el frontend (token real en peticiones,
+    interceptor, refresh...).
+  - Despliegue (Vercel para front, Render/Railway u otro para back).
+
+--------------------------------------------------------------------------------
+6. DOCUMENTACIÓN RELACIONADA
+--------------------------------------------------------------------------------
+
+  README.md        → Visión general del proyecto y guía de instalación (nota:
+                     menciona Angular, pero el frontend actual es React).
+  DOCUMENTACION.md → Arquitectura, modelo de datos, roles y roadmap de fases.
+  impl.md          → Descripción de páginas previstas + colección de peticiones
+                     HTTP de ejemplo (requests) para probar la API.
+
+================================================================================

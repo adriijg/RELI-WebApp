@@ -1,0 +1,57 @@
+[
+  {
+    "date": "2027-02-21T00:00:00",
+    "venue": "",
+    "home": "El Vaquilla FS",
+    "away": "Jeresa Instalaciones",
+    "homeCode": "320141",
+    "awayCode": "320142",
+    "homeGoals": null,
+    "awayGoals": null,
+    "ours": false
+  },
+  {
+    "date": "2027-02-21T00:00:00",
+    "venue": "",
+    "home": "Climahillo Futsal",
+    "away": "Real Lisiados",
+    "homeCode": "315202",
+    "awayCode": "320143",
+    "homeGoals": null,
+    "awayGoals": null,
+    "ours": true
+  },
+  {
+    "date": "2027-02-21T00:00:00",
+    "venue": "",
+    "home": "La Reina Canalla Tattoo F.S",
+    "away": "Aqui No Hay Quien Marque F.S",
+    "homeCode": "315407",
+    "awayCode": "307964",
+    "homeGoals": null,
+    "awayGoals": null,
+    "ours": false
+  },
+  {
+    "date": "2027-02-21T00:00:00",
+    "venue": "",
+    "home": "Mandriles F.S.",
+    "away": "Cubrasl F.S.",
+    "homeCode": "315315",
+    "awayCode": "315337",
+    "homeGoals": null,
+    "awayGoals": null,
+    "ours": false
+  },
+  {
+    "date": "2027-02-21T00:00:00",
+    "venue": "",
+    "home": "Fuloneta Futsal",
+    "away": "FS Erome",
+    "homeCode": "320152",
+    "awayCode": "320140",
+    "homeGoals": null,
+    "awayGoals": null,
+    "ours": false
+  }
+]

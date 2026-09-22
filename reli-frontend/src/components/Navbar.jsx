@@ -1,19 +1,27 @@
 // src/components/Navbar.jsx
-/* eslint-disable react/prop-types */
 import { useState } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import logo from '../assets/reli-badge.png';
 
-export default function Navbar({ theme, user, onToggleTheme, onOpenAuth, onLogout }) {
+export default function Navbar({ theme, user, isAdmin, onToggleTheme, onOpenAuth, onLogout }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const navLinks = ["INICIO", "JUGADORES", "COMPETICIÓN", "HISTORIA", "NOTICIAS"];
+  const navigate = useNavigate();
+  const location = useLocation();
+  const navLinks = [
+    { label: 'INICIO', path: '/' },
+    { label: 'JUGADORES', path: '/jugadores' },
+    { label: 'COMPETICIÓN', path: '/competicion' },
+    { label: 'HISTORIA', path: '/historia' },
+    { label: 'NOTICIAS', path: '/noticias' },
+  ];
 
   return (
     <nav className="sticky top-0 z-50 bg-re-rojo shadow-[0_10px_30px_rgba(226,29,44,0.4)] border-b border-white/10 py-3 px-4 md:px-6 transition-all">
       <div className="max-w-7xl mx-auto flex items-center justify-between">
-        
+
         {/* IZQUIERDA: Hamburguesa y Logo */}
         <div className="flex items-center gap-2 md:gap-4 lg:flex-1">
-          <button 
+          <button
             onClick={() => setIsMenuOpen(!isMenuOpen)}
             className="xl:hidden p-2 text-white hover:bg-white/10 rounded-lg transition-colors z-50"
             aria-label="Abrir menú"
@@ -29,43 +37,54 @@ export default function Navbar({ theme, user, onToggleTheme, onOpenAuth, onLogou
             )}
           </button>
 
-          <div className="flex items-center gap-3 group cursor-pointer transition-transform hover:scale-[1.02]">
-            <img 
-              src={logo} 
-              alt="Real Lisiados F.C." 
-              className="h-10 md:h-14 w-auto drop-shadow-[0_2px_10px_rgba(255,255,255,0.3)] transition-all group-hover:rotate-6" 
+          <Link to="/" className="flex items-center gap-3 group cursor-pointer transition-transform hover:scale-[1.02]">
+            <img
+              src={logo}
+              alt="Real Lisiados F.C."
+              className="h-10 md:h-14 w-auto drop-shadow-[0_2px_10px_rgba(255,255,255,0.3)] transition-all group-hover:rotate-6"
             />
             <div className="hidden sm:flex flex-col text-white font-sans uppercase text-left">
               <span className="text-lg md:text-xl font-black tracking-tighter leading-none">REAL LISIADOS</span>
               <span className="text-[10px] md:text-xs font-black text-white/70 leading-none tracking-widest mt-1">F.C.</span>
             </div>
-          </div>
+          </Link>
         </div>
 
         {/* CENTRO: Enlaces (Escritorio XL+) */}
         <div className="hidden xl:flex items-center gap-6 2xl:gap-8 justify-center flex-1">
-          {navLinks.map((link, index) => (
-            <a 
-              key={link} 
-              href="#" 
-              className={`font-black text-[11px] tracking-[0.2em] transition-all duration-300 relative group py-2 
-                ${index === 0 ? 'text-white' : 'text-white/70 hover:text-white'}`}
-            >
-              {link}
-              <span className={`absolute -bottom-1 left-0 h-0.5 bg-white shadow-[0_0_10px_rgba(255,255,255,0.5)] transition-all duration-300 
-                ${index === 0 ? 'w-full' : 'w-0 group-hover:w-full'}`} 
-              />
-            </a>
-          ))}
+          {navLinks.map((link) => {
+            const isActive = link.path === '/' ? location.pathname === '/' : location.pathname.startsWith(link.path);
+            return (
+              <Link
+                key={link.label}
+                to={link.path}
+                className={`font-black text-[11px] tracking-[0.2em] transition-all duration-300 relative group py-2
+                  ${isActive ? 'text-white' : 'text-white/70 hover:text-white'}`}
+              >
+                {link.label}
+                <span className={`absolute -bottom-1 left-0 h-0.5 bg-white shadow-[0_0_10px_rgba(255,255,255,0.5)] transition-all duration-300
+                  ${isActive ? 'w-full' : 'w-0 group-hover:w-full'}`}
+                />
+              </Link>
+            );
+          })}
         </div>
 
         {/* DERECHA: Acciones de Usuario */}
         <div className="flex items-center gap-2 md:gap-4 lg:flex-1 justify-end">
-          
+
           <div className="hidden xl:flex items-center">
             {user ? (
-                <div className="flex items-center gap-4 bg-black/10 rounded-full px-4 py-1.5 border border-white/5 shadow-inner">
+                <div className="flex items-center gap-3 bg-black/10 rounded-full px-4 py-1.5 border border-white/5 shadow-inner">
                     <span className="text-[11px] font-black text-white uppercase tracking-tighter">{user.username || user.email}</span>
+                    {isAdmin && (
+                      <button
+                        onClick={() => navigate('/admin')}
+                        className="bg-re-dorado text-re-azul-oscuro font-black text-[10px] tracking-widest px-3 py-1.5 rounded-lg hover:scale-105 transition-transform uppercase"
+                      >
+                        Panel Admin
+                      </button>
+                    )}
                     <button onClick={onLogout} className="bg-white/10 hover:bg-white/20 text-white font-bold text-[10px] tracking-widest px-3 py-1.5 rounded-lg border border-white/10">CERRAR SESIÓN</button>
                 </div>
             ) : (
@@ -76,7 +95,7 @@ export default function Navbar({ theme, user, onToggleTheme, onOpenAuth, onLogou
             )}
           </div>
 
-          <button 
+          <button
             onClick={onToggleTheme}
             className="p-2 rounded-full hover:bg-white/10 transition-colors border border-white/20"
             aria-label="Cambiar tema"
@@ -87,7 +106,7 @@ export default function Navbar({ theme, user, onToggleTheme, onOpenAuth, onLogou
               </svg>
             ) : (
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 9H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 9H3m15.364 6.364l-.707.707M6.343 6.343l-.707.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
               </svg>
             )}
           </button>
@@ -95,16 +114,27 @@ export default function Navbar({ theme, user, onToggleTheme, onOpenAuth, onLogou
 
         {/* MENÚ MÓVIL (Overlay) */}
         {isMenuOpen && (
-          <div className="fixed top-[64px] md:top-[80px] left-0 w-full bg-re-rojo border-t border-white/10 xl:hidden py-10 px-6 shadow-2xl flex flex-col gap-6 items-center slide-down h-screen z-40 bg-gradient-to-b from-re-rojo to-black/90">
-             {navLinks.map((link) => (
-                <a key={link} href="#" onClick={() => setIsMenuOpen(false)} className="text-3xl font-black italic tracking-tighter text-white hover:text-white/70 transition-colors uppercase">{link}</a>
-             ))}
-             
+          <div className="fixed top-[64px] md:top-[80px] left-0 w-full bg-re-rojo border-t border-white/10 xl:hidden py-10 px-6 shadow-2xl flex flex-col gap-6 items-center slide-down h-screen z-40 bg-gradient-to-b from-re-rojo to-black/90 overflow-y-auto">
+            {navLinks.map((link) => {
+              const isActive = link.path === '/' ? location.pathname === '/' : location.pathname.startsWith(link.path);
+              return (
+                <Link key={link.label} to={link.path} onClick={() => setIsMenuOpen(false)} className={`text-3xl font-black italic tracking-tighter transition-colors uppercase ${isActive ? 'text-white' : 'text-white/60 hover:text-white'}`}>{link.label}</Link>
+              );
+            })}
+
              <hr className="w-full border-white/10 my-4" />
-             
+
              {user ? (
-                 <div className="flex flex-col items-center gap-4">
+                 <div className="flex flex-col items-center gap-4 w-full max-w-sm">
                     <p className="text-white/60 font-bold uppercase tracking-widest text-xs">Hola, {user.username}</p>
+                    {isAdmin && (
+                      <button
+                        onClick={() => { setIsMenuOpen(false); navigate('/admin'); }}
+                        className="w-full bg-re-dorado text-re-azul-oscuro font-black py-4 rounded-2xl tracking-widest text-sm uppercase"
+                      >
+                        Panel Admin
+                      </button>
+                    )}
                     <button onClick={() => { onLogout(); setIsMenuOpen(false); }} className="w-full bg-white text-re-rojo font-black py-4 px-12 rounded-2xl tracking-widest text-sm uppercase">CERRAR SESIÓN</button>
                  </div>
              ) : (

@@ -1,6 +1,7 @@
 package es.adri.demo.service;
 
 import es.adri.demo.dto.AuthResponseDTO;
+import es.adri.demo.config.JwtService;
 import es.adri.demo.dto.LoginRequestDTO;
 import es.adri.demo.dto.UserDTO;
 import es.adri.demo.dto.UserRegistrationDTO;
@@ -24,10 +25,12 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final JwtService jwtService;
 
-    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder, JwtService jwtService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.jwtService = jwtService;
     }
 
     public UserDTO saveUser(UserRegistrationDTO userRegistrationDTO) {
@@ -59,7 +62,8 @@ public class UserService {
             throw new ResponseStatusException(UNAUTHORIZED, "Credenciales invalidas");
         }
 
-        return new AuthResponseDTO("Login correcto", toDto(user));
+        String token = jwtService.generateToken(user.getUsername(), user.getRole().name());
+        return new AuthResponseDTO("Login correcto", token, toDto(user));
     }
 
     public UserDTO findUserById(Long id) {

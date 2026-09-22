@@ -1,0 +1,57 @@
+[
+  {
+    "date": "2027-04-04T00:00:00",
+    "venue": "",
+    "home": "Aqui No Hay Quien Marque F.S",
+    "away": "Real Lisiados",
+    "homeCode": "307964",
+    "awayCode": "320143",
+    "homeGoals": null,
+    "awayGoals": null,
+    "ours": true
+  },
+  {
+    "date": "2027-04-04T00:00:00",
+    "venue": "",
+    "home": "Cubrasl F.S.",
+    "away": "Jeresa Instalaciones",
+    "homeCode": "315337",
+    "awayCode": "320142",
+    "homeGoals": null,
+    "awayGoals": null,
+    "ours": false
+  },
+  {
+    "date": "2027-04-04T00:00:00",
+    "venue": "",
+    "home": "FS Erome",
+    "away": "Fuera de Juego",
+    "homeCode": "320140",
+    "awayCode": "308788",
+    "homeGoals": null,
+    "awayGoals": null,
+    "ours": false
+  },
+  {
+    "date": "2027-04-04T00:00:00",
+    "venue": "",
+    "home": "Fuloneta Futsal",
+    "away": "El Vaquilla FS",
+    "homeCode": "320152",
+    "awayCode": "320141",
+    "homeGoals": null,
+    "awayGoals": null,
+    "ours": false
+  },
+  {
+    "date": "2027-04-04T00:00:00",
+    "venue": "",
+    "home": "Mandriles F.S.",
+    "away": "Climahillo Futsal",
+    "homeCode": "315315",
+    "awayCode": "315202",
+    "homeGoals": null,
+    "awayGoals": null,
+    "ours": false
+  }
+]

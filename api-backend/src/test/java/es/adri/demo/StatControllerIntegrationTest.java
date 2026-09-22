@@ -2,6 +2,7 @@ package es.adri.demo;
 
 import es.adri.demo.dto.StatRequestDTO;
 import es.adri.demo.model.Competition;
+import es.adri.demo.model.CompetitionType;
 import es.adri.demo.model.Match;
 import es.adri.demo.model.MatchStatus;
 import es.adri.demo.model.Player;
@@ -195,8 +196,8 @@ class StatControllerIntegrationTest {
 
     private Match createMatch(String rival) {
         Season season = seasonRepository.save(new Season(null, "2025/2026", true));
-        Competition competition = competitionRepository.save(new Competition(null, "Liga", season));
-        return matchRepository.save(new Match(null, rival, LocalDateTime.now().plusDays(1), "Madrid", MatchStatus.SCHEDULED, 0, 0, competition));
+        Competition competition = competitionRepository.save(new Competition(null, "Liga", CompetitionType.LIGA, season, null, null, null, null));
+        return matchRepository.save(new Match(null, rival, true, LocalDateTime.now().plusDays(1), "Madrid", MatchStatus.SCHEDULED, 0, 0, null, competition));
     }
 
     private User createUser(String username, String email, String rawPassword, Role role) {

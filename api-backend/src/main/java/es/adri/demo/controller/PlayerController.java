@@ -3,8 +3,10 @@ package es.adri.demo.controller;
 import es.adri.demo.dto.PagedResponseDTO;
 import es.adri.demo.dto.PlayerDTO;
 import es.adri.demo.dto.PlayerRequestDTO;
+import es.adri.demo.dto.PlayerSeasonStatsDTO;
 import es.adri.demo.service.PlayerService;
 import jakarta.validation.Valid;
+import java.util.List;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -18,6 +20,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -28,6 +31,17 @@ public class PlayerController {
 
     public PlayerController(PlayerService playerService) {
         this.playerService = playerService;
+    }
+
+    @GetMapping("/all")
+    public ResponseEntity<List<PlayerDTO>> getAllActivePlayers() {
+        return ResponseEntity.ok(playerService.findAllActive());
+    }
+
+    @GetMapping("/season-stats")
+    public ResponseEntity<List<PlayerSeasonStatsDTO>> getSeasonStats(
+            @RequestParam(required = false) Long seasonId) {
+        return ResponseEntity.ok(playerService.findSeasonStats(seasonId));
     }
 
     @GetMapping

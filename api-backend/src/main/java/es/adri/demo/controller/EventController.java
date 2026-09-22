@@ -3,6 +3,7 @@ package es.adri.demo.controller;
 import es.adri.demo.dto.PagedResponseDTO;
 import es.adri.demo.dto.EventCreateDTO;
 import es.adri.demo.dto.EventDTO;
+import es.adri.demo.dto.EventUpdateDTO;
 import es.adri.demo.service.EventService;
 import jakarta.validation.Valid;
 import java.security.Principal;
@@ -12,10 +13,14 @@ import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -37,12 +42,34 @@ public class EventController {
 
     @GetMapping
     public ResponseEntity<PagedResponseDTO<EventDTO>> getAllEvents(
-            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "0") int page,
-            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "10") int size,
-            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "date") String sortBy,
-            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "desc") String direction
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "date") String sortBy,
+            @RequestParam(defaultValue = "desc") String direction
     ) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.fromString(direction), sortBy));
         return ResponseEntity.ok(eventService.findAllEvents(pageable));
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<EventDTO> getEventById(@PathVariable Long id) {
+        return ResponseEntity.ok(eventService.findEventById(id));
+    }
+
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<EventDTO> updateEvent(
+            @PathVariable Long id,
+            @Valid @RequestBody EventUpdateDTO eventUpdateDTO,
+            Principal principal
+    ) {
+        return ResponseEntity.ok(eventService.updateEvent(id, eventUpdateDTO, principal.getName()));
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> deleteEvent(@PathVariable Long id) {
+        eventService.deleteEvent(id);
+        return ResponseEntity.noContent().build();
     }
 }

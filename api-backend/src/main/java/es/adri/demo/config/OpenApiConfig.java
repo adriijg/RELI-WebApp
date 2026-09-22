@@ -18,12 +18,18 @@ import org.springframework.context.annotation.Configuration;
                 contact = @Contact(name = "RELI WebApp"),
                 license = @License(name = "Apache 2.0")
         ),
-        security = @SecurityRequirement(name = "basicAuth")
+        security = {@SecurityRequirement(name = "basicAuth"), @SecurityRequirement(name = "bearerAuth")}
 )
 @SecurityScheme(
         name = "basicAuth",
         type = SecuritySchemeType.HTTP,
         scheme = "basic"
+)
+@SecurityScheme(
+        name = "bearerAuth",
+        type = SecuritySchemeType.HTTP,
+        scheme = "bearer",
+        bearerFormat = "JWT"
 )
 public class OpenApiConfig {
 }

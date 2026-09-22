@@ -13,11 +13,13 @@ public class MatchDTO {
 
     private Long id;
     private String rival;
+    private boolean home;
     private LocalDateTime date;
     private String location;
     private MatchStatus status;
     private Integer ourGoals;
     private Integer rivalGoals;
+    private Integer jornada;
     private Long competitionId;
     private String competitionName;
 }

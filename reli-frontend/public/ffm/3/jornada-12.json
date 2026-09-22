@@ -1,0 +1,68 @@
+[
+  {
+    "date": "2026-01-18T17:10:00",
+    "venue": "GINER DE LOS RIOS - PISTA",
+    "home": "Caudillos FC",
+    "away": "Magreb United",
+    "homeCode": "320157",
+    "awayCode": "307937",
+    "homeGoals": 1,
+    "awayGoals": 2,
+    "ours": false
+  },
+  {
+    "date": "2026-01-18T17:10:00",
+    "venue": "PABELLON J. BESTEIRO - PISTA",
+    "home": "Jagger de Munich",
+    "away": "Guetto FS",
+    "homeCode": "320139",
+    "awayCode": "320158",
+    "homeGoals": 3,
+    "awayGoals": 2,
+    "ours": false
+  },
+  {
+    "date": "2026-01-18T17:10:00",
+    "venue": "PABELLON CANTUEÑA - PISTA",
+    "home": "New Team F.S.",
+    "away": "Union Casta FC",
+    "homeCode": "307967",
+    "awayCode": "320144",
+    "homeGoals": 13,
+    "awayGoals": 1,
+    "ours": false
+  },
+  {
+    "date": "2026-01-18T18:20:00",
+    "venue": "PABELLON NIDO - PISTA",
+    "home": "FS Erome",
+    "away": "Jeresa Instalaciones",
+    "homeCode": "320140",
+    "awayCode": "320142",
+    "homeGoals": 5,
+    "awayGoals": 3,
+    "ours": false
+  },
+  {
+    "date": "2026-01-18T18:20:00",
+    "venue": "GINER DE LOS RIOS - PISTA",
+    "home": "Inter de Parla",
+    "away": "Internacional FC",
+    "homeCode": "308256",
+    "awayCode": "320145",
+    "homeGoals": 4,
+    "awayGoals": 13,
+    "ours": false
+  },
+  {
+    "date": "2026-01-18T18:20:00",
+    "venue": "PABELLON J. BESTEIRO - PISTA",
+    "home": "Real Lisiados",
+    "away": "El Vaquilla FS",
+    "homeCode": "320143",
+    "awayCode": "320141",
+    "homeGoals": 4,
+    "awayGoals": 2,
+    "ours": true
+  }
+]

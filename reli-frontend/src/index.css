@@ -12,26 +12,32 @@
   --color-foreground: var(--foreground);
   --color-card-bg: var(--card-bg);
   --color-card-border: var(--card-border);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
   --shadow-card: var(--card-shadow);
 }
 
 @layer base {
   :root {
+    color-scheme: light;
     --background: #F8FAFC;
     --foreground: #020617;
     --card-bg: #FFFFFF;
     --card-border: rgba(0, 0, 0, 0.08);
     --card-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
     --muted: #64748B;
+    --muted-foreground: #64748B;
   }
 
   .dark {
+    color-scheme: dark;
     --background: #020617;
     --foreground: #F8FAFC;
     --card-bg: #0F172A;
     --card-border: rgba(255, 255, 255, 0.08);
     --card-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
     --muted: #94A3B8;
+    --muted-foreground: #94A3B8;
   }
 
   body {
@@ -44,6 +50,22 @@
   section, .card-re {
     @apply transition-all duration-300;
   }
+
+  /* Menús desplegables nativos (select, date pickers) coherentes con el tema */
+  select {
+    color: var(--foreground);
+    background-color: var(--card-bg);
+  }
+
+  select option {
+    background-color: var(--card-bg);
+    color: var(--foreground);
+  }
+
+  select option:checked {
+    background-color: var(--muted);
+    color: var(--foreground);
+  }
 }
 
 /* Utilitarios de Diseño para mayor PROFUNDIDAD */
@@ -55,4 +77,30 @@
 
 .text-gradient-re {
   @apply bg-clip-text text-transparent bg-gradient-to-r from-re-rojo to-re-dorado;
+}
+
+/* Nombre de equipo largo: se desplaza de lado a lado para poder leerlo entero */
+.team-name-cell {
+  container-type: inline-size;
+}
+
+.team-name-ticker {
+  display: inline-block;
+  white-space: nowrap;
+  animation: team-name-sway 5s ease-in-out infinite alternate;
+}
+
+@keyframes team-name-sway {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(min(0px, calc(-100% + 100cqw)));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .team-name-ticker {
+    animation: none;
+  }
 }

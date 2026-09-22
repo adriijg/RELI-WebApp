@@ -2,6 +2,7 @@ package es.adri.demo;
 
 import es.adri.demo.dto.MatchRequestDTO;
 import es.adri.demo.model.Competition;
+import es.adri.demo.model.CompetitionType;
 import es.adri.demo.model.Match;
 import es.adri.demo.model.MatchStatus;
 import es.adri.demo.model.Role;
@@ -88,7 +89,7 @@ class MatchControllerIntegrationTest {
     @Test
     void getMatchesIsPublic() throws Exception {
         Competition competition = createCompetition("Liga");
-        matchRepository.save(new Match(null, "Rival FC", LocalDateTime.now().plusDays(1), "Madrid", MatchStatus.SCHEDULED, 0, 0, competition));
+        matchRepository.save(new Match(null, "Rival FC", true, LocalDateTime.now().plusDays(1), "Madrid", MatchStatus.SCHEDULED, 0, 0, null, competition));
 
         mockMvc.perform(get("/api/matches"))
                 .andExpect(status().isOk())
@@ -102,11 +103,13 @@ class MatchControllerIntegrationTest {
         Competition competition = createCompetition("Liga");
         MatchRequestDTO request = new MatchRequestDTO(
                 "Rival FC",
+                true,
                 LocalDateTime.now().plusDays(1),
                 "Madrid",
                 MatchStatus.SCHEDULED,
                 0,
                 0,
+                null,
                 competition.getId()
         );
 
@@ -125,11 +128,13 @@ class MatchControllerIntegrationTest {
         Competition competition = createCompetition("Liga");
         MatchRequestDTO request = new MatchRequestDTO(
                 "Rival FC",
+                true,
                 LocalDateTime.now().plusDays(1),
                 "Madrid",
                 MatchStatus.SCHEDULED,
                 0,
                 0,
+                null,
                 competition.getId()
         );
 
@@ -145,14 +150,16 @@ class MatchControllerIntegrationTest {
         User admin = createUser("admin", "admin@example.com", "Password123", Role.ROLE_ADMIN);
         Competition competition = createCompetition("Liga");
         Competition otherCompetition = createCompetition("Copa");
-        Match match = matchRepository.save(new Match(null, "Rival FC", LocalDateTime.now().plusDays(1), "Madrid", MatchStatus.SCHEDULED, 0, 0, competition));
+        Match match = matchRepository.save(new Match(null, "Rival FC", true, LocalDateTime.now().plusDays(1), "Madrid", MatchStatus.SCHEDULED, 0, 0, null, competition));
         MatchRequestDTO request = new MatchRequestDTO(
                 "Otro Rival",
+                false,
                 LocalDateTime.now().plusDays(2),
                 "Barcelona",
                 MatchStatus.FINISHED,
                 2,
                 1,
+                null,
                 otherCompetition.getId()
         );
 
@@ -170,7 +177,7 @@ class MatchControllerIntegrationTest {
     void deleteMatchAsAdminReturnsNoContent() throws Exception {
         User admin = createUser("admin", "admin@example.com", "Password123", Role.ROLE_ADMIN);
         Competition competition = createCompetition("Liga");
-        Match match = matchRepository.save(new Match(null, "Rival FC", LocalDateTime.now().plusDays(1), "Madrid", MatchStatus.SCHEDULED, 0, 0, competition));
+        Match match = matchRepository.save(new Match(null, "Rival FC", true, LocalDateTime.now().plusDays(1), "Madrid", MatchStatus.SCHEDULED, 0, 0, null, competition));
 
         mockMvc.perform(delete("/api/matches/{id}", match.getId())
                         .header("Authorization", basicAuth(admin.getUsername(), "Password123")))
@@ -182,11 +189,13 @@ class MatchControllerIntegrationTest {
         User admin = createUser("admin", "admin@example.com", "Password123", Role.ROLE_ADMIN);
         MatchRequestDTO request = new MatchRequestDTO(
                 "Rival FC",
+                true,
                 LocalDateTime.now().plusDays(1),
                 "Madrid",
                 MatchStatus.SCHEDULED,
                 0,
                 0,
+                null,
                 9999L
         );
 
@@ -200,7 +209,7 @@ class MatchControllerIntegrationTest {
 
     private Competition createCompetition(String name) {
         Season season = seasonRepository.save(new Season(null, "2025/2026", true));
-        return competitionRepository.save(new Competition(null, name, season));
+        return competitionRepository.save(new Competition(null, name, CompetitionType.LIGA, season, null, null, null, null));
     }
 
     private User createUser(String username, String email, String rawPassword, Role role) {

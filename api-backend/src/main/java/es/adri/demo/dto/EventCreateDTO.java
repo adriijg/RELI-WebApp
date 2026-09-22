@@ -1,7 +1,6 @@
 package es.adri.demo.dto;
 
 import es.adri.demo.model.EventType;
-import jakarta.validation.constraints.Future;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.time.LocalDateTime;
@@ -21,10 +20,8 @@ public class EventCreateDTO {
     private String description;
 
     @NotNull(message = "La fecha es obligatoria")
-    @Future(message = "La fecha del evento debe estar en el futuro")
     private LocalDateTime date;
 
-    @NotBlank(message = "La ubicacion es obligatoria")
     private String location;
 
     @URL(message = "La URL de la imagen no es valida")

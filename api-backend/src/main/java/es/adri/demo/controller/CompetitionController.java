@@ -3,6 +3,8 @@ package es.adri.demo.controller;
 import es.adri.demo.dto.PagedResponseDTO;
 import es.adri.demo.dto.CompetitionDTO;
 import es.adri.demo.dto.CompetitionRequestDTO;
+import es.adri.demo.dto.StandingDTO;
+import java.util.List;
 import es.adri.demo.service.CompetitionService;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.PageRequest;
@@ -44,6 +46,13 @@ public class CompetitionController {
     @GetMapping("/{id}")
     public ResponseEntity<CompetitionDTO> getCompetitionById(@PathVariable Long id) {
         return ResponseEntity.ok(competitionService.findCompetitionById(id));
+    }
+
+    @GetMapping("/{id}/standings")
+    public ResponseEntity<List<StandingDTO>> getStandings(
+            @PathVariable Long id,
+            @org.springframework.web.bind.annotation.RequestParam(required = false) Integer jornada) {
+        return ResponseEntity.ok(competitionService.getStandings(id, jornada));
     }
 
     @PostMapping

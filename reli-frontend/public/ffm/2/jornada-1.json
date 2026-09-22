@@ -1,0 +1,57 @@
+[
+  {
+    "date": "2026-09-27T13:30:00",
+    "venue": "PABELLON CANTUEÑA - PISTA",
+    "home": "La Reina Canalla Tattoo F.S",
+    "away": "Climahillo Futsal",
+    "homeCode": "315407",
+    "awayCode": "315202",
+    "homeGoals": null,
+    "awayGoals": null,
+    "ours": false
+  },
+  {
+    "date": "2026-09-27T13:30:00",
+    "venue": "GINER DE LOS RIOS - PISTA",
+    "home": "Mandriles F.S.",
+    "away": "El Vaquilla FS",
+    "homeCode": "315315",
+    "awayCode": "320141",
+    "homeGoals": null,
+    "awayGoals": null,
+    "ours": false
+  },
+  {
+    "date": "2026-09-27T16:00:00",
+    "venue": "PABELLON NIDO - PISTA",
+    "home": "Fuloneta Futsal",
+    "away": "Fuera de Juego",
+    "homeCode": "320152",
+    "awayCode": "308788",
+    "homeGoals": null,
+    "awayGoals": null,
+    "ours": false
+  },
+  {
+    "date": "2026-09-27T16:00:00",
+    "venue": "PABELLON CANTUEÑA - PISTA",
+    "home": "FS Erome",
+    "away": "Jeresa Instalaciones",
+    "homeCode": "320140",
+    "awayCode": "320142",
+    "homeGoals": null,
+    "awayGoals": null,
+    "ours": false
+  },
+  {
+    "date": "2026-09-27T17:10:00",
+    "venue": "PABELLON NIDO - PISTA",
+    "home": "Cubrasl F.S.",
+    "away": "Real Lisiados",
+    "homeCode": "315337",
+    "awayCode": "320143",
+    "homeGoals": null,
+    "awayGoals": null,
+    "ours": true
+  }
+]

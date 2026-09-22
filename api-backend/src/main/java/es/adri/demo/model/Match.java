@@ -29,7 +29,10 @@ public class Match extends BaseEntity {
     @Column(nullable = false)
     private String rival;
 
+    // true = local (aparecemos primero), false = visitante (el rival aparece primero)
     @Column(nullable = false)
+    private boolean home = true;
+
     private LocalDateTime date;
 
     private String location;
@@ -40,6 +43,8 @@ public class Match extends BaseEntity {
 
     private Integer ourGoals = 0;
     private Integer rivalGoals = 0;
+
+    private Integer jornada;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "competition_id", nullable = false)

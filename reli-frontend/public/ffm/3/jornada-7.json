@@ -1,0 +1,68 @@
+[
+  {
+    "date": "2025-11-23T18:20:00",
+    "venue": "PABELLON CANTUEÑA - PISTA",
+    "home": "Inter de Parla",
+    "away": "Jagger de Munich",
+    "homeCode": "308256",
+    "awayCode": "320139",
+    "homeGoals": 4,
+    "awayGoals": 4,
+    "ours": false
+  },
+  {
+    "date": "2025-11-23T18:20:00",
+    "venue": "GINER DE LOS RIOS - PISTA",
+    "home": "Jeresa Instalaciones",
+    "away": "Guetto FS",
+    "homeCode": "320142",
+    "awayCode": "320158",
+    "homeGoals": 4,
+    "awayGoals": 5,
+    "ours": false
+  },
+  {
+    "date": "2025-11-23T19:30:00",
+    "venue": "PABELLON CASTILLEJO - PISTA",
+    "home": "FS Erome",
+    "away": "Real Lisiados",
+    "homeCode": "320140",
+    "awayCode": "320143",
+    "homeGoals": 6,
+    "awayGoals": 4,
+    "ours": true
+  },
+  {
+    "date": "2025-11-23T19:30:00",
+    "venue": "PABELLON NIDO - PISTA",
+    "home": "Caudillos FC",
+    "away": "New Team F.S.",
+    "homeCode": "320157",
+    "awayCode": "307967",
+    "homeGoals": 4,
+    "awayGoals": 5,
+    "ours": false
+  },
+  {
+    "date": "2025-11-23T19:30:00",
+    "venue": "PABELLON CANTUEÑA - PISTA",
+    "home": "Magreb United",
+    "away": "El Vaquilla FS",
+    "homeCode": "307937",
+    "awayCode": "320141",
+    "homeGoals": 5,
+    "awayGoals": 2,
+    "ours": false
+  },
+  {
+    "date": "2025-11-23T19:30:00",
+    "venue": "GINER DE LOS RIOS - PISTA",
+    "home": "Union Casta FC",
+    "away": "Internacional FC",
+    "homeCode": "320144",
+    "awayCode": "320145",
+    "homeGoals": 4,
+    "awayGoals": 12,
+    "ours": false
+  }
+]
