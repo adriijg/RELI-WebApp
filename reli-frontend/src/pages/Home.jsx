@@ -4,7 +4,7 @@ import MatchesCarousel from '../components/MatchesCarousel';
 
 export default function Home() {
   return (
-    <main className="max-w-7xl mx-auto p-6 space-y-20">
+    <main className="max-w-7xl mx-auto p-6 space-y-10 lg:space-y-14">
       <HeroMatch />
       <NewsSection />
       <MatchesCarousel />

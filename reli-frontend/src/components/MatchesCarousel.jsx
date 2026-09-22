@@ -1,5 +1,5 @@
 // src/components/MatchesCarousel.jsx
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import logo from '../assets/reli-badge.png';
 import { STATUS_LABELS } from '../constants/matchStatus';
@@ -29,6 +29,11 @@ export default function MatchesCarousel() {
   const [loading, setLoading] = useState(true);
   const [slide, setSlide] = useState(0);
   const [visible, setVisible] = useState(3);
+  const [dragOffset, setDragOffset] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const carouselRef = useRef(null);
+  const dragStartX = useRef(0);
+  const suppressClick = useRef(false);
 
   useEffect(() => {
     const mq = window.matchMedia('(min-width: 768px)');
@@ -70,11 +75,45 @@ export default function MatchesCarousel() {
 
   const slideWidth = `calc((100% - ${(visible - 1) * GAP}px) / ${visible})`;
 
+  const handlePointerDown = (event) => {
+    if (event.pointerType === 'mouse') return;
+    dragStartX.current = event.clientX;
+    suppressClick.current = false;
+    setIsDragging(true);
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const handlePointerMove = (event) => {
+    if (!isDragging) return;
+    const offset = event.clientX - dragStartX.current;
+    if (Math.abs(offset) > 5) suppressClick.current = true;
+    setDragOffset(offset);
+  };
+
+  const handlePointerUp = (event) => {
+    if (!isDragging) return;
+    const offset = event.clientX - dragStartX.current;
+    const cardWidth = (carouselRef.current?.clientWidth || 320) / visible;
+    const cardDistance = cardWidth + GAP;
+    const threshold = Math.max(40, cardWidth * 0.2);
+    const draggedCards = Math.max(1, Math.round(Math.abs(offset) / cardDistance));
+    const nextSlide = offset < -threshold
+      ? Math.min(maxSlide, index + draggedCards)
+      : offset > threshold
+        ? Math.max(0, index - draggedCards)
+        : index;
+
+    setSlide(nextSlide);
+    setDragOffset(0);
+    setIsDragging(false);
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+  };
+
   return (
     <section className="py-12 px-6 lg:px-8 bg-card-bg rounded-[32px] border border-card-border shadow-card transition-all">
       <div className="flex flex-col sm:flex-row justify-between items-center mb-10 gap-4">
         <h2 className="text-3xl lg:text-4xl font-black italic tracking-tighter uppercase leading-none">Próximos Partidos</h2>
-        <div className="flex gap-2">
+      <div className="hidden sm:flex gap-2">
           <button
             type="button"
             onClick={() => setSlide(Math.max(0, index - 1))}
@@ -101,12 +140,19 @@ export default function MatchesCarousel() {
           No hay partidos programados en el horizonte.
         </div>
       ) : (
-        <div className="overflow-hidden p-4 -m-4">
+        <div
+          ref={carouselRef}
+          className="overflow-hidden p-4 -m-4 touch-pan-y select-none"
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerUp}
+        >
           <div
-            className="flex transition-transform duration-500 ease-in-out motion-reduce:transition-none"
+            className={`flex ${isDragging ? '' : 'transition-transform duration-500 ease-in-out motion-reduce:transition-none'}`}
             style={{
               gap: `${GAP}px`,
-              transform: `translateX(calc(-${index} * (${slideWidth} + ${GAP}px)))`,
+              transform: `translateX(calc(-${index} * (${slideWidth} + ${GAP}px) + ${dragOffset}px))`,
             }}
           >
             {upcoming.map((match) => {
@@ -122,7 +168,9 @@ export default function MatchesCarousel() {
               return (
               <div key={match.id} style={{ flex: `0 0 ${slideWidth}` }}>
                 <div
-                  onClick={() => navigate(`/partidos/${match.id}`)}
+                  onClick={() => {
+                    if (!suppressClick.current) navigate(`/partidos/${match.id}`);
+                  }}
                   onKeyDown={(e) => { if (e.key === 'Enter') navigate(`/partidos/${match.id}`); }}
                   role="button"
                   tabIndex={0}
@@ -183,6 +231,27 @@ export default function MatchesCarousel() {
           </div>
         </div>
       )}
+
+      <div className="flex sm:hidden justify-center gap-2 mt-4">
+        <button
+          type="button"
+          onClick={() => setSlide(Math.max(0, index - 1))}
+          disabled={atStart}
+          aria-label="Mover carrusel a la izquierda"
+          className={`${arrowClass} p-2 text-sm`}
+        >
+          ←
+        </button>
+        <button
+          type="button"
+          onClick={() => setSlide(Math.min(maxSlide, index + 1))}
+          disabled={atEnd}
+          aria-label="Mover carrusel a la derecha"
+          className={`${arrowClass} p-2 text-sm`}
+        >
+          →
+        </button>
+      </div>
     </section>
   );
 }

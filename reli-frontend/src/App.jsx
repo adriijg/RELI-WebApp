@@ -13,6 +13,7 @@ import NewsPage from './pages/NewsPage';
 import CompetitionPage from './pages/CompetitionPage';
 import HistoryPage from './pages/HistoryPage';
 import PlayersPage from './pages/PlayersPage';
+import CalendarPage from './pages/CalendarPage';
 import Dashboard from './pages/admin/Dashboard';
 import MatchesAdmin from './pages/admin/MatchesAdmin';
 import NewsAdmin from './pages/admin/NewsAdmin';
@@ -101,6 +102,14 @@ export default function App() {
           element={
             <PublicLayout>
               <PlayersPage />
+            </PublicLayout>
+          }
+        />
+        <Route
+          path="/calendario"
+          element={
+            <PublicLayout>
+              <CalendarPage />
             </PublicLayout>
           }
         />

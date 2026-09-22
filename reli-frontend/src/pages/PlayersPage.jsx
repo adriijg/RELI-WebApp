@@ -238,21 +238,6 @@ export default function PlayersPage() {
         <h1 className="text-4xl lg:text-5xl font-black italic tracking-tighter uppercase bg-clip-text text-transparent bg-gradient-to-r from-re-rojo to-re-dorado">
           Plantilla
         </h1>
-        <div className="flex flex-col items-center gap-2">
-          <label htmlFor="players-season" className="text-[10px] font-black uppercase tracking-widest text-foreground/40">
-            Temporada
-          </label>
-          <select
-            id="players-season"
-            value={selectedSeasonId}
-            onChange={(e) => setSelectedSeasonId(e.target.value)}
-            className="bg-card-bg border border-card-border rounded-lg px-3 py-2 text-xs font-black uppercase tracking-widest text-foreground focus:outline-none focus:ring-2 focus:ring-re-rojo/40 cursor-pointer"
-          >
-            {seasons.map((season) => (
-              <option key={season.id} value={season.id}>{season.name}</option>
-            ))}
-          </select>
-        </div>
         <div className="flex items-center justify-center gap-4 sm:gap-8 pt-2">
           <div className="text-center">
             <span className="text-2xl sm:text-3xl font-black text-re-rojo">{totalGoals}</span>
@@ -271,7 +256,7 @@ export default function PlayersPage() {
         </div>
       </header>
 
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-6">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-6">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-foreground/40">
           <span><span className="text-sky-500">PJ</span> Partidos</span>
           <span><span className="text-re-rojo">Goles</span> Goles</span>
@@ -280,17 +265,32 @@ export default function PlayersPage() {
           <span><span className="text-re-rojo">TR</span> Rojas</span>
           <span><span className="text-emerald-400">P0</span> Porterías 0</span>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <span className="text-[10px] font-black uppercase tracking-widest text-foreground/40">Ordenar:</span>
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
-            className="bg-card-bg border border-card-border rounded-lg px-3 py-1.5 text-[11px] font-black uppercase tracking-widest text-foreground focus:outline-none focus:ring-2 focus:ring-re-rojo/40 cursor-pointer"
-          >
-            {SORT_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
-          </select>
+        <div className="flex flex-wrap items-center gap-3 shrink-0">
+          <label htmlFor="players-season" className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-foreground/40">
+            Temporada:
+            <select
+              id="players-season"
+              value={selectedSeasonId}
+              onChange={(e) => setSelectedSeasonId(e.target.value)}
+              className="bg-card-bg border border-card-border rounded-lg px-3 py-1.5 text-[11px] font-black uppercase tracking-widest text-foreground focus:outline-none focus:ring-2 focus:ring-re-rojo/40 cursor-pointer"
+            >
+              {seasons.map((season) => (
+                <option key={season.id} value={season.id}>{season.name}</option>
+              ))}
+            </select>
+          </label>
+          <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-foreground/40">
+            Ordenar:
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="bg-card-bg border border-card-border rounded-lg px-3 py-1.5 text-[11px] font-black uppercase tracking-widest text-foreground focus:outline-none focus:ring-2 focus:ring-re-rojo/40 cursor-pointer"
+            >
+              {SORT_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </label>
         </div>
       </div>
 

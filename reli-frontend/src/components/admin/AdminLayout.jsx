@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { NavLink, Outlet, Link } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import logo from '../../assets/reli-badge.png';
+import ThemeToggle from '../ThemeToggle';
 
 const NAV_ITEMS = [
   { to: '/admin', label: 'Dashboard', icon: 'grid', end: true },
@@ -134,13 +135,11 @@ export default function AdminLayout() {
             </div>
 
             <div className="flex items-center gap-3">
-              <button
-                onClick={toggleTheme}
-                className="p-2 rounded-full hover:bg-muted/10 transition-colors border border-card-border"
-                aria-label="Cambiar tema"
-              >
-                {theme === 'light' ? '🌙' : '☀️'}
-              </button>
+              <ThemeToggle
+                theme={theme}
+                onToggle={toggleTheme}
+                className="text-foreground border-card-border hover:bg-muted/10"
+              />
               <div className="flex items-center gap-2 bg-re-rojo/10 border border-re-rojo/20 rounded-full pl-1.5 pr-4 py-1.5">
                 <span className="w-7 h-7 rounded-full bg-re-rojo text-white font-black text-xs flex items-center justify-center">
                   {(user?.username || 'A').charAt(0).toUpperCase()}

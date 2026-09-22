@@ -81,13 +81,13 @@ export default function HeroMatch() {
       ></div>
       <div className="absolute inset-0 bg-gradient-to-b from-card-bg via-card-bg/80 to-transparent"></div>
 
-      <div className="relative h-full max-w-6xl mx-auto flex flex-col items-center justify-center px-4 py-8 lg:px-6 lg:py-12 text-foreground">
+      <div className="relative h-full max-w-6xl mx-auto flex flex-col items-center justify-center px-4 py-6 lg:px-6 lg:py-12 text-foreground">
 
-        <div className="flex flex-col lg:flex-row items-center justify-between w-full gap-6 lg:gap-12">
+        <div className="grid grid-cols-[1fr_auto_1fr] items-start w-full gap-x-2 gap-y-5 lg:flex lg:flex-nowrap lg:items-center lg:justify-between lg:gap-12">
 
           {/* Equipo Local (izquierda) */}
-          <div className="flex flex-col items-center group flex-1">
-            <div className="bg-muted/5 rounded-[32px] border border-card-border mb-3 lg:mb-4 transition-all group-hover:scale-105 shadow-md w-28 h-28 lg:w-44 lg:h-44 flex items-center justify-center p-3 lg:p-4">
+          <div className="order-1 lg:order-none flex flex-col items-center group min-w-0 lg:flex-1">
+            <div className="bg-muted/5 rounded-2xl lg:rounded-[32px] border border-card-border mb-2 lg:mb-4 transition-all group-hover:scale-105 shadow-md w-[76px] h-[76px] sm:w-24 sm:h-24 lg:w-44 lg:h-44 flex items-center justify-center p-2 lg:p-4">
               {leftTeam.isUs ? (
                 <img
                   src={logo}
@@ -98,16 +98,20 @@ export default function HeroMatch() {
                 <span className="text-5xl lg:text-6xl drop-shadow-lg">⚽</span>
               )}
             </div>
-            <h3 className="text-lg lg:text-3xl font-black tracking-tighter text-center uppercase leading-none">{leftTeam.name}</h3>
-            <p className="text-[10px] font-black text-muted-foreground tracking-[0.2em] mt-2 italic shadow-sm">
+            <h3 className="text-[11px] sm:text-sm lg:text-3xl font-black tracking-tighter text-center uppercase leading-tight lg:leading-none max-w-[110px] lg:max-w-none">{leftTeam.name}</h3>
+            <p className="text-[8px] lg:text-[10px] font-black text-muted-foreground tracking-[0.12em] lg:tracking-[0.2em] mt-1 lg:mt-2 italic shadow-sm text-center">
               {leftTeam.isUs ? '#SOMOSLISIADOS' : 'Rival Confirmado'}
             </p>
           </div>
 
+          <div className="order-2 lg:hidden flex items-center justify-center h-[76px] sm:h-24">
+            <span className="text-re-rojo font-black italic text-2xl sm:text-3xl tracking-tighter leading-none select-none">VS</span>
+          </div>
+
           {/* VS y CRONÓMETRO */}
-          <div className="flex flex-col items-center justify-center w-full sm:min-w-[280px]">
+          <div className="order-4 lg:order-none col-span-3 lg:col-span-auto flex flex-col items-center justify-center w-full lg:w-auto lg:min-w-[280px]">
             <div className="mb-3 lg:mb-4 flex flex-col items-center">
-              <span className="text-re-rojo font-black italic text-4xl lg:text-7xl tracking-tighter leading-none select-none drop-shadow-xl">VS</span>
+              <span className="hidden lg:block text-re-rojo font-black italic text-7xl tracking-tighter leading-none select-none drop-shadow-xl">VS</span>
               <div className="bg-re-rojo text-white px-4 lg:px-5 py-1 lg:py-1.5 rounded-full shadow-lg shadow-re-rojo/20 mt-2">
                 <p className="font-black text-[10px] lg:text-xs tracking-widest uppercase">
                   {isMatchLive(nextMatch)
@@ -126,7 +130,7 @@ export default function HeroMatch() {
                 </p>
               </div>
             ) : (
-            <div className="flex justify-center gap-2 lg:gap-5 py-3 px-4 lg:py-5 lg:px-8 bg-muted/10 rounded-2xl border border-card-border backdrop-blur-sm shadow-inner">
+            <div className="flex justify-center gap-2 lg:gap-5 py-3 px-4 lg:py-5 lg:px-8 bg-muted/10 rounded-2xl border border-card-border backdrop-blur-sm shadow-inner w-full max-w-[290px] lg:max-w-none">
               <div className="text-center">
                 <span className="text-xl lg:text-4xl font-black block leading-none text-re-rojo">{timeLeft.days}</span>
                 <span className="text-[8px] lg:text-[9px] text-muted-foreground font-black uppercase tracking-widest mt-1">Días</span>
@@ -162,8 +166,8 @@ export default function HeroMatch() {
           </div>
 
           {/* Equipo Visitante (derecha) */}
-          <div className="flex flex-col items-center group flex-1">
-            <div className="bg-muted/5 rounded-[32px] border border-card-border mb-3 lg:mb-4 transition-all group-hover:scale-105 shadow-md w-28 h-28 lg:w-44 lg:h-44 flex items-center justify-center p-3 lg:p-4">
+          <div className="order-3 lg:order-none flex flex-col items-center group min-w-0 lg:flex-1">
+            <div className="bg-muted/5 rounded-2xl lg:rounded-[32px] border border-card-border mb-2 lg:mb-4 transition-all group-hover:scale-105 shadow-md w-[76px] h-[76px] sm:w-24 sm:h-24 lg:w-44 lg:h-44 flex items-center justify-center p-2 lg:p-4">
               {rightTeam.isUs ? (
                 <img
                   src={logo}
@@ -174,15 +178,15 @@ export default function HeroMatch() {
                 <span className="text-5xl lg:text-6xl drop-shadow-lg">⚽</span>
               )}
             </div>
-            <h3 className="text-lg lg:text-3xl font-black tracking-tighter text-center uppercase leading-none">{rightTeam.name}</h3>
-            <p className="text-[10px] font-black text-muted-foreground tracking-[0.2em] mt-2 uppercase shadow-sm">
+            <h3 className="text-[11px] sm:text-sm lg:text-3xl font-black tracking-tighter text-center uppercase leading-tight lg:leading-none max-w-[110px] lg:max-w-none">{rightTeam.name}</h3>
+            <p className="text-[8px] lg:text-[10px] font-black text-muted-foreground tracking-[0.12em] lg:tracking-[0.2em] mt-1 lg:mt-2 uppercase shadow-sm text-center">
               {rightTeam.isUs ? '#SOMOSLISIADOS' : 'Rival Confirmado'}
             </p>
           </div>
 
         </div>
 
-        <div className="mt-8 lg:mt-12 w-full max-w-xs scale-hover">
+        <div className="mt-6 lg:mt-12 w-full max-w-xs scale-hover">
           <button
             onClick={() => { if (nextMatch?.id) navigate(`/partidos/${nextMatch.id}`); }}
             className="w-full py-3 lg:py-4 bg-re-rojo text-white font-black rounded-2xl shadow-xl shadow-re-rojo/20 hover:bg-re-rojo/90 transition-all text-xs lg:text-sm tracking-widest uppercase"
