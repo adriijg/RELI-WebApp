@@ -31,3 +31,6 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### Local env (secretos, no subir a GitHub) ###
+.env

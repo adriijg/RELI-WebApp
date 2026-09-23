@@ -7,6 +7,7 @@ import org.springframework.data.domain.Pageable;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface StatRepository extends JpaRepository<Stat, Long> {
 
@@ -17,6 +18,24 @@ public interface StatRepository extends JpaRepository<Stat, Long> {
     Page<Stat> findByPlayerId(Long playerId, Pageable pageable);
 
     Page<Stat> findByMatchId(Long matchId, Pageable pageable);
+
+    @Query("""
+            SELECT s.player.id, COALESCE(SUM(s.assists), 0),
+                   COALESCE(SUM(s.yellowCards), 0), COALESCE(SUM(s.redCards), 0)
+            FROM Stat s
+            WHERE s.match.competition.season.current = true
+            GROUP BY s.player.id
+            """)
+    List<Object[]> sumCardsByCurrentSeason();
+
+    @Query("""
+            SELECT s.player.id, COALESCE(SUM(s.assists), 0),
+                   COALESCE(SUM(s.yellowCards), 0), COALESCE(SUM(s.redCards), 0)
+            FROM Stat s
+            WHERE s.match.competition.season.id = :seasonId
+            GROUP BY s.player.id
+            """)
+    List<Object[]> sumCardsBySeason(@Param("seasonId") Long seasonId);
 
     @Query("""
             SELECT new es.adri.demo.dto.PlayerSeasonStatsDTO(

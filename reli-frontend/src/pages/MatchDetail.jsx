@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import logo from '../assets/reli-badge.png';
-import { getMatchDetail, getMatches } from '../services/api';
+import { getMatchDetail, getMatches, getStats } from '../services/api';
 import { STATUS_LABELS } from '../constants/matchStatus';
 import { POSITION_LABELS } from '../constants/positions';
 import { isMatchLive } from '../utils/matches';
@@ -170,12 +170,15 @@ export default function MatchDetail() {
     setLoading(true);
     setError('');
     try {
-      const [detailResult, matchesResult] = await Promise.allSettled([
+      const [detailResult, matchesResult, statsResult] = await Promise.allSettled([
         getMatchDetail(id),
         getMatches({ page: 0, size: 1000, sortBy: 'date', direction: 'desc' }),
+        getStats({ matchId: id, size: 200 }),
       ]);
       if (detailResult.status === 'rejected') throw detailResult.reason;
       const data = detailResult.value;
+      const statsValue = statsResult.status === 'fulfilled' ? statsResult.value : [];
+      const matchStats = Array.isArray(statsValue) ? statsValue : statsValue?.content ?? [];
       const allMatches = matchesResult.status === 'fulfilled' ? getMatchList(matchesResult.value) : [];
       const competitionIds = [...new Set(
         allMatches
@@ -186,7 +189,7 @@ export default function MatchDetail() {
       if (data.match.competitionId != null) competitionIds.push(data.match.competitionId);
       const ffmMatches = await getFfmMatches([...new Set(competitionIds)]);
       const teamMatches = mapTeamMatches(ffmMatches, data.rivalInfo?.rivalName || data.match.rival);
-      setDetail({ ...data, rivalInfo: buildRivalInfo(data, allMatches, teamMatches) });
+      setDetail({ ...data, stats: matchStats, rivalInfo: buildRivalInfo(data, allMatches, teamMatches) });
     } catch (err) {
       setError(err.message || 'No se pudo cargar el partido');
     } finally {
@@ -227,7 +230,7 @@ export default function MatchDetail() {
     );
   }
 
-  const { match, goals, callups, rivalInfo } = detail;
+  const { match, goals, callups, rivalInfo, stats = [] } = detail;
   const isHome = match.home !== false;
   const left = isHome
     ? { name: 'REAL LISIADOS', isUs: true }
@@ -238,6 +241,18 @@ export default function MatchDetail() {
   const leftGoals = isHome ? match.ourGoals : match.rivalGoals;
   const rightGoals = isHome ? match.rivalGoals : match.ourGoals;
   const scorers = groupGoals(goals);
+  const jerseyByPlayer = new Map();
+  for (const g of goals) {
+    if (g?.playerId != null && g?.jerseyNumber != null && !jerseyByPlayer.has(g.playerId)) {
+      jerseyByPlayer.set(g.playerId, g.jerseyNumber);
+    }
+  }
+  for (const c of callups) {
+    if (c?.playerId != null && c?.jerseyNumber != null && !jerseyByPlayer.has(c.playerId)) {
+      jerseyByPlayer.set(c.playerId, c.jerseyNumber);
+    }
+  }
+  const carded = stats.filter((s) => (s?.yellowCards ?? 0) > 0 || (s?.redCards ?? 0) > 0);
   const formattedDate = formatDateTime(match.date);
   const finished = match.status === 'FINISHED' && match.ourGoals != null && match.rivalGoals != null;
 
@@ -347,6 +362,50 @@ export default function MatchDetail() {
                 <span className="font-black text-xs sm:text-sm flex-1 min-w-0 truncate">{scorer.playerName}</span>
                 <span className="text-re-rojo font-black text-[10px] sm:text-xs tracking-widest uppercase shrink-0">
                   ⚽ {scorer.minutes.filter((m) => m != null).map((m) => `${m}'`).join(', ') || '—'}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      {/* Tarjetas */}
+      <section className="bg-card-bg border border-card-border rounded-3xl shadow-card p-4 sm:p-6 lg:p-8">
+        <div className="flex items-center justify-between mb-4 sm:mb-6">
+          <h3 className="text-lg sm:text-xl lg:text-2xl font-black italic tracking-tighter uppercase">Tarjetas</h3>
+          <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+            {carded.length} {carded.length === 1 ? 'jugador' : 'jugadores'}
+          </span>
+        </div>
+
+        {carded.length === 0 ? (
+          <p className="text-center text-muted-foreground font-bold text-xs sm:text-sm py-6 sm:py-8 bg-muted/5 rounded-2xl border border-dashed border-card-border">
+            Sin tarjetas en este partido.
+          </p>
+        ) : (
+          <ul className="space-y-2 sm:space-y-3">
+            {carded.map((s) => (
+              <li
+                key={s.playerId}
+                className="flex items-center gap-2 sm:gap-4 bg-muted/5 border border-card-border rounded-2xl px-3 sm:px-4 py-2.5 sm:py-3"
+              >
+                <span className="shrink-0 w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-re-azul-oscuro text-white font-black text-xs sm:text-sm flex items-center justify-center">
+                  {jerseyByPlayer.get(s.playerId) ?? '—'}
+                </span>
+                <span className="font-black text-xs sm:text-sm flex-1 min-w-0 truncate">{s.playerName}</span>
+                <span className="shrink-0 flex items-center gap-2 text-[10px] sm:text-xs font-black tracking-widest uppercase">
+                  {(s.yellowCards ?? 0) > 0 && (
+                    <span className="inline-flex items-center gap-1">
+                      <span className="inline-block w-3 h-4 rounded-[3px] bg-yellow-400 border border-yellow-600" />
+                      {s.yellowCards > 1 ? `x${s.yellowCards}` : ''}
+                    </span>
+                  )}
+                  {(s.redCards ?? 0) > 0 && (
+                    <span className="inline-flex items-center gap-1">
+                      <span className="inline-block w-3 h-4 rounded-[3px] bg-red-600 border border-red-800" />
+                      {s.redCards > 1 ? `x${s.redCards}` : ''}
+                    </span>
+                  )}
                 </span>
               </li>
             ))}

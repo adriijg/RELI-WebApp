@@ -9,6 +9,7 @@ import es.adri.demo.model.Player;
 import es.adri.demo.repository.MatchCallUpRepository;
 import es.adri.demo.repository.MatchGoalRepository;
 import es.adri.demo.repository.PlayerRepository;
+import es.adri.demo.repository.StatRepository;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -23,13 +24,16 @@ public class PlayerService {
     private final PlayerRepository playerRepository;
     private final MatchGoalRepository matchGoalRepository;
     private final MatchCallUpRepository matchCallUpRepository;
+    private final StatRepository statRepository;
 
     public PlayerService(PlayerRepository playerRepository,
                          MatchGoalRepository matchGoalRepository,
-                         MatchCallUpRepository matchCallUpRepository) {
+                         MatchCallUpRepository matchCallUpRepository,
+                         StatRepository statRepository) {
         this.playerRepository = playerRepository;
         this.matchGoalRepository = matchGoalRepository;
         this.matchCallUpRepository = matchCallUpRepository;
+        this.statRepository = statRepository;
     }
 
     public PagedResponseDTO<PlayerDTO> findAllActivePlayers(Pageable pageable) {
@@ -69,9 +73,21 @@ public class PlayerService {
             cleanSheetsMap.put((Long) row[0], (Long) row[1]);
         }
 
+        Map<Long, long[]> cardsMap = new HashMap<>();
+        List<Object[]> cardRows = seasonId == null
+                ? statRepository.sumCardsByCurrentSeason()
+                : statRepository.sumCardsBySeason(seasonId);
+        for (Object[] row : cardRows) {
+            cardsMap.put((Long) row[0],
+                    new long[]{((Number) row[1]).longValue(),
+                            ((Number) row[2]).longValue(),
+                            ((Number) row[3]).longValue()});
+        }
+
         List<PlayerSeasonStatsDTO> result = new ArrayList<>();
         for (Player player : playerRepository.findAllByActiveTrue()) {
             Long id = player.getId();
+            long[] cards = cardsMap.getOrDefault(id, new long[3]);
             result.add(new PlayerSeasonStatsDTO(
                     id,
                     player.getName(),
@@ -80,9 +96,9 @@ public class PlayerService {
                     player.getPosition(),
                     player.getPhotoUrl(),
                     goalsMap.getOrDefault(id, 0L),
-                    0L,
-                    0L,
-                    0L,
+                    cards[0],
+                    cards[1],
+                    cards[2],
                     appearancesMap.getOrDefault(id, 0L),
                     cleanSheetsMap.getOrDefault(id, 0L)
             ));
