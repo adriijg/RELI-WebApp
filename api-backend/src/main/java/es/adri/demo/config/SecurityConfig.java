@@ -38,6 +38,8 @@ public class SecurityConfig {
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**").permitAll()
                         // Listado de usuarios: solo admin (antes de permitir el resto de GET)
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/users").hasRole("ADMIN")
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/quintet/ballots").hasRole("ADMIN")
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/quintet/me").authenticated()
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/**").permitAll()
                         .anyRequest().authenticated()
                 )

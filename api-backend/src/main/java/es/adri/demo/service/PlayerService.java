@@ -92,6 +92,7 @@ public class PlayerService {
                     id,
                     player.getName(),
                     player.getNickname(),
+                    player.getSurnames(),
                     player.getJerseyNumber(),
                     player.getPosition(),
                     player.getPhotoUrl(),
@@ -133,6 +134,7 @@ public class PlayerService {
     private void mapRequestToEntity(PlayerRequestDTO playerRequestDTO, Player player) {
         player.setName(playerRequestDTO.getName());
         player.setNickname(playerRequestDTO.getNickname());
+        player.setSurnames(playerRequestDTO.getSurnames());
         player.setJerseyNumber(playerRequestDTO.getJerseyNumber());
         player.setPosition(playerRequestDTO.getPosition());
         player.setPhotoUrl(playerRequestDTO.getPhotoUrl());
@@ -143,6 +145,7 @@ public class PlayerService {
                 player.getId(),
                 player.getName(),
                 player.getNickname(),
+                player.getSurnames(),
                 player.getJerseyNumber(),
                 player.getPosition(),
                 player.getPhotoUrl(),

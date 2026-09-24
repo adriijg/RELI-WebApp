@@ -52,11 +52,8 @@ export default function AuthModal({ isOpen, onClose, initialView = 'login', onAu
           password: formData.password
         };
         const response = await loginUser(credentials);
-        setSuccess('¡Inicio de sesión exitoso!');
         if (response.token) localStorage.setItem('re-token', response.token);
-        setTimeout(() => {
-          onAuthSuccess(response.user || { username: formData.identifier });
-        }, 1000);
+        onAuthSuccess(response.user || { username: formData.identifier });
       } else {
         // FLUJO DE REGISTRO
         const userData = {
@@ -78,10 +75,7 @@ export default function AuthModal({ isOpen, onClose, initialView = 'login', onAu
         const loginResponse = await loginUser(loginCredentials);
         
         if (loginResponse.token) localStorage.setItem('re-token', loginResponse.token);
-        
-        setTimeout(() => {
-          onAuthSuccess(loginResponse.user || { username: formData.username });
-        }, 1000);
+        onAuthSuccess(loginResponse.user || { username: formData.username });
       }
     } catch (err) {
       setError(err.message || 'Ocurrió un error inesperado');

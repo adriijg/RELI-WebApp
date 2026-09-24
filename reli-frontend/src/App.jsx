@@ -1,4 +1,5 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
+import { motion, MotionConfig } from 'framer-motion';
 import { useApp } from './context/AppContext';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
@@ -13,6 +14,7 @@ import NewsPage from './pages/NewsPage';
 import CompetitionPage from './pages/CompetitionPage';
 import HistoryPage from './pages/HistoryPage';
 import PlayersPage from './pages/PlayersPage';
+import QuintetPage from './pages/QuintetPage';
 import CalendarPage from './pages/CalendarPage';
 import Dashboard from './pages/admin/Dashboard';
 import MatchesAdmin from './pages/admin/MatchesAdmin';
@@ -24,8 +26,9 @@ import StatsAdmin from './pages/admin/StatsAdmin';
 import UsersAdmin from './pages/admin/UsersAdmin';
 import SyncAdmin from './pages/admin/SyncAdmin';
 
-function PublicLayout({ children }) {
+function PublicLayout() {
   const { theme, toggleTheme, user, isAdmin, openAuth, handleLogout } = useApp();
+  const location = useLocation();
   return (
     <div className="min-h-screen bg-background text-foreground font-sans transition-colors duration-300 flex flex-col">
       <Navbar
@@ -36,7 +39,17 @@ function PublicLayout({ children }) {
         onOpenAuth={openAuth}
         onLogout={handleLogout}
       />
-      <div className="flex-1">{children}</div>
+      <MotionConfig reducedMotion="user">
+        <motion.div
+          key={location.pathname}
+          className="flex-1"
+          initial={{ opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+        >
+          <Outlet />
+        </motion.div>
+      </MotionConfig>
       <Footer />
     </div>
   );
@@ -49,70 +62,17 @@ export default function App() {
     <div className={`${theme === 'dark' ? 'dark' : ''} min-h-screen bg-background text-foreground font-sans transition-colors duration-300`}>
       <ScrollToTop />
       <Routes>
-        <Route
-          path="/"
-          element={
-            <PublicLayout>
-              <Home />
-            </PublicLayout>
-          }
-        />
-        <Route
-          path="/partidos/:id"
-          element={
-            <PublicLayout>
-              <MatchDetail />
-            </PublicLayout>
-          }
-        />
-        <Route
-          path="/noticias/:id"
-          element={
-            <PublicLayout>
-              <NewsDetail />
-            </PublicLayout>
-          }
-        />
-        <Route
-          path="/noticias"
-          element={
-            <PublicLayout>
-              <NewsPage />
-            </PublicLayout>
-          }
-        />
-        <Route
-          path="/competicion"
-          element={
-            <PublicLayout>
-              <CompetitionPage />
-            </PublicLayout>
-          }
-        />
-        <Route
-          path="/historia"
-          element={
-            <PublicLayout>
-              <HistoryPage />
-            </PublicLayout>
-          }
-        />
-        <Route
-          path="/jugadores"
-          element={
-            <PublicLayout>
-              <PlayersPage />
-            </PublicLayout>
-          }
-        />
-        <Route
-          path="/calendario"
-          element={
-            <PublicLayout>
-              <CalendarPage />
-            </PublicLayout>
-          }
-        />
+        <Route element={<PublicLayout />}>
+          <Route path="/" element={<Home />} />
+          <Route path="/partidos/:id" element={<MatchDetail />} />
+          <Route path="/noticias/:id" element={<NewsDetail />} />
+          <Route path="/noticias" element={<NewsPage />} />
+          <Route path="/competicion" element={<CompetitionPage />} />
+          <Route path="/historia" element={<HistoryPage />} />
+          <Route path="/jugadores" element={<PlayersPage />} />
+          <Route path="/quinteto" element={<QuintetPage />} />
+          <Route path="/calendario" element={<CalendarPage />} />
+        </Route>
         <Route
           path="/admin"
           element={

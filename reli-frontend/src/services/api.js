@@ -74,6 +74,11 @@ export const loginUser = (credentials) =>
 export const registerUser = (userData) =>
     apiFetch('/users/register', { method: 'POST', body: userData, auth: false });
 
+export const saveQuintetVote = (body) => apiFetch('/quintet/votes', { method: 'POST', body });
+export const getMyQuintetVote = (seasonId, jornada) => apiFetch('/quintet/me', { params: { seasonId, jornada } });
+export const getQuintetTally = (seasonId, jornada) => apiFetch('/quintet/tally', { params: { seasonId, jornada }, auth: false });
+export const getQuintetBallots = (seasonId, jornada) => apiFetch('/quintet/ballots', { params: { seasonId, jornada } });
+
 /* ---------- Partidos ---------- */
 export const getMatches = (params) => apiFetch('/matches', { params });
 export const getMatch = (id) => apiFetch(`/matches/${id}`);

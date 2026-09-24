@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion, MotionConfig } from 'framer-motion';
 import { getCompetitions, getSeasons, getStandings, getMatchesByCompetition, toPage } from '../services/api';
 import { STATUS_LABELS } from '../constants/matchStatus';
 import { computeStandings } from '../utils/standings';
@@ -24,19 +25,23 @@ function MatchRow({ match, navigate }) {
   const live = match.status === 'IN_PROGRESS';
 
   return (
-    <div
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, amount: 0.6 }}
+      whileHover={{ x: 4 }}
       onClick={() => navigate(`/partidos/${match.id}`)}
-      className="flex items-center gap-2 sm:gap-3 p-3 sm:p-4 rounded-2xl hover:bg-muted/5 transition-colors cursor-pointer group border border-transparent hover:border-card-border"
+      className="mx-3 my-2 flex cursor-pointer items-center gap-2 rounded-2xl border border-white/10 bg-black/30 px-3 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] hover:border-re-dorado/50 sm:gap-3 sm:px-4"
     >
-      <div className="shrink-0 w-14 sm:w-20 text-center">
-        <p className="text-[8px] sm:text-[10px] font-black uppercase tracking-widest text-foreground/40">{formatDate(match.date)}</p>
+      <div className="w-14 shrink-0 border-r border-re-dorado/25 pr-2 text-center sm:w-20">
+        <p className="text-[8px] font-black uppercase tracking-widest text-re-dorado sm:text-[10px]">{formatDate(match.date)}</p>
         {match.date && (
-          <p className="text-[8px] sm:text-[10px] font-bold text-foreground/30">{formatTime(match.date)}</p>
+          <p className="text-[8px] font-bold text-white/45 sm:text-[10px]">{formatTime(match.date)}</p>
         )}
       </div>
 
       <div className="flex-1 min-w-0 text-right overflow-hidden team-name-cell">
-        <span className="team-name-ticker text-[10px] sm:text-sm font-black uppercase tracking-tight">
+        <span className="team-name-ticker text-[10px] font-black uppercase tracking-tight text-white sm:text-sm">
           {isHome ? 'Real Lisiados' : match.rival}
         </span>
       </div>
@@ -49,12 +54,12 @@ function MatchRow({ match, navigate }) {
         ) : live ? (
           <span className="text-blue-500 font-black text-[9px] sm:text-xs tracking-widest uppercase animate-pulse">EN VIVO</span>
         ) : (
-          <span className="text-foreground/30 font-black text-xs sm:text-sm">VS</span>
+          <span className="text-xs font-black italic text-re-rojo sm:text-sm">VS</span>
         )}
       </div>
 
       <div className="flex-1 min-w-0 text-left overflow-hidden team-name-cell">
-        <span className="team-name-ticker text-[10px] sm:text-sm font-black uppercase tracking-tight">
+        <span className="team-name-ticker text-[10px] sm:text-sm font-black uppercase tracking-tight text-white">
           {isHome ? match.rival : 'Real Lisiados'}
         </span>
       </div>
@@ -68,16 +73,18 @@ function MatchRow({ match, navigate }) {
           {STATUS_LABELS[match.status] || match.status}
         </span>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
 function RoundRow({ game }) {
   const finished = game.homeGoals != null && game.awayGoals != null;
   return (
-    <div
-      className={`flex items-center gap-2 sm:gap-3 p-3 sm:p-4 rounded-2xl transition-colors ${
-        game.ours ? 'bg-re-rojo/10 border border-re-rojo/20' : ''
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      className={`flex items-center gap-2 rounded-2xl p-3 transition-colors sm:gap-3 sm:p-4 ${
+        game.ours ? 'border border-re-rojo/30 bg-re-rojo/10' : ''
       }`}
     >
       <div className="shrink-0 w-14 sm:w-20 text-center">
@@ -114,9 +121,11 @@ function RoundRow({ game }) {
           {game.venue || ''}
         </span>
       </div>
-    </div>
+    </motion.div>
   );
 }
+
+const selectClass = 'w-full rounded-xl border border-re-dorado/25 bg-black/30 px-4 py-3 text-sm font-bold uppercase tracking-wide text-white focus:outline-none focus:ring-2 focus:ring-re-dorado';
 
 export default function CompetitionPage() {
   const navigate = useNavigate();
@@ -349,29 +358,36 @@ export default function CompetitionPage() {
   }, [allMatches, selectedJornada]);
 
   return (
-    <main className="max-w-5xl mx-auto p-4 sm:p-6 space-y-8">
-      <section className="bg-card-bg border border-card-border rounded-[40px] shadow-2xl overflow-hidden">
-        <div className="bg-re-rojo px-4 sm:px-6 py-6 sm:px-10">
-          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/70 mb-1">
-            {selected ? `${selected.type === 'COPA' ? 'Copa' : 'Liga'} • ${selected.seasonName || ''}` : 'Competición'}
+    <MotionConfig reducedMotion="user">
+    <main className="mx-auto max-w-5xl space-y-8 p-4 text-white sm:p-6">
+      <section className="gold-sweep relative overflow-hidden rounded-[1.7rem] border border-re-dorado/30 bg-[#071018] shadow-[0_24px_60px_rgba(0,0,0,0.35)]">
+        <div className="stadium-beam stadium-beam-left" />
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(226,29,44,0.45),transparent_55%)]" />
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="relative bg-re-rojo px-5 py-6 sm:px-8"
+        >
+          <p className="mb-1 text-[10px] font-black uppercase tracking-[0.28em] text-white/70">
+            {selected ? `${selected.type === 'COPA' ? 'Copa' : 'Liga'} · ${selected.seasonName || ''}` : 'Competición'}
           </p>
-          <h1 className="text-2xl lg:text-4xl font-black italic tracking-tighter uppercase text-white leading-none">
+          <h1 className="text-3xl font-black italic uppercase leading-none tracking-tighter text-white lg:text-4xl">
             Clasificación
           </h1>
-        </div>
+        </motion.div>
 
-        <div className="p-4 sm:p-6 lg:p-10">
+        <div className="relative p-4 sm:p-6">
           <div className="flex flex-col sm:flex-row gap-4">
             {seasons.length > 1 && (
               <div className="flex-1 sm:max-w-xs">
-                <label htmlFor="season-select" className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-2">
+                <label htmlFor="season-select" className="mb-2 block text-[10px] font-black uppercase tracking-widest text-re-dorado">
                   Temporada
                 </label>
                 <select
                   id="season-select"
                   value={selectedSeasonId}
                   onChange={handleSelectSeason}
-                  className="w-full bg-muted/10 border border-card-border rounded-xl px-4 py-3 text-sm font-bold uppercase tracking-wide focus:outline-none focus:ring-2 focus:ring-re-rojo"
+                  className={selectClass}
                 >
                   {seasons.map((s) => (
                     <option key={s.id} value={s.id}>
@@ -383,14 +399,14 @@ export default function CompetitionPage() {
             )}
 
             <div className="flex-1">
-              <label htmlFor="competition-select" className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-2">
+              <label htmlFor="competition-select" className="mb-2 block text-[10px] font-black uppercase tracking-widest text-re-dorado">
                 Competición
               </label>
               <select
                 id="competition-select"
                 value={selectedId}
                 onChange={handleSelectCompetition}
-                className="w-full bg-muted/10 border border-card-border rounded-xl px-4 py-3 text-sm font-bold uppercase tracking-wide focus:outline-none focus:ring-2 focus:ring-re-rojo"
+                className={selectClass}
               >
                 {filteredCompetitions.map((c) => (
                   <option key={c.id} value={c.id}>
@@ -402,14 +418,14 @@ export default function CompetitionPage() {
 
             {isLiga && (
               <div className="flex-1 sm:max-w-xs">
-                <label htmlFor="jornada-select" className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-2">
+                <label htmlFor="jornada-select" className="mb-2 block text-[10px] font-black uppercase tracking-widest text-re-dorado">
                   Jornada
                 </label>
                 <select
                   id="jornada-select"
                   value={selectedJornada ?? 'all'}
                   onChange={handleSelectJornada}
-                  className="w-full bg-muted/10 border border-card-border rounded-xl px-4 py-3 text-sm font-bold uppercase tracking-wide focus:outline-none focus:ring-2 focus:ring-re-rojo"
+                  className={selectClass}
                 >
                   <option value="all">Todas</option>
                   {availableJornadas.map((j) => (
@@ -438,11 +454,15 @@ export default function CompetitionPage() {
           )}
 
           {!tableLoading && displayStandings && displayStandings.length > 0 && (
-            <section className="bg-card-bg border border-card-border rounded-3xl shadow-card overflow-hidden">
+            <motion.section
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="overflow-hidden rounded-[1.7rem] border border-re-dorado/30 bg-[#071018] shadow-[0_24px_60px_rgba(0,0,0,0.28)]"
+            >
               <div className="overflow-x-auto">
-                <table className="w-full text-sm min-w-[640px]">
+                <table className="w-full min-w-[640px] text-sm text-white">
                   <thead>
-                    <tr className="text-[9px] lg:text-[10px] font-black uppercase tracking-widest text-muted-foreground border-b border-card-border">
+                    <tr className="border-b border-re-dorado/20 text-[9px] font-black uppercase tracking-widest text-re-dorado lg:text-[10px]">
                       <th className="text-center px-3 py-4 w-12">#</th>
                       <th className="text-left px-3 py-4">Equipo</th>
                       <th className="text-center px-2 py-4" title="Partidos jugados">PJ</th>
@@ -458,20 +478,30 @@ export default function CompetitionPage() {
                   </thead>
                   <tbody>
                     {displayStandings.map((row, index) => (
-                      <tr
+                      <motion.tr
                         key={row.teamName}
-                        className={`border-b border-card-border last:border-0 transition-colors ${
-                          row.isUs ? 'bg-re-rojo/10 hover:bg-re-rojo/15' : 'hover:bg-muted/5'
+                        initial={{ opacity: 0, x: -16 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: Math.min(index, 12) * 0.045, duration: 0.35 }}
+                        className={`border-b border-white/5 last:border-0 ${
+                          row.isUs ? 'bg-re-rojo/15' : 'hover:bg-white/5'
                         }`}
                       >
-                        <td className="text-center px-3 py-4">
-                          <span
-                            className={`inline-flex w-7 h-7 items-center justify-center rounded-lg font-black text-xs ${
-                              index < 3 ? 'bg-re-dorado text-re-azul-oscuro' : 'bg-muted/10 text-muted-foreground'
+                        <td className="px-3 py-4 text-center">
+                          <motion.span
+                            initial={{ scale: 0.6 }}
+                            animate={{ scale: 1 }}
+                            transition={{ delay: Math.min(index, 12) * 0.045 + 0.1, type: 'spring', stiffness: 320, damping: 16 }}
+                            className={`inline-flex h-7 w-7 items-center justify-center rounded-lg text-xs font-black ${
+                              index === 0
+                                ? 'bg-re-dorado text-re-azul-oscuro shadow-[0_0_16px_rgba(193,154,91,0.55)]'
+                                : index < 3
+                                  ? 'bg-re-dorado/80 text-re-azul-oscuro'
+                                  : 'bg-white/10 text-white/55'
                             }`}
                           >
                             {index + 1}
-                          </span>
+                          </motion.span>
                         </td>
                         <td className="px-3 py-4 font-black uppercase text-xs lg:text-sm truncate max-w-[180px]">
                           {row.teamName}
@@ -513,22 +543,22 @@ export default function CompetitionPage() {
                         <span className="text-muted-foreground text-xs">—</span>
                       )}
                     </td>
-                      </tr>
+                      </motion.tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-              <p className="px-6 py-4 text-[9px] font-bold uppercase tracking-widest text-muted-foreground border-t border-card-border">
+              <p className="border-t border-white/10 px-6 py-4 text-[9px] font-bold uppercase tracking-widest text-white/40">
                 {selectedJornada != null
                   ? `Clasificación parcial hasta la jornada ${selectedJornada} · Victoria = 3 pts · Empate = 1 pt`
                   : 'Solo cuentan los partidos finalizados · Victoria = 3 pts · Empate = 1 pt'}
                 {ffmAvailable ? ' · Fuente: FFM' : ' · Fuente: nuestros partidos'}
               </p>
-            </section>
+            </motion.section>
           )}
 
           {selectedJornada != null && roundGames && roundGames.length > 0 && (
-            <section className="bg-card-bg border border-card-border rounded-3xl shadow-card overflow-hidden">
+            <section className="overflow-hidden rounded-[1.7rem] border border-re-dorado/30 bg-[#071018] text-white shadow-[0_24px_60px_rgba(0,0,0,0.28)]">
               <div className="px-4 sm:px-6 py-4 border-b border-card-border">
                 <h2 className="text-lg font-black uppercase tracking-tight">
                   Jornada {selectedJornada}
@@ -555,24 +585,32 @@ export default function CompetitionPage() {
             const jornadas = Array.from(grouped.entries()).sort((a, b) => a[0] - b[0]);
 
             return (
-              <section className="bg-card-bg border border-card-border rounded-3xl shadow-card overflow-hidden">
-                <div className="px-4 sm:px-6 py-4 border-b border-card-border">
-                  <h2 className="text-lg font-black uppercase tracking-tight">Partidos por Jornada</h2>
+              <section className="overflow-hidden rounded-[1.7rem] border border-re-dorado/30 bg-[#071018] text-white shadow-[0_24px_60px_rgba(0,0,0,0.28)]">
+                <div className="border-b border-re-dorado/20 px-4 py-4 sm:px-6">
+                  <p className="mb-1 text-[10px] font-black uppercase tracking-[0.28em] text-re-dorado">Temporada</p>
+                  <h2 className="text-lg font-black italic uppercase tracking-tight">Partidos por jornada</h2>
                 </div>
-                <div className="divide-y divide-card-border">
-                  {jornadas.map(([jornada, jornadaMatches]) => (
-                    <div key={jornada}>
-                      <div className="px-4 sm:px-6 py-3 bg-muted/5">
-                        <h3 className="text-xs font-black uppercase tracking-widest text-re-rojo">
+                <div className="pb-3">
+                  {jornadas.map(([jornada, jornadaMatches], groupIndex) => (
+                    <motion.div
+                      key={jornada}
+                      initial={{ opacity: 0, y: 12 }}
+                      whileInView={{ opacity: 1, y: 0 }}
+                      viewport={{ once: true, amount: 0.3 }}
+                      transition={{ delay: Math.min(groupIndex, 6) * 0.04 }}
+                    >
+                      <div className="flex items-center gap-3 px-4 pb-1 pt-4 sm:px-6">
+                        <h3 className="text-[11px] font-black uppercase tracking-[0.22em] text-re-rojo">
                           Jornada {jornada}
                         </h3>
+                        <span className="h-px flex-1 bg-re-dorado/25" />
                       </div>
-                      <div className="divide-y divide-card-border">
+                      <div>
                         {jornadaMatches.map((match) => (
                           <MatchRow key={match.id} match={match} navigate={navigate} />
                         ))}
                       </div>
-                    </div>
+                    </motion.div>
                   ))}
                 </div>
               </section>
@@ -580,7 +618,7 @@ export default function CompetitionPage() {
           })()}
 
           {displayMatches.length > 0 && selectedJornada == null && !(isLiga && availableJornadas.length > 0) && (
-            <section className="bg-card-bg border border-card-border rounded-3xl shadow-card overflow-hidden">
+            <section className="overflow-hidden rounded-[1.7rem] border border-re-dorado/30 bg-[#071018] text-white shadow-[0_24px_60px_rgba(0,0,0,0.28)]">
               <div className="px-4 sm:px-6 py-4 border-b border-card-border">
                 <h2 className="text-lg font-black uppercase tracking-tight">Partidos</h2>
               </div>
@@ -600,5 +638,6 @@ export default function CompetitionPage() {
         </>
       )}
     </main>
+    </MotionConfig>
   );
 }

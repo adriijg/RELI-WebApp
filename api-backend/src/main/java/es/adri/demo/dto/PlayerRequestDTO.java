@@ -20,6 +20,8 @@ public class PlayerRequestDTO {
 
     private String nickname;
 
+    private String surnames;
+
     @NotNull(message = "El dorsal es obligatorio")
     @Min(value = 1, message = "El dorsal debe estar entre 1 y 99")
     @Max(value = 99, message = "El dorsal debe estar entre 1 y 99")

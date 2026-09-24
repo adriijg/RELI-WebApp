@@ -24,6 +24,7 @@ public interface StatRepository extends JpaRepository<Stat, Long> {
                    COALESCE(SUM(s.yellowCards), 0), COALESCE(SUM(s.redCards), 0)
             FROM Stat s
             WHERE s.match.competition.season.current = true
+              AND s.match.status = es.adri.demo.model.MatchStatus.FINISHED
             GROUP BY s.player.id
             """)
     List<Object[]> sumCardsByCurrentSeason();
@@ -33,6 +34,7 @@ public interface StatRepository extends JpaRepository<Stat, Long> {
                    COALESCE(SUM(s.yellowCards), 0), COALESCE(SUM(s.redCards), 0)
             FROM Stat s
             WHERE s.match.competition.season.id = :seasonId
+              AND s.match.status = es.adri.demo.model.MatchStatus.FINISHED
             GROUP BY s.player.id
             """)
     List<Object[]> sumCardsBySeason(@Param("seasonId") Long seasonId);
@@ -42,6 +44,7 @@ public interface StatRepository extends JpaRepository<Stat, Long> {
                 s.player.id,
                 s.player.name,
                 s.player.nickname,
+                s.player.surnames,
                 s.player.jerseyNumber,
                 s.player.position,
                 s.player.photoUrl,
@@ -54,7 +57,8 @@ public interface StatRepository extends JpaRepository<Stat, Long> {
             )
             FROM Stat s
             WHERE s.match.competition.season.current = true
-            GROUP BY s.player.id, s.player.name, s.player.nickname,
+              AND s.match.status = es.adri.demo.model.MatchStatus.FINISHED
+            GROUP BY s.player.id, s.player.name, s.player.nickname, s.player.surnames,
                      s.player.jerseyNumber, s.player.position, s.player.photoUrl
             ORDER BY s.player.jerseyNumber ASC
             """)

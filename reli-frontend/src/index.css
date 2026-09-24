@@ -62,9 +62,11 @@
     color: var(--foreground);
   }
 
+  select option:hover,
+  select option:focus,
   select option:checked {
-    background-color: var(--muted);
-    color: var(--foreground);
+    background-color: #E21D2C;
+    color: #ffffff;
   }
 }
 
@@ -102,5 +104,172 @@
 @media (prefers-reduced-motion: reduce) {
   .team-name-ticker {
     animation: none;
+  }
+}
+
+/* Plantilla: estadio de noche */
+@keyframes beam-sway {
+  0%, 100% { transform: rotate(8deg); opacity: 0.35; }
+  50% { transform: rotate(16deg); opacity: 0.7; }
+}
+
+@keyframes dust-rise {
+  0% { transform: translateY(12px); opacity: 0; }
+  15% { opacity: 0.55; }
+  100% { transform: translateY(-140px); opacity: 0; }
+}
+
+@keyframes ring-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes grass-drift {
+  from { background-position: 0 0; }
+  to { background-position: 96px 0; }
+}
+
+@keyframes pitch-draw {
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes player-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-7px); }
+}
+
+@keyframes squad-cycle {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+@keyframes gold-sweep {
+  0%, 18% { transform: translateX(0) skewX(-16deg); }
+  62%, 100% { transform: translateX(420%) skewX(-16deg); }
+}
+
+.stadium-grass {
+  background-color: #083528;
+  background-image: repeating-linear-gradient(90deg, #083528 0 48px, #0b4030 48px 96px);
+  animation: grass-drift 22s linear infinite;
+}
+
+.stadium-beam {
+  position: absolute;
+  top: -30%;
+  width: 38%;
+  height: 150%;
+  background: linear-gradient(180deg, rgba(255, 244, 214, 0.2), transparent 68%);
+  filter: blur(10px);
+  transform-origin: top center;
+  pointer-events: none;
+}
+
+.stadium-beam-left {
+  left: -8%;
+  animation: beam-sway 8s ease-in-out infinite;
+}
+
+.stadium-beam-right {
+  right: -8%;
+  animation: beam-sway 10s ease-in-out infinite reverse;
+}
+
+.stadium-dust {
+  position: absolute;
+  bottom: 12%;
+  width: 3px;
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(243, 229, 171, 0.7);
+  animation: dust-rise 7s ease-in infinite;
+}
+
+.pitch-draw {
+  stroke-dasharray: 900;
+  stroke-dashoffset: 900;
+  animation: pitch-draw 2s ease forwards;
+}
+
+.squad-radar {
+  background: conic-gradient(from 0deg, transparent 0 76%, rgba(243, 229, 171, 0.55) 100%);
+  animation: ring-spin 6s linear infinite;
+  mask-image: radial-gradient(circle, transparent 30%, #000 46%, transparent 72%);
+}
+
+.player-float {
+  animation: player-float 3.4s ease-in-out infinite;
+}
+
+.squad-ring-wrap {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 6.25rem;
+  height: 6.25rem;
+}
+
+.squad-ring-wrap::before {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: 999px;
+  background: conic-gradient(#E21D2C, #C19A5B, transparent 42%, transparent 58%, #F3E5AB, #E21D2C);
+  animation: ring-spin 3.8s linear infinite;
+}
+
+.squad-ring-wrap::after {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  border-radius: 999px;
+  background: #071018;
+}
+
+.squad-cycle-bar {
+  transform-origin: left center;
+  animation: squad-cycle 4.8s linear infinite;
+}
+
+.squad-cycle-bar.is-paused {
+  animation-play-state: paused;
+}
+
+.spotlight-cone {
+  background: linear-gradient(180deg, transparent, rgba(243, 229, 171, 0.08) 40%, rgba(255, 255, 255, 0.55));
+  clip-path: polygon(42% 0, 58% 0, 100% 100%, 0 100%);
+  filter: blur(0.5px);
+}
+
+.gold-sweep {
+  position: relative;
+  overflow: hidden;
+}
+
+.gold-sweep::after {
+  content: "";
+  position: absolute;
+  inset: -20% auto -20% -40%;
+  width: 38%;
+  background: linear-gradient(90deg, transparent, rgba(243, 229, 171, 0.16), transparent);
+  transform: skewX(-16deg);
+  animation: gold-sweep 7.5s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stadium-grass,
+  .stadium-beam,
+  .stadium-dust,
+  .pitch-draw,
+  .squad-radar,
+  .player-float,
+  .squad-ring-wrap::before,
+  .squad-cycle-bar,
+  .gold-sweep::after {
+    animation: none;
+  }
+
+  .pitch-draw {
+    stroke-dashoffset: 0;
   }
 }

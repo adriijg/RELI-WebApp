@@ -68,6 +68,20 @@ def load_players(api: str, token: str) -> list[dict]:
     return r.json().get("content", [])
 
 
+# Dorsal del acta -> jugador actual, cuando el número cambió de temporada.
+# 2025/26: Adrián "Buko" llevaba el 27; en 2026/27 es el 6.
+DORSAL_ALIASES = {
+    27: {"nickname": "BUKO", "name": "ADRIAN"},
+}
+
+
+def player_from_alias(alias: dict, players: list[dict]) -> dict | None:
+    for player in players:
+        if norm(player.get("nickname")) == alias["nickname"] or norm(player.get("name")) == alias["name"]:
+            return player
+    return None
+
+
 def map_players(our_side: dict, players: list[dict]) -> tuple[dict, list[dict]]:
     """Devuelve (mapeo dorsal->player, avisos). Clave primaria: dorsal."""
     by_dorsal = {p["jerseyNumber"]: p for p in players}
@@ -75,6 +89,21 @@ def map_players(our_side: dict, players: list[dict]) -> tuple[dict, list[dict]]:
     warnings: list[dict] = []
     for conv in our_side["titulares"] + our_side["suplentes"]:
         dorsal = conv["dorsal"]
+        alias = DORSAL_ALIASES.get(dorsal)
+        if alias:
+            player = player_from_alias(alias, players)
+            if player is None:
+                warnings.append({"dorsal": dorsal, "acta": conv["nombre"],
+                                 "problema": "alias de dorsal sin jugador en la BD"})
+                continue
+            tokens = acta_first_names(conv["nombre"])
+            if alias["name"] not in tokens and alias["nickname"] not in tokens:
+                warnings.append({"dorsal": dorsal, "acta": conv["nombre"],
+                                 "bd": f"{player.get('name')} ({player.get('nickname')})",
+                                 "problema": "el alias no coincide con el nombre del acta; no se importa"})
+                continue
+            mapping[dorsal] = player
+            continue
         player = by_dorsal.get(dorsal)
         if player is None:
             warnings.append({"dorsal": dorsal, "acta": conv["nombre"],
@@ -98,7 +127,8 @@ def find_match(api: str, token: str, competition_id: int, acta: dict) -> dict | 
     content = r.json().get("content", [])
     # Rival en la BD = el otro equipo del acta
     our_name = acta["our_side_name"]
-    rival_name = acta["away"]["nombre"] if norm(our_name) == norm(acta["local"]["nombre"]) \
+    rival_side = acta.get("visitante") or acta.get("away") or {}
+    rival_name = rival_side.get("nombre") if norm(our_name) == norm(acta["local"]["nombre"]) \
         else acta["local"]["nombre"]
     for m in content:
         if m.get("competitionId") != competition_id:
@@ -176,8 +206,10 @@ def main() -> int:
     match_id = match["id"]
     print(f"Partido BD #{match_id}: vs {match.get('rival')} J{match.get('jornada')} "
           f"{match.get('date')} [{match.get('status')}] {match.get('ourGoals')}-{match.get('rivalGoals')}")
+    resultado = acta.get("resultado") or {}
+    visitante = (acta.get("visitante") or acta.get("away") or {}).get("nombre")
     print(f"Acta {acta.get('codacta')}: {acta['local']['nombre']} "
-          f"{acta['resultado']['home']}-{acta['resultado']['away']} vs {acta['visitante']['nombre']} "
+          f"{resultado.get('home', '?')}-{resultado.get('away', '?')} vs {visitante} "
           f"-> lado nuestro: {our_flag} ({our_side['nombre']})")
 
     players = load_players(args.api, token)

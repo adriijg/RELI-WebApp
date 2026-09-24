@@ -44,23 +44,23 @@ export default function HistoryPage() {
   ];
 
   return (
-    <main className="max-w-5xl mx-auto p-6 space-y-8">
+    <main className="max-w-3xl mx-auto p-4 sm:p-6 space-y-4">
       {/* Hero */}
-      <section className="relative overflow-hidden rounded-[40px] bg-card-bg border border-card-border shadow-2xl">
+      <section className="relative overflow-hidden rounded-3xl bg-card-bg border border-card-border shadow-card">
         <div
           className="absolute inset-0 bg-cover bg-center opacity-10 dark:opacity-20"
           style={{ backgroundImage: "url('https://images.unsplash.com/photo-1508098682722-e99c43a406b2?q=80&w=2070&auto=format&fit=crop')" }}
         />
         <div className="absolute inset-0 bg-gradient-to-b from-card-bg via-card-bg/80 to-transparent" />
-        <div className="relative px-6 py-14 lg:p-16 flex flex-col items-center text-center">
-          <img src={logo} alt="Real Lisiados F.C." className="h-20 lg:h-28 w-auto drop-shadow-xl mb-6" />
-          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-re-rojo mb-2">
+        <div className="relative px-5 py-7 sm:py-8 flex flex-col items-center text-center">
+          <img src={logo} alt="Real Lisiados F.C." className="h-12 sm:h-14 w-auto drop-shadow-md mb-3" />
+          <p className="text-[9px] font-black uppercase tracking-[0.18em] text-re-rojo mb-1">
             Real Lisiados F.C. • #SOMOSLISIADOS
           </p>
-          <h1 className="text-3xl lg:text-5xl font-black italic tracking-tighter uppercase leading-none">
+          <h1 className="text-2xl sm:text-3xl font-black italic tracking-tighter uppercase leading-none">
             Nuestra historia
           </h1>
-          <p className="mt-4 max-w-2xl text-xs lg:text-sm font-medium text-muted-foreground">
+          <p className="mt-2 max-w-lg text-[11px] sm:text-xs font-medium text-muted-foreground">
             Mucho más que un club de fútbol sala. Una familia unida por la pasión,
             el esfuerzo y la superación en cada encuentro.
           </p>
@@ -68,7 +68,7 @@ export default function HistoryPage() {
       </section>
 
       {/* Cifras */}
-      <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <section className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         {[
           { value: stats.seasons, label: 'Temporadas' },
           { value: stats.competitions, label: 'Competiciones' },
@@ -77,12 +77,12 @@ export default function HistoryPage() {
         ].map((item) => (
           <div
             key={item.label}
-            className="bg-card-bg border border-card-border rounded-3xl shadow-card p-6 text-center"
+            className="bg-card-bg border border-card-border rounded-2xl shadow-card px-3 py-3 text-center"
           >
-            <p className="text-3xl lg:text-4xl font-black italic text-re-rojo leading-none">
+            <p className="text-xl sm:text-2xl font-black italic text-re-rojo leading-none">
               {loading ? '—' : item.value}
             </p>
-            <p className="mt-2 text-[9px] lg:text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+            <p className="mt-1 text-[8px] font-black uppercase tracking-widest text-muted-foreground">
               {item.label}
             </p>
           </div>
@@ -90,11 +90,11 @@ export default function HistoryPage() {
       </section>
 
       {/* El club */}
-      <section className="bg-card-bg border border-card-border rounded-3xl shadow-card p-6 lg:p-10">
-        <h2 className="text-xl lg:text-2xl font-black italic tracking-tighter uppercase mb-4">
+      <section className="bg-card-bg border border-card-border rounded-2xl shadow-card p-4 sm:p-5">
+        <h2 className="text-base sm:text-lg font-black italic tracking-tighter uppercase mb-2">
           El club
         </h2>
-        <div className="space-y-4 text-sm lg:text-base leading-relaxed text-foreground/90">
+        <div className="space-y-2 text-xs sm:text-sm leading-relaxed text-foreground/90">
           <p>
             El <strong>Real Lisiados F.C.</strong> es un equipo de fútbol sala que compite
             jornada a jornada con una idea clara: dejarse todo en la pista y disfrutar
@@ -109,25 +109,25 @@ export default function HistoryPage() {
       </section>
 
       {/* Temporadas */}
-      <section className="bg-card-bg border border-card-border rounded-3xl shadow-card p-6 lg:p-10">
-        <h2 className="text-xl lg:text-2xl font-black italic tracking-tighter uppercase mb-6">
+      <section className="bg-card-bg border border-card-border rounded-2xl shadow-card p-4 sm:p-5">
+        <h2 className="text-base sm:text-lg font-black italic tracking-tighter uppercase mb-3">
           Temporada a temporada
         </h2>
         {loading ? (
-          <div className="space-y-3">
-            <div className="h-16 rounded-2xl bg-muted/10 animate-pulse" />
-            <div className="h-16 rounded-2xl bg-muted/10 animate-pulse" />
+          <div className="space-y-2">
+            <div className="h-8 rounded-xl bg-muted/10 animate-pulse" />
+            <div className="h-8 rounded-xl bg-muted/10 animate-pulse" />
           </div>
         ) : seasons.length === 0 ? (
-          <p className="text-center text-muted-foreground font-bold text-sm py-8 bg-muted/5 rounded-2xl border border-dashed border-card-border">
+          <p className="text-center text-muted-foreground font-bold text-xs py-5 bg-muted/5 rounded-xl border border-dashed border-card-border">
             Todavía no hay temporadas registradas.
           </p>
         ) : (
-          <ol className="relative ml-2 border-l-2 border-re-rojo/30 pl-6 space-y-6">
+          <ol className="relative ml-1 border-l-2 border-re-rojo/30 pl-5 space-y-3">
             {seasons.map((season) => (
               <li key={season.id} className="relative">
-                <span className="absolute -left-[31px] top-1 w-3 h-3 rounded-full bg-re-rojo shadow-[0_0_10px_rgba(226,29,44,0.6)]" />
-                <p className="font-black text-base lg:text-lg uppercase tracking-tight flex items-center gap-3 flex-wrap">
+                <span className="absolute -left-[25px] top-1 w-2.5 h-2.5 rounded-full bg-re-rojo" />
+                <p className="font-black text-sm uppercase tracking-tight flex items-center gap-2 flex-wrap">
                   Temporada {season.name}
                   {season.current && (
                     <span className="text-[8px] font-black uppercase tracking-widest bg-re-dorado text-re-azul-oscuro px-2 py-0.5 rounded-full">
@@ -142,16 +142,16 @@ export default function HistoryPage() {
       </section>
 
       {/* Valores */}
-      <section className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <section className="grid grid-cols-1 sm:grid-cols-3 gap-2">
         {values.map((item) => (
           <div
             key={item.title}
-            className="bg-card-bg border border-card-border rounded-3xl shadow-card p-6 lg:p-8 text-center hover:-translate-y-1 transition-transform"
+            className="bg-card-bg border border-card-border rounded-2xl shadow-card p-4 text-center"
           >
-            <h3 className="text-lg font-black italic tracking-tighter uppercase text-re-rojo mb-2">
+            <h3 className="text-sm font-black italic tracking-tighter uppercase text-re-rojo mb-1">
               {item.title}
             </h3>
-            <p className="text-xs lg:text-sm text-muted-foreground font-medium leading-relaxed">
+            <p className="text-[11px] sm:text-xs text-muted-foreground font-medium leading-relaxed">
               {item.text}
             </p>
           </div>
@@ -159,26 +159,26 @@ export default function HistoryPage() {
       </section>
 
       {/* CTA */}
-      <section className="bg-re-rojo rounded-3xl p-6 lg:p-10 flex flex-col sm:flex-row items-center justify-between gap-6 relative overflow-hidden shadow-xl">
-        <span className="absolute -right-6 -bottom-8 text-8xl lg:text-[160px] opacity-10 font-black italic select-none text-white">
+      <section className="bg-re-rojo rounded-2xl px-4 py-4 sm:px-5 flex flex-col sm:flex-row items-center justify-between gap-3 relative overflow-hidden">
+        <span className="absolute -right-4 -bottom-6 text-7xl opacity-10 font-black italic select-none text-white">
           RELI
         </span>
-        <div className="relative">
-          <h3 className="text-xl lg:text-2xl font-black text-white uppercase leading-none mb-2">
+        <div className="relative text-center sm:text-left">
+          <h3 className="text-base sm:text-lg font-black text-white uppercase leading-none mb-1">
             Vive la historia en directo
           </h3>
-          <p className="text-white/80 text-xs font-bold">Consulta el equipo y la clasificación actual.</p>
+          <p className="text-white/80 text-[11px] font-bold">Consulta el equipo y la clasificación actual.</p>
         </div>
-        <div className="relative flex gap-3 flex-wrap justify-center">
+        <div className="relative flex gap-2 flex-wrap justify-center">
           <Link
             to="/jugadores"
-            className="bg-white text-re-rojo font-black px-6 py-3 rounded-xl text-xs tracking-widest uppercase hover:scale-105 transition-transform"
+            className="bg-white text-re-rojo font-black px-4 py-2 rounded-lg text-[10px] tracking-widest uppercase"
           >
             Jugadores
           </Link>
           <Link
             to="/competicion"
-            className="bg-black/20 text-white border border-white/20 font-black px-6 py-3 rounded-xl text-xs tracking-widest uppercase hover:scale-105 transition-transform"
+            className="bg-black/20 text-white border border-white/20 font-black px-4 py-2 rounded-lg text-[10px] tracking-widest uppercase"
           >
             Clasificación
           </Link>

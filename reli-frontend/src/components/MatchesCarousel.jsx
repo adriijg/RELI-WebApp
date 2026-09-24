@@ -1,6 +1,7 @@
 // src/components/MatchesCarousel.jsx
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion, MotionConfig } from 'framer-motion';
 import logo from '../assets/reli-badge.png';
 import { STATUS_LABELS } from '../constants/matchStatus';
 import { fetchHomeMatches, pickFeaturedMatch, selectCarouselMatches } from '../utils/matches';
@@ -70,8 +71,8 @@ export default function MatchesCarousel() {
   const atEnd = index >= maxSlide;
 
   const arrowClass =
-    'p-3 bg-muted/10 rounded-full border border-card-border transition-all active:scale-90 ' +
-    'hover:bg-re-rojo hover:text-white disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-muted/10 disabled:hover:text-current';
+    'grid h-10 w-10 place-items-center rounded-full border border-re-dorado/40 text-re-dorado transition active:scale-90 ' +
+    'hover:bg-re-rojo hover:text-white hover:border-re-rojo disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-re-dorado disabled:hover:border-re-dorado/40';
 
   const slideWidth = `calc((100% - ${(visible - 1) * GAP}px) / ${visible})`;
 
@@ -110,9 +111,15 @@ export default function MatchesCarousel() {
   };
 
   return (
-    <section className="py-12 px-6 lg:px-8 bg-card-bg rounded-[32px] border border-card-border shadow-card transition-all">
-      <div className="flex flex-col sm:flex-row justify-between items-center mb-10 gap-4">
-        <h2 className="text-3xl lg:text-4xl font-black italic tracking-tighter uppercase leading-none">Próximos Partidos</h2>
+    <MotionConfig reducedMotion="user">
+    <section className="relative overflow-hidden rounded-[1.7rem] border border-re-dorado/30 bg-[#071018] px-5 py-8 text-white shadow-[0_24px_60px_rgba(0,0,0,0.28)] lg:px-8">
+      <div className="stadium-beam stadium-beam-left opacity-60" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(226,29,44,0.22),transparent_42%)]" />
+      <div className="relative mb-8 flex flex-col items-center justify-between gap-4 sm:flex-row">
+        <div>
+          <p className="mb-2 text-[10px] font-black uppercase tracking-[0.28em] text-re-dorado">Calendario</p>
+          <h2 className="text-3xl font-black italic uppercase leading-none tracking-tighter lg:text-4xl">Próximos Partidos</h2>
+        </div>
       <div className="hidden sm:flex gap-2">
           <button
             type="button"
@@ -167,17 +174,22 @@ export default function MatchesCarousel() {
               const rightGoals = matchIsHome ? match.rivalGoals : match.ourGoals;
               return (
               <div key={match.id} style={{ flex: `0 0 ${slideWidth}` }}>
-                <div
+                <motion.div
+                  initial={{ opacity: 0, y: 16 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, amount: 0.4 }}
+                  whileHover={{ y: -6 }}
+                  transition={{ duration: 0.4 }}
                   onClick={() => {
                     if (!suppressClick.current) navigate(`/partidos/${match.id}`);
                   }}
                   onKeyDown={(e) => { if (e.key === 'Enter') navigate(`/partidos/${match.id}`); }}
                   role="button"
                   tabIndex={0}
-                  className="h-full p-6 lg:p-8 rounded-3xl border border-card-border transition-all hover:scale-105 hover:bg-muted/5 cursor-pointer group bg-card-bg shadow-lg"
+                  className="group h-full cursor-pointer rounded-3xl border border-white/10 bg-black/30 p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition hover:border-re-dorado/50 lg:p-7"
                 >
                   <div className="flex justify-between items-start mb-8">
-                    <span className="text-[9px] lg:text-[10px] font-black px-2 py-1 bg-muted/10 rounded uppercase tracking-widest text-muted-foreground">
+                    <span className="rounded bg-white/5 px-2 py-1 text-[9px] font-black uppercase tracking-widest text-white/55 lg:text-[10px]">
                       {match.competitionName || "LIGA"}
                       {match.jornada != null ? ` • J${match.jornada}` : ""}
                     </span>
@@ -216,15 +228,15 @@ export default function MatchesCarousel() {
                     </div>
                   </div>
 
-                  <div className="pt-6 border-t border-card-border text-center">
+                  <div className="border-t border-white/10 pt-6 text-center">
                     <p className="text-re-rojo font-black text-xs lg:text-sm mb-1 uppercase tracking-widest">
                       {match.date ? new Date(match.date).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: '2-digit' }).toUpperCase() : "FECHA TBD"}
                     </p>
-                    <p className="text-[9px] lg:text-[10px] text-muted-foreground font-black uppercase tracking-tighter">
+                    <p className="text-[9px] font-black uppercase tracking-tighter text-white/45 lg:text-[10px]">
                       📍 {match.location || "Sede por confirmar"}
                     </p>
                   </div>
-                </div>
+                </motion.div>
               </div>
               );
             })}
@@ -253,5 +265,6 @@ export default function MatchesCarousel() {
         </button>
       </div>
     </section>
+    </MotionConfig>
   );
 }

@@ -1,6 +1,7 @@
 // src/components/NewsSection.jsx
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { motion, MotionConfig } from 'framer-motion';
 import { getEvents, toPage } from '../services/api';
 
 const TYPE_BADGES = {
@@ -30,17 +31,24 @@ export default function NewsSection() {
   const [main, ...rest] = news;
 
   return (
-    <section className="py-12">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-8 border-b border-card-border pb-4 gap-4 transition-all">
+    <MotionConfig reducedMotion="user">
+    <section className="py-4">
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, amount: 0.6 }}
+        className="mb-6 flex items-end justify-between gap-4 border-b border-re-dorado/25 pb-4"
+      >
         <div className="max-w-xl">
-          <h2 className="text-3xl lg:text-5xl font-black italic tracking-tighter uppercase leading-none">
+          <p className="mb-2 text-[10px] font-black uppercase tracking-[0.28em] text-re-dorado">Vestuario</p>
+          <h2 className="text-3xl font-black italic uppercase leading-none tracking-tighter lg:text-5xl">
             Últimas Noticias
           </h2>
-          <p className="text-muted-foreground mt-3 font-medium text-xs lg:text-sm">
+          <p className="mt-3 text-xs font-medium text-muted-foreground lg:text-sm">
             Toda la actualidad del primer equipo y la cantera directamente desde el vestuario.
           </p>
         </div>
-      </div>
+      </motion.div>
 
       {loading ? (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -55,18 +63,20 @@ export default function NewsSection() {
           Todavía no hay noticias publicadas.
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.55 }}>
           <Link
             to={`/noticias/${main.id}`}
-            className="relative group cursor-pointer overflow-hidden rounded-3xl bg-slate-900 aspect-[4/5] lg:aspect-auto card-depth min-h-[400px] block"
+            className="group relative block aspect-[4/5] min-h-[400px] cursor-pointer overflow-hidden rounded-3xl border border-re-dorado/30 bg-[#071018] shadow-[0_20px_50px_rgba(0,0,0,0.28)] lg:aspect-auto"
           >
             <img
               src={main.imageUrl || FALLBACK_IMAGE}
-              className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 opacity-70"
+              className="absolute inset-0 h-full w-full object-cover opacity-80 transition duration-700 group-hover:scale-105"
               alt={main.title}
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-re-azul-oscuro via-transparent to-transparent" />
-            <div className="absolute bottom-0 p-6 lg:p-10">
+            <span className="pointer-events-none absolute inset-y-0 -left-1/3 w-1/3 -skew-x-12 bg-gradient-to-r from-transparent via-white/25 to-transparent opacity-0 transition duration-700 group-hover:left-[120%] group-hover:opacity-100" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#071018] via-[#071018]/20 to-transparent" />
+            <div className="absolute bottom-0 p-6 lg:p-8">
               <span className="bg-re-dorado text-re-azul-oscuro text-[9px] lg:text-[10px] font-black px-3 py-1 rounded mb-4 inline-block uppercase tracking-widest">
                 {TYPE_BADGES[main.type] || main.type}
               </span>
@@ -83,13 +93,20 @@ export default function NewsSection() {
               </p>
             </div>
           </Link>
+          </motion.div>
 
           <div className="flex flex-col gap-6">
-            {rest.slice(0, 2).map((item) => (
-              <Link
+            {rest.slice(0, 2).map((item, index) => (
+              <motion.div
                 key={item.id}
+                initial={{ opacity: 0, x: 18 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.45, delay: 0.08 * index }}
+              >
+              <Link
                 to={`/noticias/${item.id}`}
-                className="bg-card-bg border border-card-border rounded-3xl overflow-hidden flex h-auto lg:h-1/2 group cursor-pointer transition-all hover:bg-muted/5 shadow-lg"
+                className="group flex h-auto cursor-pointer overflow-hidden rounded-3xl border border-re-dorado/25 bg-[#071018] text-white shadow-lg transition hover:-translate-y-1 hover:border-re-dorado/60 lg:h-full"
               >
                 <div className="w-1/3 overflow-hidden min-h-[150px] bg-re-azul-oscuro">
                   <img
@@ -105,7 +122,7 @@ export default function NewsSection() {
                   <h4 className="text-sm lg:text-xl font-black leading-tight uppercase transition-colors group-hover:text-re-rojo">
                     {item.title}
                   </h4>
-                  <p className="text-[9px] lg:text-xs text-muted-foreground mt-2 font-bold tracking-widest">
+                  <p className="mt-2 text-[9px] font-bold tracking-widest text-white/50 lg:text-xs">
                     {item.date
                       ? `🕒 ${new Date(item.date).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: '2-digit' }).toUpperCase()}`
                       : ''}
@@ -113,6 +130,7 @@ export default function NewsSection() {
                   </p>
                 </div>
               </Link>
+              </motion.div>
             ))}
 
             {rest.length === 0 && (
@@ -133,5 +151,6 @@ export default function NewsSection() {
         </div>
       )}
     </section>
+    </MotionConfig>
   );
 }

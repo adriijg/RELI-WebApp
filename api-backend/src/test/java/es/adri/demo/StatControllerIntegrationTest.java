@@ -191,7 +191,7 @@ class StatControllerIntegrationTest {
     }
 
     private Player createPlayer(String name) {
-        return playerRepository.save(new Player(null, name, name, 10, Position.ALA, "https://example.com/player.jpg", true));
+        return playerRepository.save(new Player(null, name, name, null, 10, Position.ALA, "https://example.com/player.jpg", true));
     }
 
     private Match createMatch(String rival) {

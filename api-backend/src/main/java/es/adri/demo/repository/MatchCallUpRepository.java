@@ -21,6 +21,7 @@ public interface MatchCallUpRepository extends JpaRepository<MatchCallUp, Long> 
             SELECT c.player.id, COUNT(c.id)
             FROM MatchCallUp c
             WHERE c.match.competition.season.current = true
+              AND c.match.status = es.adri.demo.model.MatchStatus.FINISHED
             GROUP BY c.player.id
             """)
     List<Object[]> countAppearancesByCurrentSeason();
@@ -29,6 +30,7 @@ public interface MatchCallUpRepository extends JpaRepository<MatchCallUp, Long> 
             SELECT c.player.id, COUNT(c.id)
             FROM MatchCallUp c
             WHERE c.match.competition.season.id = :seasonId
+              AND c.match.status = es.adri.demo.model.MatchStatus.FINISHED
             GROUP BY c.player.id
             """)
     List<Object[]> countAppearancesBySeason(@Param("seasonId") Long seasonId);
@@ -37,6 +39,7 @@ public interface MatchCallUpRepository extends JpaRepository<MatchCallUp, Long> 
             SELECT c.player.id, COUNT(c.id)
             FROM MatchCallUp c
             WHERE c.match.competition.season.current = true
+              AND c.match.status = es.adri.demo.model.MatchStatus.FINISHED
               AND c.player.position = es.adri.demo.model.Position.PORTERO
               AND c.match.rivalGoals = 0
             GROUP BY c.player.id
@@ -47,6 +50,7 @@ public interface MatchCallUpRepository extends JpaRepository<MatchCallUp, Long> 
                                                 SELECT c.player.id, COUNT(c.id)
                                                 FROM MatchCallUp c
                                                 WHERE c.match.competition.season.id = :seasonId
+                                                        AND c.match.status = es.adri.demo.model.MatchStatus.FINISHED
                                                         AND c.player.position = es.adri.demo.model.Position.PORTERO
                                                         AND c.match.rivalGoals = 0
                                                 GROUP BY c.player.id

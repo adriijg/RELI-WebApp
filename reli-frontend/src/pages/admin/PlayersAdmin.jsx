@@ -24,6 +24,7 @@ export default function PlayersAdmin() {
   const fields = [
     { name: 'name', label: 'Nombre', type: 'text', required: true },
     { name: 'nickname', label: 'Apodo', type: 'text', placeholder: 'Opcional' },
+    { name: 'surnames', label: 'Apellidos', type: 'text', placeholder: 'Opcional', fullWidth: true },
     { name: 'jerseyNumber', label: 'Dorsal (1-99)', type: 'number', required: true, min: 1, max: 99 },
     {
       name: 'position',
@@ -46,6 +47,7 @@ export default function PlayersAdmin() {
       ),
     },
     { key: 'name', label: 'Nombre' },
+    { key: 'surnames', label: 'Apellidos' },
     { key: 'nickname', label: 'Apodo' },
     {
       key: 'position',
@@ -100,7 +102,7 @@ export default function PlayersAdmin() {
           setModalOpen(true);
         }}
         onDelete={setDeleteTarget}
-        searchKeys={['name', 'nickname', 'position']}
+        searchKeys={['name', 'surnames', 'nickname', 'position']}
         emptyMessage="La plantilla está vacía."
       />
 

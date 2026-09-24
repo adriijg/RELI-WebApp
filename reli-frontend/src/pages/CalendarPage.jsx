@@ -2,7 +2,7 @@ import MatchCalendar from '../components/MatchCalendar';
 
 export default function CalendarPage() {
   return (
-    <main className="max-w-7xl mx-auto p-6">
+    <main className="max-w-3xl mx-auto p-4 sm:p-6">
       <MatchCalendar />
     </main>
   );

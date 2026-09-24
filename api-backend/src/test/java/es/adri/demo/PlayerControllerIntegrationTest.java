@@ -64,8 +64,8 @@ class PlayerControllerIntegrationTest {
 
     @Test
     void getPlayersReturnsOnlyActivePlayers() throws Exception {
-        playerRepository.save(new Player(null, "Jugador Activo", "Activo", 7, Position.ALA, "https://example.com/a.jpg", true));
-        playerRepository.save(new Player(null, "Jugador Inactivo", "Inactivo", 10, Position.PIVOT, "https://example.com/b.jpg", false));
+        playerRepository.save(new Player(null, "Jugador Activo", "Activo", null, 7, Position.ALA, "https://example.com/a.jpg", true));
+        playerRepository.save(new Player(null, "Jugador Inactivo", "Inactivo", null, 10, Position.PIVOT, "https://example.com/b.jpg", false));
 
         mockMvc.perform(get("/api/players"))
                 .andExpect(status().isOk())
@@ -104,8 +104,8 @@ class PlayerControllerIntegrationTest {
     @Test
     void updatePlayerAsAdminReturnsUpdatedPlayer() throws Exception {
         User admin = createUser("admin", "admin@example.com", "Password123", Role.ROLE_ADMIN);
-        Player player = playerRepository.save(new Player(null, "Juan Perez", "Juan", 8, Position.ALA, "https://example.com/a.jpg", true));
-        PlayerRequestDTO request = new PlayerRequestDTO("Juan Actualizado", "JP", 9, Position.PIVOT, "https://example.com/updated.jpg");
+        Player player = playerRepository.save(new Player(null, "Juan Perez", "Juan", null, 8, Position.ALA, "https://example.com/a.jpg", true));
+        PlayerRequestDTO request = new PlayerRequestDTO("Juan Actualizado", "JP", "Perez", 9, Position.PIVOT, "https://example.com/updated.jpg");
 
         mockMvc.perform(put("/api/players/{id}", player.getId())
                         .header("Authorization", basicAuth(admin.getUsername(), "Password123"))
@@ -120,7 +120,7 @@ class PlayerControllerIntegrationTest {
     @Test
     void deletePlayerAsAdminPerformsSoftDelete() throws Exception {
         User admin = createUser("admin", "admin@example.com", "Password123", Role.ROLE_ADMIN);
-        Player player = playerRepository.save(new Player(null, "Juan Perez", "Juan", 8, Position.ALA, "https://example.com/a.jpg", true));
+        Player player = playerRepository.save(new Player(null, "Juan Perez", "Juan", null, 8, Position.ALA, "https://example.com/a.jpg", true));
 
         mockMvc.perform(delete("/api/players/{id}", player.getId())
                         .header("Authorization", basicAuth(admin.getUsername(), "Password123")))
@@ -132,7 +132,7 @@ class PlayerControllerIntegrationTest {
     @Test
     void createPlayerWithInvalidPayloadReturnsBadRequest() throws Exception {
         User admin = createUser("admin", "admin@example.com", "Password123", Role.ROLE_ADMIN);
-        PlayerRequestDTO request = new PlayerRequestDTO("", "Juan", 0, Position.ALA, "not-a-url");
+        PlayerRequestDTO request = new PlayerRequestDTO("", "Juan", null, 0, Position.ALA, "not-a-url");
 
         mockMvc.perform(post("/api/players")
                         .header("Authorization", basicAuth(admin.getUsername(), "Password123"))
@@ -146,7 +146,7 @@ class PlayerControllerIntegrationTest {
     }
 
     private PlayerRequestDTO validPlayerRequest() {
-        return new PlayerRequestDTO("Juan Perez", "Juan", 8, Position.ALA, "https://example.com/player.jpg");
+        return new PlayerRequestDTO("Juan Perez", "Juan", null, 8, Position.ALA, "https://example.com/player.jpg");
     }
 
     private User createUser(String username, String email, String rawPassword, Role role) {

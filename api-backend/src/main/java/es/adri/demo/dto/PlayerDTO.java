@@ -13,6 +13,7 @@ public class PlayerDTO {
     private Long id;
     private String name;
     private String nickname;
+    private String surnames;
     private Integer jerseyNumber;
     private Position position;
     private String photoUrl;

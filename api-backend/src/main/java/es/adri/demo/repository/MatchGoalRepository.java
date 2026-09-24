@@ -16,6 +16,7 @@ public interface MatchGoalRepository extends JpaRepository<MatchGoal, Long> {
             SELECT g.player.id, COUNT(g.id)
             FROM MatchGoal g
             WHERE g.match.competition.season.current = true
+              AND g.match.status = es.adri.demo.model.MatchStatus.FINISHED
             GROUP BY g.player.id
             """)
     List<Object[]> countGoalsByCurrentSeason();
@@ -24,6 +25,7 @@ public interface MatchGoalRepository extends JpaRepository<MatchGoal, Long> {
             SELECT g.player.id, COUNT(g.id)
             FROM MatchGoal g
             WHERE g.match.competition.season.id = :seasonId
+              AND g.match.status = es.adri.demo.model.MatchStatus.FINISHED
             GROUP BY g.player.id
             """)
     List<Object[]> countGoalsBySeason(@Param("seasonId") Long seasonId);

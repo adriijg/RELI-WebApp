@@ -28,6 +28,8 @@ public class Player extends BaseEntity {
 
     private String nickname;
 
+    private String surnames;
+
     @Column(nullable = false)
     private Integer jerseyNumber;
 

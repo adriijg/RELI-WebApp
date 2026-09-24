@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import logo from '../assets/reli-badge.png';
 import { getMatchDetail, getMatches, getStats } from '../services/api';
 import { STATUS_LABELS } from '../constants/matchStatus';
+import { jerseyForCompetition } from '../constants/jerseys';
 import { POSITION_LABELS } from '../constants/positions';
 import { isMatchLive } from '../utils/matches';
 
@@ -240,16 +241,21 @@ export default function MatchDetail() {
     : { name: 'REAL LISIADOS', isUs: true };
   const leftGoals = isHome ? match.ourGoals : match.rivalGoals;
   const rightGoals = isHome ? match.rivalGoals : match.ourGoals;
-  const scorers = groupGoals(goals);
+  const historicalJersey = (playerId, jerseyNumber) =>
+    jerseyForCompetition(playerId, match.competitionId, jerseyNumber);
+  const scorers = groupGoals(goals).map((scorer) => ({
+    ...scorer,
+    jerseyNumber: historicalJersey(scorer.playerId, scorer.jerseyNumber),
+  }));
   const jerseyByPlayer = new Map();
   for (const g of goals) {
     if (g?.playerId != null && g?.jerseyNumber != null && !jerseyByPlayer.has(g.playerId)) {
-      jerseyByPlayer.set(g.playerId, g.jerseyNumber);
+      jerseyByPlayer.set(g.playerId, historicalJersey(g.playerId, g.jerseyNumber));
     }
   }
   for (const c of callups) {
     if (c?.playerId != null && c?.jerseyNumber != null && !jerseyByPlayer.has(c.playerId)) {
-      jerseyByPlayer.set(c.playerId, c.jerseyNumber);
+      jerseyByPlayer.set(c.playerId, historicalJersey(c.playerId, c.jerseyNumber));
     }
   }
   const carded = stats.filter((s) => (s?.yellowCards ?? 0) > 0 || (s?.redCards ?? 0) > 0);
@@ -273,7 +279,7 @@ export default function MatchDetail() {
           </span>
         </div>
 
-        <div className="p-4 sm:p-6 lg:p-10">
+        <div className="p-4 sm:p-5">
           <div className="flex justify-center mb-4 sm:mb-6">
             <span className="inline-block px-3 sm:px-4 py-1 sm:py-1.5 rounded-full text-[9px] sm:text-[10px] font-black uppercase tracking-widest bg-muted/10 text-muted-foreground border border-card-border">
               {STATUS_LABELS[match.status] || match.status}
@@ -282,7 +288,7 @@ export default function MatchDetail() {
 
           <div className="flex items-center justify-between gap-2 sm:gap-4 lg:gap-8">
             <div className="text-center flex-1 min-w-0">
-              <div className="h-12 sm:h-16 lg:h-24 flex items-center justify-center mb-2 sm:mb-3">
+              <div className="h-10 sm:h-14 flex items-center justify-center mb-2">
                 {left.isUs ? (
                   <img src={logo} alt="Real Lisiados F.C." className="h-full w-auto drop-shadow-lg" />
                 ) : (
@@ -296,11 +302,11 @@ export default function MatchDetail() {
 
             <div className="shrink-0 text-center px-1 sm:px-2">
               {finished ? (
-                <span className="text-re-rojo font-black italic text-3xl sm:text-5xl lg:text-7xl tracking-tighter block leading-none">
+                <span className="text-re-rojo font-black italic text-3xl sm:text-4xl lg:text-5xl tracking-tighter block leading-none">
                   {leftGoals} - {rightGoals}
                 </span>
               ) : (
-                <span className="text-re-rojo font-black italic text-3xl sm:text-5xl lg:text-7xl tracking-tighter block leading-none">
+                <span className="text-re-rojo font-black italic text-3xl sm:text-4xl lg:text-5xl tracking-tighter block leading-none">
                   VS
                 </span>
               )}
@@ -310,7 +316,7 @@ export default function MatchDetail() {
             </div>
 
             <div className="text-center flex-1 min-w-0">
-              <div className="h-12 sm:h-16 lg:h-24 flex items-center justify-center mb-2 sm:mb-3">
+              <div className="h-10 sm:h-14 flex items-center justify-center mb-2">
                 {right.isUs ? (
                   <img src={logo} alt="Real Lisiados F.C." className="h-full w-auto drop-shadow-lg" />
                 ) : (
@@ -327,11 +333,18 @@ export default function MatchDetail() {
             {formattedDate || 'Fecha TBD'}
           </p>
 
-          <div className="mt-6 sm:mt-8 pt-4 sm:pt-6 border-t border-card-border text-center">
+          <div className="mt-4 pt-4 border-t border-card-border text-center">
             <p className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-re-rojo mb-1">📍 Sede</p>
-            <p className="font-black text-xs sm:text-sm lg:text-base uppercase text-foreground/80">
+            <p className="font-black text-xs sm:text-sm uppercase text-foreground/80">
               {match.location || 'Sede por confirmar'}
             </p>
+            {finished && (
+              <p className="mt-3 text-[11px] font-bold uppercase tracking-widest text-foreground/70">
+                {callups.length} convocados
+                {carded.length > 0 ? ` · ${carded.length} ${carded.length === 1 ? 'tarjeta' : 'tarjetas'}` : ''}
+                {goals.length > 0 ? ` · ${goals.length} ${goals.length === 1 ? 'gol' : 'goles'}` : ' · sin goles nuestros'}
+              </p>
+            )}
           </div>
         </div>
       </section>
@@ -346,8 +359,10 @@ export default function MatchDetail() {
         </div>
 
         {scorers.length === 0 ? (
-          <p className="text-center text-muted-foreground font-bold text-xs sm:text-sm py-6 sm:py-8 bg-muted/5 rounded-2xl border border-dashed border-card-border">
-            Todavía no hay goles registrados para este partido.
+          <p className="text-center text-muted-foreground font-bold text-xs sm:text-sm py-4 bg-muted/5 rounded-2xl border border-dashed border-card-border">
+            {finished && (match.ourGoals ?? 0) === 0
+              ? 'El Real Lisiados no marcó en este partido.'
+              : 'Todavía no hay goles registrados para este partido.'}
           </p>
         ) : (
           <ul className="space-y-2 sm:space-y-3">
@@ -434,7 +449,7 @@ export default function MatchDetail() {
                 className="flex items-center gap-2 sm:gap-3 bg-muted/5 border border-card-border rounded-2xl px-3 sm:px-4 py-2.5 sm:py-3"
               >
                 <span className="shrink-0 w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-re-azul-oscuro text-white font-black text-xs sm:text-sm flex items-center justify-center">
-                  {player.jerseyNumber}
+                  {historicalJersey(player.playerId, player.jerseyNumber)}
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="font-black text-xs sm:text-sm truncate">{player.playerName}</p>
