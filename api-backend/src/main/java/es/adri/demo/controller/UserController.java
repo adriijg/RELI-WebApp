@@ -5,6 +5,8 @@ import es.adri.demo.dto.LoginRequestDTO;
 import es.adri.demo.dto.UserDTO;
 import es.adri.demo.dto.UserRegistrationDTO;
 import es.adri.demo.dto.UserUpdateDTO;
+import es.adri.demo.dto.PasswordResetConfirmDTO;
+import es.adri.demo.dto.PasswordResetRequestDTO;
 import jakarta.validation.Valid;
 import es.adri.demo.service.UserService;
 import java.util.List;
@@ -39,6 +41,30 @@ public class UserController {
     @PostMapping("/login")
     public ResponseEntity<AuthResponseDTO> loginUser(@Valid @RequestBody LoginRequestDTO loginRequestDTO) {
         return ResponseEntity.ok(userService.loginUser(loginRequestDTO));
+    }
+
+    @GetMapping("/verify-email")
+    public ResponseEntity<String> verifyEmail(@org.springframework.web.bind.annotation.RequestParam String token) {
+        userService.verifyEmail(token);
+        return ResponseEntity.ok("Email confirmado correctamente");
+    }
+
+    @PostMapping("/verify-email/resend")
+    public ResponseEntity<String> resendVerification(@Valid @RequestBody PasswordResetRequestDTO request) {
+        userService.resendVerification(request.getEmail());
+        return ResponseEntity.ok("Si la cuenta existe y necesita confirmación, recibirás un nuevo correo");
+    }
+
+    @PostMapping("/password-reset/request")
+    public ResponseEntity<String> requestPasswordReset(@Valid @RequestBody PasswordResetRequestDTO request) {
+        userService.requestPasswordReset(request.getEmail());
+        return ResponseEntity.ok("Si el email existe, recibirás instrucciones para recuperar la contraseña");
+    }
+
+    @PostMapping("/password-reset/confirm")
+    public ResponseEntity<String> confirmPasswordReset(@Valid @RequestBody PasswordResetConfirmDTO request) {
+        userService.resetPassword(request.getToken(), request.getPassword());
+        return ResponseEntity.ok("Contraseña actualizada correctamente");
     }
 
     @GetMapping

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion, MotionConfig } from 'framer-motion';
 import { fetchHomeMatches, isMatchLive } from '../utils/matches';
@@ -20,11 +20,17 @@ function sameDay(a, b) {
 }
 
 function buildWeeks(cursor) {
-  const first = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
+  const year = cursor.getFullYear();
+  const month = cursor.getMonth();
+  const first = new Date(year, month, 1);
+  const last = new Date(year, month + 1, 0);
   const startOffset = (first.getDay() + 6) % 7;
+  const daysInMonth = last.getDate();
+  const totalCells = startOffset + daysInMonth;
+  const weeksCount = Math.ceil(totalCells / 7);
   const gridStart = new Date(first);
   gridStart.setDate(first.getDate() - startOffset);
-  return Array.from({ length: 6 }, (_, week) => (
+  return Array.from({ length: weeksCount }, (_, week) => (
     Array.from({ length: 7 }, (_, day) => {
       const date = new Date(gridStart);
       date.setDate(gridStart.getDate() + week * 7 + day);
@@ -63,9 +69,9 @@ function CalendarMatch({ match, navigate }) {
       animate={{ opacity: 1, y: 0 }}
       whileHover={{ x: 4 }}
       onClick={() => navigate(`/partidos/${match.id}`)}
-      className="group grid w-full grid-cols-[52px_minmax(0,1fr)_auto] items-center gap-3 rounded-2xl border border-white/10 bg-black/30 p-3 text-left text-white hover:border-re-dorado/50 sm:grid-cols-[72px_minmax(0,1fr)_auto] sm:gap-5 sm:p-4"
+      className="group grid w-full grid-cols-[58px_minmax(0,1fr)_auto] items-center gap-3 rounded-2xl border border-card-border dark:border-white/10 bg-muted/5 dark:bg-black/30 p-4 text-left text-foreground dark:text-white hover:border-re-dorado/40 dark:hover:border-re-dorado/50 sm:grid-cols-[80px_minmax(0,1fr)_auto] sm:gap-5 sm:p-5"
     >
-      <div className="border-r border-re-dorado/30 pr-3 text-center sm:pr-5">
+      <div className="border-r border-card-border dark:border-re-dorado/30 pr-3 text-center sm:pr-5">
         <p className="text-2xl font-black leading-none text-re-rojo sm:text-3xl">{date.getDate()}</p>
         <p className="mt-1 text-[9px] font-black uppercase tracking-widest text-re-dorado sm:text-[10px]">
           {date.toLocaleDateString('es-ES', { weekday: 'short' }).replace('.', '')}
@@ -74,7 +80,7 @@ function CalendarMatch({ match, navigate }) {
 
       <div className="min-w-0">
         <div className="flex items-center gap-2 flex-wrap mb-1">
-          <span className="text-[9px] font-black uppercase tracking-widest text-white/45">
+          <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground dark:text-white/45">
             {formatTime(date)}
           </span>
           <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${
@@ -83,12 +89,12 @@ function CalendarMatch({ match, navigate }) {
             {live ? 'En vivo' : STATUS_LABELS[match.status] || match.status}
           </span>
         </div>
-        <p className="font-black uppercase tracking-tight truncate group-hover:text-re-rojo transition-colors">
+        <p className="font-black uppercase tracking-tight truncate group-hover:text-re-rojo transition-colors text-foreground dark:text-white">
           {isHome ? 'Real Lisiados' : match.rival}
           <span className="mx-2 italic text-re-rojo">vs</span>
           {isHome ? match.rival : 'Real Lisiados'}
         </p>
-        <p className="mt-1 truncate text-[9px] font-bold uppercase tracking-tight text-white/40 sm:text-[10px]">
+        <p className="mt-1 truncate text-[9px] font-bold uppercase tracking-tight text-muted-foreground dark:text-white/40 sm:text-[10px]">
           {isHome ? 'Local' : 'Visitante'}{match.location ? ` · ${match.location}` : ''}
         </p>
       </div>
@@ -104,6 +110,9 @@ export default function MatchCalendar() {
   const [loading, setLoading] = useState(true);
   const [cursor, setCursor] = useState(() => new Date());
   const [selectedDay, setSelectedDay] = useState(null);
+  const [dragOffset, setDragOffset] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStartY = useRef(0);
 
   useEffect(() => {
     fetchHomeMatches()
@@ -152,14 +161,35 @@ export default function MatchCalendar() {
     setCursor(new Date());
   };
 
+  const handlePointerDown = (e) => {
+    if (e.pointerType === 'mouse') return;
+    dragStartY.current = e.clientY;
+    setIsDragging(true);
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+  const handlePointerMove = (e) => {
+    if (!isDragging) return;
+    setDragOffset(e.clientY - dragStartY.current);
+  };
+  const handlePointerUp = (e) => {
+    if (!isDragging) return;
+    const offset = e.clientY - dragStartY.current;
+    const threshold = 100;
+    if (offset > threshold) shiftMonth(-1);
+    else if (offset < -threshold) shiftMonth(1);
+    setDragOffset(0);
+    setIsDragging(false);
+    e.currentTarget.releasePointerCapture?.(e.pointerId);
+  };
+
   const agendaTitle = selectedDay
     ? selectedDay.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })
     : formatMonth(cursor);
 
   return (
     <MotionConfig reducedMotion="user">
-    <section className="gold-sweep relative overflow-hidden rounded-[1.7rem] border border-re-dorado/30 bg-[#071018] px-3 py-5 text-white shadow-[0_24px_60px_rgba(0,0,0,0.35)] sm:px-5 sm:py-6">
-      <div className="stadium-beam stadium-beam-right opacity-50" />
+    <section className="gold-sweep relative overflow-hidden rounded-[1.7rem] border border-card-border dark:border-re-dorado/30 bg-card-bg dark:bg-[#071018] px-4 py-6 text-foreground dark:text-white shadow-card dark:shadow-[0_24px_60px_rgba(0,0,0,0.35)] sm:px-6 sm:py-8">
+      <div className="stadium-beam stadium-beam-right opacity-50 hidden dark:block" />
       <div className="relative mb-4 flex items-end justify-between gap-4">
         <div>
           <p className="mb-1 text-[10px] font-black uppercase tracking-[0.25em] text-re-dorado">Agenda del equipo</p>
@@ -180,7 +210,7 @@ export default function MatchCalendar() {
           <button
             type="button"
             onClick={() => shiftMonth(-1)}
-            className="grid h-9 w-9 place-items-center rounded-full border border-white/10 text-white/70 transition-colors hover:border-re-dorado/50 hover:text-re-dorado"
+            className="grid h-9 w-9 place-items-center rounded-full border border-card-border dark:border-white/10 text-foreground/70 dark:text-white/70 transition-colors hover:border-re-dorado/50 hover:text-re-dorado"
             aria-label="Mes anterior"
           >
             ‹
@@ -188,7 +218,7 @@ export default function MatchCalendar() {
           <button
             type="button"
             onClick={() => shiftMonth(1)}
-            className="grid h-9 w-9 place-items-center rounded-full border border-white/10 text-white/70 transition-colors hover:border-re-dorado/50 hover:text-re-dorado"
+            className="grid h-9 w-9 place-items-center rounded-full border border-card-border dark:border-white/10 text-foreground/70 dark:text-white/70 transition-colors hover:border-re-dorado/50 hover:text-re-dorado"
             aria-label="Mes siguiente"
           >
             ›
@@ -200,24 +230,29 @@ export default function MatchCalendar() {
         <div className="py-12 text-center text-re-rojo font-black uppercase tracking-widest text-xs animate-pulse">Cargando calendario...</div>
       ) : (
         <>
-          <AnimatePresence mode="wait">
+          <AnimatePresence mode="popLayout">
           <motion.div
             key={`${cursor.getFullYear()}-${cursor.getMonth()}`}
-            initial={{ opacity: 0, y: 10 }}
+            initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.28 }}
-            className="overflow-hidden rounded-2xl border border-re-dorado/25"
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+            className="overflow-hidden rounded-2xl border border-card-border dark:border-re-dorado/25 touch-none select-none will-change-transform"
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerUp}
+            style={{ transform: `translateY(${dragOffset}px)`, transition: isDragging ? 'none' : 'transform 0.18s ease' }}
           >
-            <div className="grid grid-cols-7 border-b border-re-dorado/20 bg-black/30">
+            <div className="grid grid-cols-7 border-b border-card-border dark:border-re-dorado/20 bg-muted/5 dark:bg-black/30">
               {WEEKDAYS.map((day) => (
-                <div key={day} className="py-2 text-center text-[11px] font-bold text-re-dorado">
+                <div key={day} className="py-2.5 text-center text-[12px] font-black tracking-widest text-re-dorado">
                   {day}
                 </div>
               ))}
             </div>
             {weeks.map((week) => (
-              <div key={dayKey(week[0])} className="grid grid-cols-7 border-b border-white/5 last:border-b-0">
+              <div key={dayKey(week[0])} className="grid grid-cols-7 border-b-2 border-card-border dark:border-white/10 last:border-b-0">
                 {week.map((date) => {
                   const inMonth = date.getMonth() === cursor.getMonth();
                   const isToday = sameDay(date, today);
@@ -229,37 +264,37 @@ export default function MatchCalendar() {
                   return (
                     <div
                       key={dayKey(date)}
-                      className={`min-h-[2.75rem] border-r border-white/5 p-1 text-left align-top transition-colors last:border-r-0 sm:min-h-[3.4rem] ${
-                        isSelected ? 'bg-re-rojo/15' : dayMatches.length ? 'bg-re-dorado/5' : ''
-                      } ${inMonth ? '' : 'bg-black/20'}`}
+                      className={`min-h-[4.6rem] border-r border-card-border dark:border-white/5 p-1.5 text-left align-top transition-colors last:border-r-0 sm:min-h-[5.2rem] lg:min-h-[5.8rem] ${
+                        isSelected ? 'bg-re-rojo/15' : dayMatches.length ? 'bg-re-dorado/10 dark:bg-re-dorado/10' : ''
+                      } ${inMonth ? '' : 'bg-muted/5 dark:bg-black/20'}`}
                     >
                       <button
                         type="button"
                         onClick={() => setSelectedDay(isSelected ? null : date)}
-                        className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-semibold sm:h-7 sm:w-7 sm:text-xs ${
+                        className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-[13px] font-black sm:h-8 sm:w-8 sm:text-sm ${
                           isToday
                             ? 'bg-re-rojo text-white shadow-[0_0_14px_rgba(226,29,44,0.65)]'
-                            : inMonth ? 'text-white hover:bg-white/10' : 'text-white/30'
+                            : inMonth ? 'text-foreground dark:text-white hover:bg-muted/10 dark:hover:bg-white/10' : 'text-muted-foreground dark:text-white/30'
                         }`}
                         aria-label={`Ver partidos del ${date.toLocaleDateString('es-ES')}`}
                         aria-pressed={isSelected}
                       >
                         {date.getDate()}
                       </button>
-                      <div className="mt-1 space-y-0.5">
+                      <div className="mt-1.5 space-y-1">
                         {visible.map((match) => (
                           <button
                             key={match.id}
                             type="button"
                             onClick={() => navigate(`/partidos/${match.id}`)}
-                            className={`block w-full truncate rounded px-1 py-0.5 text-left text-[8px] sm:text-[10px] font-semibold leading-tight ${eventTone(match)}`}
+                            className={`block w-full truncate rounded-md px-1.5 py-1 text-left text-[10px] sm:text-[11px] font-black leading-tight shadow-sm ${eventTone(match)}`}
                             title={match.rival}
                           >
                             {match.rival}
                           </button>
                         ))}
                         {extra > 0 && (
-                          <span className="block px-1 text-[9px] font-bold text-foreground/45">+{extra}</span>
+                          <span className="block px-1 text-[10px] font-black text-muted-foreground dark:text-white/60">+{extra} más</span>
                         )}
                       </div>
                     </div>
@@ -271,8 +306,8 @@ export default function MatchCalendar() {
           </AnimatePresence>
 
           <div className="relative mt-8">
-            <div className="mb-2 flex items-end justify-between gap-3 border-b border-re-dorado/20 pb-2">
-              <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-re-dorado capitalize">
+            <div className="mb-3 flex items-end justify-between gap-3 border-b border-card-border dark:border-re-dorado/20 pb-3">
+              <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-re-dorado capitalize">
                 {agendaTitle}
               </h3>
               {selectedDay && (
@@ -286,7 +321,7 @@ export default function MatchCalendar() {
               )}
             </div>
             {visibleMatches.length === 0 ? (
-              <p className="py-8 text-center text-sm font-bold text-white/45">
+              <p className="py-10 text-center text-sm font-black uppercase tracking-widest text-muted-foreground dark:text-white/45">
                 No hay partidos en {selectedDay ? 'este día' : 'este mes'}.
               </p>
             ) : (

@@ -27,6 +27,16 @@ export default function CompetitionsAdmin() {
     sortBy: 'name',
     direction: 'asc',
   });
+  const handleBulkDelete = async (selected) => {
+    if (!window.confirm(`¿Borrar ${selected.length} competiciones seleccionadas? Esta acción no se puede deshacer.`)) return;
+    try {
+      await Promise.all(selected.map((row) => deleteCompetition(row.id)));
+      await crud.load(crud.page);
+    } catch (err) {
+      alert(err.message || 'No se pudieron borrar todas las competiciones');
+      await crud.load(crud.page);
+    }
+  };
 
   useEffect(() => {
     getSeasons({ size: 100 })
@@ -106,6 +116,7 @@ export default function CompetitionsAdmin() {
           setModalOpen(true);
         }}
         onDelete={setDeleteTarget}
+        onBulkDelete={handleBulkDelete}
         searchKeys={['name', 'type', 'seasonName']}
         emptyMessage="No hay competiciones creadas."
       />

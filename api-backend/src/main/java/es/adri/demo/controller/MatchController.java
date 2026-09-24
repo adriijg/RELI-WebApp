@@ -41,14 +41,28 @@ public class MatchController {
         return ResponseEntity.ok(matchService.findMatchesByCompetitionId(competitionId));
     }
 
+    @GetMapping("/next")
+    public ResponseEntity<MatchDTO> getNextMatch() {
+        MatchDTO dto = matchService.findNextMatch();
+        if (dto == null) return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(dto);
+    }
+
     @GetMapping
     public ResponseEntity<PagedResponseDTO<MatchDTO>> getAllMatches(
             @org.springframework.web.bind.annotation.RequestParam(defaultValue = "0") int page,
             @org.springframework.web.bind.annotation.RequestParam(defaultValue = "10") int size,
             @org.springframework.web.bind.annotation.RequestParam(defaultValue = "date") String sortBy,
-            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "desc") String direction
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "desc") String direction,
+            @org.springframework.web.bind.annotation.RequestParam(required = false) String status
     ) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.fromString(direction), sortBy));
+        if (status != null && !status.isBlank()) {
+            try {
+                es.adri.demo.model.MatchStatus st = es.adri.demo.model.MatchStatus.valueOf(status);
+                return ResponseEntity.ok(matchService.findMatchesByStatus(st, pageable));
+            } catch (IllegalArgumentException ignored) {}
+        }
         return ResponseEntity.ok(matchService.findAllMatches(pageable));
     }
 

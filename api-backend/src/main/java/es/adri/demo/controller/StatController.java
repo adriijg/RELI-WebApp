@@ -35,6 +35,8 @@ public class StatController {
     public ResponseEntity<PagedResponseDTO<StatDTO>> getStats(
             @RequestParam(required = false) Long playerId,
             @RequestParam(required = false) Long matchId,
+            @RequestParam(required = false) Long seasonId,
+            @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "id") String sortBy,
@@ -46,6 +48,9 @@ public class StatController {
         }
         if (matchId != null) {
             return ResponseEntity.ok(statService.findStatsByMatchId(matchId, pageable));
+        }
+        if ((seasonId != null) || (search != null && !search.isBlank())) {
+            return ResponseEntity.ok(statService.findStatsFiltered(seasonId, search, pageable));
         }
         return ResponseEntity.ok(statService.findAllStats(pageable));
     }

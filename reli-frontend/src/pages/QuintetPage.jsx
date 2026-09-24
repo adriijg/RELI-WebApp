@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useApp } from '../context/AppContext';
-import { getAllPlayers, getCompetitions, getMatches, getQuintetBallots, getQuintetTally, getMyQuintetVote, getSeasons, saveQuintetVote, toPage } from '../services/api';
+import { getAllPlayers, getCompetitions, getMatches, getMatchDetail, getPlayerSeasonStats, getQuintetBallots, getQuintetSeasonTally, getQuintetStatus, getQuintetTally, deleteQuintetVote, getMyQuintetVote, getSeasons, openQuintet, closeQuintet, saveQuintetVote, toPage } from '../services/api';
 import { jerseyForSeason } from '../constants/jerseys';
 import { POSITION_LABELS } from '../constants/positions';
 
@@ -87,16 +87,18 @@ export default function QuintetPage() {
   const [saved, setSaved] = useState(null);
   const [tally, setTally] = useState(null);
   const [ballots, setBallots] = useState([]);
+  const [seasonTally, setSeasonTally] = useState(null);
+  const [quintetStatus, setQuintetStatus] = useState(null);
+  const isVoteOpen = quintetStatus?.open === true;
 
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
-      const [seasonData, competitionData, matchData, squad] = await Promise.all([
+      const [seasonData, competitionData, matchData] = await Promise.all([
         getSeasons({ size: 100, sortBy: 'name', direction: 'desc' }),
         getCompetitions({ size: 100 }),
         getMatches({ size: 100, sortBy: 'date', direction: 'asc' }),
-        getAllPlayers(),
       ]);
       const seasons = toPage(seasonData).content;
       const current = seasons.find((season) => season.current) || seasons[0];
@@ -107,13 +109,56 @@ export default function QuintetPage() {
       );
       const seasonMatches = toPage(matchData).content.filter((item) => competitionIds.has(item.competitionId));
       const chosen = weekMatch(seasonMatches);
-      const roster = (Array.isArray(squad) ? squad : []).map((player) => ({
-        ...player,
-        jerseyNumber: jerseyForSeason(player.id, current?.id, player.jerseyNumber),
-      }));
+      // roster por temporada: solo jugadores asignados a esa temporada
+      let squad = [];
+      if (current) {
+        try {
+          const stats = await getPlayerSeasonStats({ seasonId: current.id });
+          squad = Array.isArray(stats) ? stats : [];
+          // stats ya trae jersey del roster; mapear a formato esperado
+          squad = squad.map((p) => ({
+            id: p.playerId,
+            name: p.name,
+            nickname: p.nickname,
+            surnames: p.surnames,
+            jerseyNumber: jerseyForSeason(p.playerId, current.id, p.jerseyNumber),
+            position: p.position,
+            photoUrl: p.photoUrl,
+          }));
+        } catch {
+          squad = await getAllPlayers().catch(() => []);
+          squad = (Array.isArray(squad) ? squad : []).map((player) => ({
+            ...player,
+            jerseyNumber: jerseyForSeason(player.id, current.id, player.jerseyNumber),
+          }));
+        }
+        if (squad.length === 0) {
+          const fallback = await getAllPlayers().catch(() => []);
+          squad = (Array.isArray(fallback) ? fallback : []).map((player) => ({
+            ...player,
+            jerseyNumber: jerseyForSeason(player.id, current.id, player.jerseyNumber),
+          }));
+        }
+      } else {
+        const fallback = await getAllPlayers().catch(() => []);
+        squad = Array.isArray(fallback) ? fallback : [];
+      }
       setSeasonId(current ? String(current.id) : '');
       setMatch(chosen);
-      setPlayers(roster);
+      // solo convocados de ese partido
+      if (chosen?.id) {
+        try {
+          const d = await getMatchDetail(chosen.id);
+          const callups = d?.callups || [];
+          const ids = new Set(callups.map(c => String(c.playerId ?? c.id)));
+          if (callups.length > 0) {
+            squad = squad.filter(p => ids.has(String(p.id)));
+          } else {
+            squad = [];
+          }
+        } catch {}
+      }
+      setPlayers(squad);
     } catch {
       setError('No se pudo abrir la votación de esta jornada.');
     } finally {
@@ -135,6 +180,12 @@ export default function QuintetPage() {
     if (!currentSeason || !currentMatch) return;
     const tallyData = await getQuintetTally(currentSeason, currentMatch.jornada).catch(() => null);
     setTally(tallyData);
+    const seasonData = await getQuintetSeasonTally(currentSeason).catch(() => null);
+    setSeasonTally(seasonData);
+    try {
+      const st = await getQuintetStatus(currentSeason, currentMatch.jornada).catch(() => null);
+      setQuintetStatus(st);
+    } catch { setQuintetStatus(null); }
     if (!isAdmin) {
       setBallots([]);
       return;
@@ -144,6 +195,11 @@ export default function QuintetPage() {
   }, [isAdmin]);
 
   useEffect(() => {
+    if (!seasonId || !match?.jornada) { setQuintetStatus(null); return; }
+    getQuintetStatus(seasonId, match.jornada).then(setQuintetStatus).catch(() => setQuintetStatus({ open: false }));
+  }, [seasonId, match?.jornada]);
+
+  useEffect(() => {
     if (!seasonId || !match) return undefined;
     let cancelled = false;
     (async () => {
@@ -151,8 +207,14 @@ export default function QuintetPage() {
         setSaved(null);
         setLineup(emptyLineup());
         setBallots([]);
-        const tallyData = await getQuintetTally(seasonId, match.jornada).catch(() => null);
-        if (!cancelled) setTally(tallyData);
+        const [tallyData, seasonData] = await Promise.all([
+          getQuintetTally(seasonId, match.jornada).catch(() => null),
+          getQuintetSeasonTally(seasonId).catch(() => null),
+        ]);
+        if (!cancelled) {
+          setTally(tallyData);
+          setSeasonTally(seasonData);
+        }
         return;
       }
       claimLegacy(voterKey);
@@ -202,6 +264,7 @@ export default function QuintetPage() {
       openAuth('login');
       return;
     }
+    if (!isVoteOpen) return;
     if (locked) return;
     if (chosenIds.has(player.id)) {
       setLineup((current) => {
@@ -223,6 +286,7 @@ export default function QuintetPage() {
   };
 
   const clearSlot = (slotId) => {
+    if (!isVoteOpen) return;
     if (locked) return;
     setLineup((current) => ({ ...current, [slotId]: null }));
     setActiveSlot(slotId);
@@ -233,6 +297,7 @@ export default function QuintetPage() {
       openAuth('login');
       return;
     }
+    if (!isVoteOpen) return;
     if (locked || filled < 5 || !match) return;
     const playerIds = SLOTS.map((slot) => lineup[slot.id]);
     const ballot = await saveQuintetVote({
@@ -253,6 +318,27 @@ export default function QuintetPage() {
   };
 
   const editVote = () => setSaved(null);
+  const deleteVote = async () => {
+    if (!seasonId || !match?.jornada) return;
+    try {
+      await deleteQuintetVote(seasonId, match.jornada);
+      setSaved(null);
+      setMyVoteIds(null);
+      setLineup(emptyLineup());
+      // limpia localStorage por si quedó
+      try {
+        const all = JSON.parse(localStorage.getItem('reli-quinteto-votes') || '{}');
+        const key = String(voterKey);
+        if (all[key] && String(all[key].seasonId) === String(seasonId) && Number(all[key].jornada) === Number(match.jornada)) {
+          delete all[key];
+          localStorage.setItem('reli-quinteto-votes', JSON.stringify(all));
+        }
+      } catch {}
+      const s = await getQuintetStatus(seasonId, match.jornada).catch(() => null);
+      if (s) setQuintetStatus(s);
+      await refreshPublic(seasonId, match);
+    } catch (e) { alert(e.message || 'No se pudo borrar'); }
+  };
 
   const playerById = (id) => players.find((player) => player.id === id);
 
@@ -295,6 +381,18 @@ export default function QuintetPage() {
           : 'Todavía no hay una jornada abierta para votar.'}
       </p>
 
+      {quintetStatus && (
+        <div className={`rounded-xl border px-3 py-2 text-[11px] font-black uppercase tracking-widest ${isVoteOpen ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' : 'bg-re-rojo/10 text-re-rojo border-re-rojo/20'}`}>
+          {isVoteOpen ? `Votación abierta · cierra jueves 23:59${quintetStatus.closesAt ? ` (${new Date(quintetStatus.closesAt).toLocaleString('es-ES', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' })})` : ''}` : 'Votación cerrada · espera a que el admin la abra'}
+        </div>
+      )}
+      {isAdmin && match && seasonId && (
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={async () => { try { const s = await openQuintet(seasonId, match.jornada); setQuintetStatus(s); } catch (e) { alert(e.message); } }} className="rounded-full bg-emerald-600 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-white">Abrir votación</button>
+          <button type="button" onClick={async () => { try { const s = await closeQuintet(seasonId, match.jornada); setQuintetStatus(s); } catch (e) { alert(e.message); } }} className="rounded-full bg-re-rojo px-4 py-2 text-[10px] font-black uppercase tracking-widest text-white">Cerrar votación</button>
+        </div>
+      )}
+
       <section className="space-y-3">
         <div className="stadium-grass relative min-h-[400px] overflow-hidden rounded-[1.4rem] border border-re-dorado/35 shadow-[0_18px_50px_rgba(0,0,0,0.35)]">
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(193,154,91,0.18),transparent_46%)]" />
@@ -312,6 +410,7 @@ export default function QuintetPage() {
                 key={slot.id}
                 type="button"
                 onClick={() => {
+                  if (!isVoteOpen) return;
                   if (!voterKey) { openAuth('login'); return; }
                   if (player) clearSlot(slot.id);
                   else setActiveSlot(slot.id);
@@ -356,7 +455,10 @@ export default function QuintetPage() {
           </div>
         </div>
 
-        {voterKey && !locked && (
+        {isVoteOpen && players.length === 0 && (
+          <div className="rounded-2xl border border-dashed border-card-border bg-muted/5 px-4 py-3 text-center text-[11px] font-bold text-muted-foreground">Aún no hay convocados para este partido, votación no disponible.</div>
+        )}
+        {isVoteOpen && voterKey && !locked && players.length > 0 && (
           <div className="rounded-[1.4rem] border border-re-dorado/20 bg-card-bg/80 px-3 py-3">
             <p className="text-[9px] font-black uppercase tracking-[0.2em] text-re-dorado">
               Plantilla · cualquier puesto
@@ -411,18 +513,29 @@ export default function QuintetPage() {
               Entrar para votar
             </button>
           ) : locked ? (
-            <button
-              type="button"
-              onClick={editVote}
-              className="rounded-full border border-re-dorado/50 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-re-dorado"
-            >
-              Cambiar voto
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={editVote}
+                className="rounded-full border border-re-dorado/50 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-re-dorado"
+              >
+                Cambiar voto
+              </button>
+              {isVoteOpen && (
+                <button
+                  type="button"
+                  onClick={deleteVote}
+                  className="rounded-full border border-re-rojo/50 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-re-rojo hover:bg-re-rojo hover:text-white transition-colors"
+                >
+                  Borrar voto
+                </button>
+              )}
+            </div>
           ) : (
             <button
               type="button"
               onClick={submit}
-              disabled={filled < 5}
+              disabled={filled < 5 || !isVoteOpen}
               className="rounded-full bg-re-rojo px-4 py-2 text-[10px] font-black uppercase tracking-widest text-white disabled:cursor-not-allowed disabled:opacity-40"
             >
               Enviar voto
@@ -454,6 +567,62 @@ export default function QuintetPage() {
               <li className="text-[11px] text-white/45">Todavía no hay papeletas en esta jornada.</li>
             )}
           </ol>
+        </section>
+      )}
+
+      {seasonTally && (seasonTally.yearlyQuintet || []).length > 0 && (
+        <section className="rounded-[1.4rem] border border-re-dorado/30 bg-card-bg p-4">
+          <p className="text-[9px] font-black uppercase tracking-[0.22em] text-re-rojo">Acumulado temporada</p>
+          <h2 className="mt-1 text-lg font-black italic uppercase tracking-tight">Quinteto del año · {seasonTally.totalBallots} papeletas</h2>
+          <p className="mt-1 text-[11px] text-foreground/60">
+            Suma de todas las jornadas: 4 jugadores de campo más votados + portero más votado.
+          </p>
+          <div className="stadium-grass relative mt-3 min-h-[280px] overflow-hidden rounded-[1.2rem] border border-re-dorado/35">
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(193,154,91,0.18),transparent_46%)]" />
+            <div className="pointer-events-none absolute inset-3 rounded-sm border border-re-dorado/25" />
+            <div className="pointer-events-none absolute left-3 right-3 top-1/2 h-px bg-white/25" />
+            <div className="pointer-events-none absolute left-1/2 top-1/2 h-20 w-20 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/30" />
+            {seasonTally.yearlyQuintet.map((row, index) => {
+              const slot = SLOTS[index];
+              const player = playerById(row.playerId);
+              if (!slot) return null;
+              return (
+                <div key={row.playerId} className="absolute z-10 w-20 -translate-x-1/2 -translate-y-1/2 text-center" style={{ left: `${slot.x}%`, top: `${slot.y}%` }}>
+                  <span className="relative mx-auto block w-fit">
+                    <img src={player?.photoUrl || FALLBACK_PHOTO} alt="" className="relative h-10 w-10 rounded-full object-cover ring-2 ring-re-dorado shadow-lg" onError={(e) => { e.target.src = FALLBACK_PHOTO; }} />
+                    <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-re-rojo text-[10px] font-black text-white">{player?.jerseyNumber ?? '•'}</span>
+                  </span>
+                  <span className="mt-1 block text-[10px] font-black uppercase leading-tight text-white">{player?.nickname || player?.name || `Jugador ${row.playerId}`}</span>
+                  <span className="block text-[8px] font-bold uppercase tracking-widest text-re-dorado">{row.votes} votos</span>
+                </div>
+              );
+            })}
+          </div>
+          <ol className="mt-3 space-y-2">
+            {(seasonTally.yearlyQuintet || []).map((row, index) => {
+              const player = playerById(row.playerId);
+              return (
+                <li key={row.playerId} className="flex items-center justify-between rounded-xl bg-muted/20 px-3 py-2">
+                  <span className="text-sm font-black uppercase">{index + 1}. {player?.nickname || player?.name || `Jugador ${row.playerId}`} <span className="text-[10px] text-foreground/50">({POSITION_LABELS[player?.position] || player?.position || ''})</span></span>
+                  <span className="text-[11px] font-black text-re-rojo">{row.votes} votos</span>
+                </li>
+              );
+            })}
+          </ol>
+          <details className="mt-3">
+            <summary className="cursor-pointer text-[11px] font-black uppercase tracking-widest text-re-dorado">Ver ranking completo</summary>
+            <ol className="mt-2 space-y-1">
+              {(seasonTally.ranking || []).map((row, index) => {
+                const player = playerById(row.playerId);
+                return (
+                  <li key={row.playerId} className="flex items-center justify-between rounded-lg bg-black/5 px-3 py-1.5 text-xs">
+                    <span>{index + 1}. {player?.nickname || player?.name || row.playerId}</span>
+                    <span className="font-black">{row.votes}</span>
+                  </li>
+                );
+              })}
+            </ol>
+          </details>
         </section>
       )}
 

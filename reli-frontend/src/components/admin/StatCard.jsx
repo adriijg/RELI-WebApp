@@ -10,10 +10,10 @@ export default function StatCard({ label, value, accent = 'red', hint }) {
   };
 
   return (
-    <div className={`card-depth rounded-3xl p-5 border bg-gradient-to-br ${accents[accent]} transition-all hover:-translate-y-1 hover:shadow-xl`}>
-      <p className="text-4xl font-black italic tracking-tighter leading-none">{value ?? '—'}</p>
-      <p className="mt-3 text-[10px] font-black uppercase tracking-widest text-muted-foreground">{label}</p>
-      {hint && <p className="mt-1 text-[10px] font-bold text-muted-foreground/70">{hint}</p>}
+    <div className={`card-depth rounded-2xl lg:rounded-2xl p-3 lg:p-4 border bg-gradient-to-br ${accents[accent]} transition-all hover:-translate-y-0.5 hover:shadow-lg h-full min-h-[130px] lg:min-h-[150px] flex flex-col justify-center`}>
+      <p className="text-2xl lg:text-3xl font-black italic tracking-tighter leading-none">{value ?? '—'}</p>
+      <p className="mt-2 text-[9px] lg:text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">{label}</p>
+      {hint && <p className="mt-1 text-[9px] font-bold text-muted-foreground/70">{hint}</p>}
     </div>
   );
 }

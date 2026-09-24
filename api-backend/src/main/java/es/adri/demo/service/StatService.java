@@ -53,6 +53,23 @@ public class StatService {
         return toPagedResponse(page);
     }
 
+    public PagedResponseDTO<StatDTO> findStatsFiltered(Long seasonId, String search, Pageable pageable) {
+        String trimmed = search != null ? search.trim() : null;
+        boolean hasSearch = trimmed != null && !trimmed.isBlank();
+        boolean hasSeason = seasonId != null;
+        Page<Stat> page;
+        if (hasSeason && hasSearch) {
+            page = statRepository.findBySeasonAndSearch(seasonId, trimmed, pageable);
+        } else if (hasSeason) {
+            page = statRepository.findBySeasonId(seasonId, pageable);
+        } else if (hasSearch) {
+            page = statRepository.findBySearch(trimmed, pageable);
+        } else {
+            page = statRepository.findAll(pageable);
+        }
+        return toPagedResponse(page.map(this::toDto));
+    }
+
     @Transactional
     public StatDTO createStat(StatRequestDTO statRequestDTO) {
         Stat stat = new Stat();

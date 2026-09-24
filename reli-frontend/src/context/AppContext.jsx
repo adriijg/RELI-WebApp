@@ -36,11 +36,15 @@ export function AppProvider({ children }) {
     else root.classList.remove('dark');
 
     if (user) {
-      const events = ['mousemove', 'keydown', 'scroll', 'click'];
-      events.forEach((event) => window.addEventListener(event, resetInactivityTimer));
+      const events = ['mousemove', 'mousedown', 'keydown', 'scroll', 'click', 'touchstart', 'touchmove'];
+      events.forEach((event) => window.addEventListener(event, resetInactivityTimer, { passive: true }));
+      // Si el móvil bloquea timers en segundo plano, al volver a primer plano forzamos check
+      const onVisibility = () => { if (!document.hidden) resetInactivityTimer(); };
+      document.addEventListener('visibilitychange', onVisibility);
       resetInactivityTimer();
       return () => {
         events.forEach((event) => window.removeEventListener(event, resetInactivityTimer));
+        document.removeEventListener('visibilitychange', onVisibility);
         if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
       };
     }

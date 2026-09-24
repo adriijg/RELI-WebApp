@@ -26,6 +26,16 @@ export default function NewsAdmin() {
     sortBy: 'date',
     direction: 'desc',
   });
+  const handleBulkDelete = async (selected) => {
+    if (!window.confirm(`¿Borrar ${selected.length} noticias seleccionadas? Esta acción no se puede deshacer.`)) return;
+    try {
+      await Promise.all(selected.map((row) => deleteEvent(row.id)));
+      await crud.load(crud.page);
+    } catch (err) {
+      alert(err.message || 'No se pudieron borrar todas las noticias');
+      await crud.load(crud.page);
+    }
+  };
 
   const fields = [
     { name: 'title', label: 'Título', type: 'text', required: true, fullWidth: true, placeholder: 'Titular de la noticia' },
@@ -97,6 +107,7 @@ export default function NewsAdmin() {
           setModalOpen(true);
         }}
         onDelete={setDeleteTarget}
+        onBulkDelete={handleBulkDelete}
         searchKeys={['title', 'description', 'location', 'type']}
         emptyMessage="No hay noticias publicadas."
       />

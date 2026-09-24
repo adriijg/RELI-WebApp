@@ -6,9 +6,11 @@ import es.adri.demo.dto.PlayerRequestDTO;
 import es.adri.demo.dto.PlayerSeasonStatsDTO;
 import es.adri.demo.exception.ResourceNotFoundException;
 import es.adri.demo.model.Player;
+import es.adri.demo.model.PlayerSeason;
 import es.adri.demo.repository.MatchCallUpRepository;
 import es.adri.demo.repository.MatchGoalRepository;
 import es.adri.demo.repository.PlayerRepository;
+import es.adri.demo.repository.PlayerSeasonRepository;
 import es.adri.demo.repository.StatRepository;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -17,23 +19,28 @@ import java.util.Map;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@Transactional
 public class PlayerService {
 
     private final PlayerRepository playerRepository;
     private final MatchGoalRepository matchGoalRepository;
     private final MatchCallUpRepository matchCallUpRepository;
     private final StatRepository statRepository;
+    private final PlayerSeasonRepository playerSeasonRepository;
 
     public PlayerService(PlayerRepository playerRepository,
                          MatchGoalRepository matchGoalRepository,
                          MatchCallUpRepository matchCallUpRepository,
-                         StatRepository statRepository) {
+                         StatRepository statRepository,
+                         PlayerSeasonRepository playerSeasonRepository) {
         this.playerRepository = playerRepository;
         this.matchGoalRepository = matchGoalRepository;
         this.matchCallUpRepository = matchCallUpRepository;
         this.statRepository = statRepository;
+        this.playerSeasonRepository = playerSeasonRepository;
     }
 
     public PagedResponseDTO<PlayerDTO> findAllActivePlayers(Pageable pageable) {
@@ -49,20 +56,21 @@ public class PlayerService {
     }
 
     public List<PlayerSeasonStatsDTO> findSeasonStats(Long seasonId) {
+        // Usar Stat como fuente única para que los cambios desde /admin/estadísticas se reflejen en Jugadores
         Map<Long, Long> goalsMap = new HashMap<>();
         List<Object[]> goalRows = seasonId == null
-                ? matchGoalRepository.countGoalsByCurrentSeason()
-                : matchGoalRepository.countGoalsBySeason(seasonId);
+                ? statRepository.sumGoalsByCurrentSeason()
+                : statRepository.sumGoalsBySeason(seasonId);
         for (Object[] row : goalRows) {
-            goalsMap.put((Long) row[0], (Long) row[1]);
+            goalsMap.put((Long) row[0], ((Number) row[1]).longValue());
         }
 
         Map<Long, Long> appearancesMap = new HashMap<>();
         List<Object[]> appearanceRows = seasonId == null
-                ? matchCallUpRepository.countAppearancesByCurrentSeason()
-                : matchCallUpRepository.countAppearancesBySeason(seasonId);
+                ? statRepository.countAppearancesByCurrentSeasonFromStat()
+                : statRepository.countAppearancesBySeasonFromStat(seasonId);
         for (Object[] row : appearanceRows) {
-            appearancesMap.put((Long) row[0], (Long) row[1]);
+            appearancesMap.put((Long) row[0], ((Number) row[1]).longValue());
         }
 
         Map<Long, Long> cleanSheetsMap = new HashMap<>();
@@ -84,16 +92,43 @@ public class PlayerService {
                             ((Number) row[3]).longValue()});
         }
 
+        // Si hay roster para la temporada, filtrar solo esos jugadores y usar dorsal del roster
+        List<Player> basePlayers;
+        Map<Long, Integer> rosterJersey = new HashMap<>();
+        if (seasonId != null) {
+            List<PlayerSeason> roster;
+            try {
+                roster = playerSeasonRepository.findBySeasonId(seasonId);
+            } catch (Exception ex) {
+                roster = List.of();
+            }
+            if (!roster.isEmpty()) {
+                basePlayers = roster.stream()
+                        .filter(ps -> ps.getPlayer() != null && ps.getPlayer().isActive())
+                        .map(PlayerSeason::getPlayer)
+                        .toList();
+                for (PlayerSeason ps : roster) {
+                    if (ps.getPlayer() != null) rosterJersey.put(ps.getPlayer().getId(), ps.getJerseyNumber());
+                }
+            } else {
+                // temporada sin roster: devolver vacio para forzar asignacion (el bootstrap la poblará)
+                basePlayers = List.of();
+            }
+        } else {
+            basePlayers = playerRepository.findAllByActiveTrue();
+        }
+
         List<PlayerSeasonStatsDTO> result = new ArrayList<>();
-        for (Player player : playerRepository.findAllByActiveTrue()) {
+        for (Player player : basePlayers) {
             Long id = player.getId();
             long[] cards = cardsMap.getOrDefault(id, new long[3]);
+            Integer jersey = rosterJersey.getOrDefault(id, player.getJerseyNumber());
             result.add(new PlayerSeasonStatsDTO(
                     id,
                     player.getName(),
                     player.getNickname(),
                     player.getSurnames(),
-                    player.getJerseyNumber(),
+                    jersey,
                     player.getPosition(),
                     player.getPhotoUrl(),
                     goalsMap.getOrDefault(id, 0L),

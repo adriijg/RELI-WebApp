@@ -6,44 +6,59 @@ import ThemeToggle from './ThemeToggle';
 
 export default function Navbar({ theme, user, isAdmin, onToggleTheme, onOpenAuth, onLogout }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [accountOpen, setAccountOpen] = useState(false);
-  const [clubOpen, setClubOpen] = useState(false);
-  const accountRef = useRef(null);
-  const clubRef = useRef(null);
+  const [visible, setVisible] = useState(true);
+  const lastY = useRef(0);
+  const menuOpenRef = useRef(false);
   const navigate = useNavigate();
   const location = useLocation();
-  const primaryLinks = [
-    { label: 'Inicio', path: '/' },
-    { label: 'Jugadores', path: '/jugadores' },
-    { label: 'Quinteto', path: '/quinteto' },
-    { label: 'Competición', path: '/competicion' },
+  const navLinks = [
+    { label: 'INICIO', path: '/' },
+    { label: 'JUGADORES', path: '/jugadores' },
+    { label: 'COMPETICIÓN', path: '/competicion' },
+    { label: 'HISTORIA', path: '/historia' },
+    { label: 'NOTICIAS', path: '/noticias' },
+    { label: 'CALENDARIO', path: '/calendario' },
   ];
-  const clubLinks = [
-    { label: 'Historia', path: '/historia' },
-    { label: 'Noticias', path: '/noticias' },
-    { label: 'Calendario', path: '/calendario' },
-  ];
-  const navLinks = [...primaryLinks, ...clubLinks];
-  const clubActive = clubLinks.some((link) => location.pathname.startsWith(link.path));
 
   useEffect(() => {
-    setClubOpen(false);
-    setAccountOpen(false);
-    setIsMenuOpen(false);
+    menuOpenRef.current = isMenuOpen;
+    if (isMenuOpen) setVisible(true);
+  }, [isMenuOpen]);
+
+  useEffect(() => {
+    lastY.current = window.scrollY;
+    const onScroll = () => {
+      const y = window.scrollY;
+      const isMobile = window.innerWidth < 1280;
+      if (!isMobile || menuOpenRef.current) {
+        setVisible(true);
+        lastY.current = y;
+        return;
+      }
+      if (y < 80) {
+        setVisible(true);
+      } else if (y > lastY.current + 4) {
+        setVisible(false);
+      } else if (y < lastY.current - 4) {
+        setVisible(true);
+      }
+      lastY.current = y;
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
+    };
+  }, []);
+
+  useEffect(() => {
+    setVisible(true);
+    lastY.current = window.scrollY;
   }, [location.pathname]);
 
-  useEffect(() => {
-    if (!accountOpen && !clubOpen) return undefined;
-    const close = (event) => {
-      if (accountOpen && !accountRef.current?.contains(event.target)) setAccountOpen(false);
-      if (clubOpen && !clubRef.current?.contains(event.target)) setClubOpen(false);
-    };
-    document.addEventListener('pointerdown', close);
-    return () => document.removeEventListener('pointerdown', close);
-  }, [accountOpen, clubOpen]);
-
   return (
-    <nav className="sticky top-0 z-50 bg-re-rojo shadow-[0_10px_30px_rgba(226,29,44,0.4)] border-b border-white/10 py-3 px-4 md:px-6 transition-all">
+    <nav className={`sticky top-0 z-50 bg-re-rojo shadow-[0_10px_30px_rgba(226,29,44,0.4)] border-b border-white/10 py-3 px-4 md:px-6 transition-transform duration-300 ${visible ? 'translate-y-0' : '-translate-y-full'}`}>
       <div className="max-w-7xl mx-auto flex items-center justify-between">
 
         {/* IZQUIERDA: Hamburguesa y Logo */}
@@ -78,42 +93,23 @@ export default function Navbar({ theme, user, isAdmin, onToggleTheme, onOpenAuth
         </div>
 
         {/* CENTRO: Enlaces (Escritorio XL+) */}
-        <div className="hidden xl:flex flex-1 items-center justify-center gap-1">
-          {primaryLinks.map((link) => {
+        <div className="hidden xl:flex items-center gap-6 2xl:gap-8 justify-center flex-1">
+          {navLinks.map((link) => {
             const isActive = link.path === '/' ? location.pathname === '/' : location.pathname.startsWith(link.path);
             return (
               <Link
                 key={link.label}
                 to={link.path}
-                className={`rounded-full px-3 py-1.5 text-[13px] font-semibold transition ${isActive ? 'bg-white text-re-rojo' : 'text-white/80 hover:bg-white/10 hover:text-white'}`}
+                className={`font-black text-[11px] tracking-[0.2em] transition-all duration-300 relative group py-2
+                  ${isActive ? 'text-white' : 'text-white/70 hover:text-white'}`}
               >
                 {link.label}
+                <span className={`absolute -bottom-1 left-0 h-0.5 bg-white shadow-[0_0_10px_rgba(255,255,255,0.5)] transition-all duration-300
+                  ${isActive ? 'w-full' : 'w-0 group-hover:w-full'}`}
+                />
               </Link>
             );
           })}
-          <div className="relative" ref={clubRef}>
-            <button
-              type="button"
-              onClick={() => setClubOpen((open) => !open)}
-              className={`rounded-full px-3 py-1.5 text-[13px] font-semibold transition ${clubActive || clubOpen ? 'bg-white text-re-rojo' : 'text-white/80 hover:bg-white/10 hover:text-white'}`}
-              aria-expanded={clubOpen}
-            >
-              Club
-            </button>
-            {clubOpen && (
-              <div className="absolute left-0 top-full z-50 mt-2 w-40 overflow-hidden rounded-xl border border-white/10 bg-[#071018] py-1 text-left shadow-xl">
-                {clubLinks.map((link) => (
-                  <Link
-                    key={link.path}
-                    to={link.path}
-                    className="block px-3 py-2 text-xs font-semibold text-white hover:bg-white/10"
-                  >
-                    {link.label}
-                  </Link>
-                ))}
-              </div>
-            )}
-          </div>
         </div>
 
         {/* DERECHA: Acciones de Usuario */}
@@ -121,43 +117,20 @@ export default function Navbar({ theme, user, isAdmin, onToggleTheme, onOpenAuth
 
           <div className="hidden xl:flex items-center">
             {user ? (
-                <div className="relative" ref={accountRef}>
-                    <button
-                      type="button"
-                      onClick={() => setAccountOpen((open) => !open)}
-                      className="rounded-full border border-white/35 px-3 py-1 text-[11px] font-semibold text-white/90 transition hover:bg-white hover:text-re-rojo"
-                      aria-expanded={accountOpen}
-                    >
-                      {user.username || 'Cuenta'}
-                    </button>
-                    {accountOpen && (
-                      <div className="absolute right-0 top-full z-50 mt-2 w-36 overflow-hidden rounded-xl border border-white/10 bg-[#071018] py-1 text-left shadow-xl">
-                        {isAdmin && (
-                          <button
-                            type="button"
-                            onClick={() => { setAccountOpen(false); navigate('/admin'); }}
-                            className="block w-full px-3 py-2 text-left text-xs font-semibold text-white hover:bg-white/10"
-                          >
-                            Panel
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => { setAccountOpen(false); onLogout(); }}
-                          className="block w-full px-3 py-2 text-left text-xs font-semibold text-white/80 hover:bg-white/10"
-                        >
-                          Salir
-                        </button>
-                      </div>
+                <div className="flex items-center gap-2 rounded-full border border-white/10 bg-black/10 px-2 py-1.5 shadow-inner backdrop-blur-sm">
+                    <span className="text-[10px] font-black uppercase tracking-[0.18em] text-white/80">{user.username || user.email}</span>
+                    {isAdmin && (
+                      <button
+                        onClick={() => navigate('/admin')}
+                        className="rounded-full border border-white/15 bg-white/5 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.2em] text-white transition-colors hover:bg-white/10"
+                      >
+                        Admin
+                      </button>
                     )}
+                    <button onClick={onLogout} className="rounded-full border border-white/15 bg-white/5 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.2em] text-white transition-colors hover:bg-white/10">Cerrar</button>
                 </div>
             ) : (
-                <button
-                  onClick={() => onOpenAuth('login')}
-                  className="rounded-full border border-white/35 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-white/90 transition hover:bg-white hover:text-re-rojo"
-                >
-                  Entrar
-                </button>
+                <button onClick={() => onOpenAuth('login')} className="bg-white text-re-rojo font-black px-5 py-2 rounded-lg text-[11px] tracking-widest shadow-xl hover:scale-105 transition-transform uppercase whitespace-nowrap">ENTRAR</button>
             )}
           </div>
 
@@ -182,23 +155,22 @@ export default function Navbar({ theme, user, isAdmin, onToggleTheme, onOpenAuth
 
              {user ? (
                  <div className="flex flex-col items-center gap-4 w-full max-w-sm">
-                    <p className="text-white/80 font-semibold tracking-wide text-sm">Hola, {user.username}</p>
+                    <p className="text-white/60 font-bold uppercase tracking-widest text-xs">Hola, {user.username}</p>
                     {isAdmin && (
                       <button
                         onClick={() => { setIsMenuOpen(false); navigate('/admin'); }}
-                        className="w-full border border-white/30 text-white font-semibold py-3.5 rounded-xl text-sm hover:bg-white/10 transition-colors"
+                        className="w-full rounded-2xl border border-white/15 bg-white/5 py-3 text-sm font-black uppercase tracking-[0.2em] text-white transition-colors hover:bg-white/10"
                       >
-                        Panel
+                        Admin
                       </button>
                     )}
-                    <button onClick={() => { onLogout(); setIsMenuOpen(false); }} className="w-full bg-white text-re-rojo font-semibold py-3.5 px-12 rounded-xl text-sm">Salir</button>
+                    <button onClick={() => { onLogout(); setIsMenuOpen(false); }} className="w-full rounded-2xl border border-white/15 bg-white/5 py-3 text-sm font-black uppercase tracking-[0.2em] text-white transition-colors hover:bg-white/10">Cerrar sesión</button>
                  </div>
-             ) : (
-                 <div className="flex flex-col w-full gap-4 max-w-sm">
-                    <button onClick={() => { onOpenAuth('login'); setIsMenuOpen(false); }} className="w-full border-2 border-white text-white font-black py-4 rounded-2xl tracking-widest text-sm uppercase">INICIAR SESIÓN</button>
-                    <button onClick={() => { onOpenAuth('register'); setIsMenuOpen(false); }} className="w-full bg-white text-re-rojo font-black py-4 rounded-2xl tracking-widest text-sm shadow-xl uppercase">REGISTRARSE</button>
-                 </div>
-             )}
+              ) : (
+                  <div className="flex flex-col w-full gap-4 max-w-sm">
+                     <button onClick={() => { onOpenAuth('login'); setIsMenuOpen(false); }} className="w-full bg-white text-re-rojo font-black py-4 rounded-2xl tracking-widest text-sm shadow-xl uppercase">ENTRAR</button>
+                  </div>
+              )}
           </div>
         )}
       </div>

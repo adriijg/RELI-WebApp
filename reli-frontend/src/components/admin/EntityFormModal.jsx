@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { uploadImageToSupabase } from '../../services/supabase';
 
-export default function EntityFormModal({ open, title, fields, initialValue, submitLabel = 'Guardar', onSubmit, onClose }) {
+export default function EntityFormModal({ open, title, fields, initialValue, submitLabel = 'Guardar', onSubmit, onClose, extra }) {
   const [values, setValues] = useState({});
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -255,6 +255,7 @@ export default function EntityFormModal({ open, title, fields, initialValue, sub
             </button>
           </div>
         </form>
+        {extra && <div className="border-t border-card-border bg-muted/10 p-6">{extra}</div>}
       </div>
     </div>
   );

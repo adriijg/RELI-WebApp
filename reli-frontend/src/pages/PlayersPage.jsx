@@ -12,7 +12,6 @@ const SORT_OPTIONS = [
   { value: 'jerseyNumber', label: 'Dorsal' },
   { value: 'goals', label: 'Goles' },
   { value: 'appearances', label: 'Partidos' },
-  { value: 'assists', label: 'Asistencias' },
   { value: 'yellowCards', label: 'Amarillas' },
   { value: 'redCards', label: 'Rojas' },
   { value: 'cleanSheets', label: 'Porterías 0' },
@@ -51,22 +50,14 @@ export default function PlayersPage() {
     setError('');
     try {
       const data = await getPlayerSeasonStats({ seasonId: selectedSeasonId });
-      if (data && data.length > 0) {
-        setPlayers(data.map((player) => ({
-          ...player,
-          jerseyNumber: jerseyForSeason(player.playerId, selectedSeasonId, player.jerseyNumber),
-        })));
-      } else {
-        const fallback = await getAllPlayers();
-        setPlayers((Array.isArray(fallback) ? fallback : []).map((player) => emptyPlayer(player, selectedSeasonId)));
-      }
+      // Con roster por temporada, si la lista viene vacía es porque no hay asignados
+      setPlayers((Array.isArray(data) ? data : []).map((player) => ({
+        ...player,
+        jerseyNumber: jerseyForSeason(player.playerId, selectedSeasonId, player.jerseyNumber),
+      })));
     } catch {
-      try {
-        const fallback = await getAllPlayers();
-        setPlayers((Array.isArray(fallback) ? fallback : []).map((player) => emptyPlayer(player, selectedSeasonId)));
-      } catch {
-        setError('No se pudieron cargar los jugadores');
-      }
+      setError('No se pudieron cargar los jugadores');
+      setPlayers([]);
     } finally {
       setLoading(false);
     }
@@ -85,6 +76,18 @@ export default function PlayersPage() {
 
   useEffect(() => {
     if (selectedSeasonId) load();
+  }, [load, selectedSeasonId]);
+
+  // Refrescar al volver de /admin/estadísticas para que se vea la edición
+  useEffect(() => {
+    const onFocus = () => { if (selectedSeasonId) load(); };
+    window.addEventListener('focus', onFocus);
+    const onVis = () => { if (!document.hidden && selectedSeasonId) load(); };
+    document.addEventListener('visibilitychange', onVis);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVis);
+    };
   }, [load, selectedSeasonId]);
 
   useEffect(() => {
@@ -187,15 +190,98 @@ export default function PlayersPage() {
           </div>
         </div>
 
-        <StadiumSquad
-          grouped={grouped}
-          players={players}
-          line={line}
-          seasonName={selectedSeason?.name}
-          sortBy={sortBy}
-          onOpen={setSelectedPlayer}
-          modalOpen={Boolean(selectedPlayer)}
-        />
+        </main>
+      <div className="px-4 sm:px-6">
+        <div className="mx-auto max-w-5xl">
+          <StadiumSquad
+            grouped={grouped}
+            players={players}
+            line={line}
+            seasonName={selectedSeason?.name}
+            sortBy={sortBy}
+            onOpen={setSelectedPlayer}
+            modalOpen={Boolean(selectedPlayer)}
+          />
+        </div>
+      </div>
+      <main className="mx-auto max-w-5xl space-y-3 p-4 sm:p-6 pt-6">
+        {(() => {
+          const filtered = [...players]
+            .filter((p) => line === 'ALL' || p.position === line)
+            .sort((a, b) => (b[sortBy] ?? 0) - (a[sortBy] ?? 0));
+          if (!filtered.length) return null;
+          return (
+            <section className="overflow-hidden rounded-[1.7rem] border border-card-border dark:border-re-dorado/30 bg-card-bg dark:bg-[#071018] shadow-card dark:shadow-[0_24px_60px_rgba(0,0,0,0.28)]">
+              <div className="flex items-center justify-between gap-3 border-b border-card-border dark:border-re-dorado/20 px-4 py-4 sm:px-6">
+                <h2 className="text-sm font-black uppercase tracking-tight text-foreground dark:text-white">Estadísticas · {selectedSeason?.name || 'Plantilla'}</h2>
+                <span className="rounded-full bg-re-dorado/15 dark:bg-re-dorado/20 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-re-dorado">{filtered.length} jugadores</span>
+              </div>
+              <div className="hidden sm:block overflow-x-auto">
+                <table className="w-full min-w-[760px] text-left">
+                  <thead className="bg-muted/5 dark:bg-white/[0.04] text-[10px] font-black uppercase tracking-widest text-muted-foreground dark:text-white/60">
+                    <tr>
+                      <th className="px-4 py-3 sm:px-6 w-[42%]">Jugador</th>
+                      <th className="px-2 py-3 text-left">Pos</th>
+                      <th className="px-1.5 py-3 text-center">PJ</th>
+                      <th className="px-1.5 py-3 text-center text-re-rojo">G</th>
+                      <th className="px-1.5 py-3 text-center">TA</th>
+                      <th className="px-1.5 py-3 text-center">TR</th>
+                      <th className="px-1.5 py-3 text-center">PO</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-card-border dark:divide-white/5 text-[13px]">
+                    {filtered.map((p) => (
+                      <tr key={p.playerId} onClick={() => setSelectedPlayer(p)} className="cursor-pointer transition hover:bg-muted/5 dark:hover:bg-white/[0.04]">
+                        <td className="px-4 py-3.5 sm:px-6">
+                          <div className="flex items-center gap-3">
+                            <img src={p.photoUrl || 'https://pjefzhrnoftaovlvnjaz.supabase.co/storage/v1/object/public/images/default-player.png'} alt="" className="h-10 w-10 rounded-full object-cover ring-1 ring-card-border dark:ring-white/10" onError={(e) => { e.target.src = 'https://pjefzhrnoftaovlvnjaz.supabase.co/storage/v1/object/public/images/default-player.png'; }} />
+                            <div className="min-w-0">
+                              <p className="flex items-center gap-1.5 truncate text-[15px] font-black uppercase leading-none tracking-tight text-foreground dark:text-white">
+                                {p.nickname || p.name}
+                                <span className="rounded-md bg-foreground dark:bg-white px-1.5 py-0.5 text-[11px] font-black leading-none text-background dark:text-[#071018]">#{p.jerseyNumber}</span>
+                              </p>
+                              <p className="text-[11px] font-bold text-muted-foreground dark:text-white/60 truncate">{[p.name, p.surnames].filter(Boolean).join(' ')}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-2 py-3.5 text-left"><span className="inline-flex rounded-full bg-muted/10 dark:bg-white/10 px-2 py-1 text-[10px] font-black uppercase tracking-widest text-foreground/70 dark:text-white/70">{POSITION_LABELS[p.position] || p.position}</span></td>
+                        <td className="px-1.5 py-3.5 text-center font-bold tabular-nums text-foreground dark:text-white">{p.appearances}</td>
+                        <td className="px-1.5 py-3.5 text-center font-black tabular-nums text-re-rojo">{p.goals}</td>
+                        <td className="px-1.5 py-3.5 text-center"><span className="rounded bg-amber-500/10 px-1.5 py-0.5 font-black tabular-nums text-amber-600 dark:text-amber-400">{p.yellowCards}</span></td>
+                        <td className="px-1.5 py-3.5 text-center"><span className="rounded bg-re-rojo/10 px-1.5 py-0.5 font-black tabular-nums text-re-rojo">{p.redCards}</span></td>
+                        <td className="px-1.5 py-3.5 text-center tabular-nums text-foreground dark:text-white">{p.position === 'PORTERO' ? p.cleanSheets : '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="sm:hidden divide-y divide-card-border dark:divide-white/5">
+                {filtered.map((p) => (
+                  <button key={p.playerId} type="button" onClick={() => setSelectedPlayer(p)} className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-muted/5 dark:hover:bg-white/[0.04]">
+                    <img src={p.photoUrl || 'https://pjefzhrnoftaovlvnjaz.supabase.co/storage/v1/object/public/images/default-player.png'} alt="" className="h-10 w-10 shrink-0 rounded-full object-cover ring-1 ring-card-border dark:ring-white/10" onError={(e) => { e.target.src = 'https://pjefzhrnoftaovlvnjaz.supabase.co/storage/v1/object/public/images/default-player.png'; }} />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <p className="truncate text-sm font-black uppercase leading-none tracking-tight text-foreground dark:text-white">{p.nickname || p.name}</p>
+                        <span className="shrink-0 rounded bg-card-border dark:bg-white/10 px-1.5 py-0.5 text-[10px] font-black text-foreground/70 dark:text-white/70">#{p.jerseyNumber}</span>
+                        <span className="truncate text-[10px] font-black uppercase tracking-widest text-foreground/50 dark:text-white/50">{POSITION_LABELS[p.position] || p.position}</span>
+                      </div>
+                      <p className="truncate text-[11px] font-bold text-muted-foreground dark:text-white/60">{[p.name, p.surnames].filter(Boolean).join(' ')}</p>
+                      <div className="mt-1.5 flex flex-wrap gap-1.5 text-[11px]">
+                        <span className="rounded-full bg-muted/10 dark:bg-white/10 px-2 py-0.5 font-bold text-foreground dark:text-white">PJ <b className="font-black">{p.appearances}</b></span>
+                        <span className="rounded-full bg-re-rojo px-2 py-0.5 font-black text-white">G {p.goals}</span>
+                        <span className="rounded-full bg-amber-500/15 px-2 py-0.5 font-black text-amber-700 dark:text-amber-400">TA {p.yellowCards}</span>
+                        <span className="rounded-full bg-re-rojo/10 px-2 py-0.5 font-black text-re-rojo">TR {p.redCards}</span>
+                        {p.position === 'PORTERO' && <span className="rounded-full bg-muted/10 dark:bg-white/10 px-2 py-0.5 text-foreground dark:text-white">PO {p.cleanSheets}</span>}
+                      </div>
+                    </div>
+                    <span className="shrink-0 text-muted-foreground dark:text-white/40">›</span>
+                  </button>
+                ))}
+              </div>
+              <p className="border-t border-card-border dark:border-white/5 bg-muted/5 dark:bg-white/[0.03] px-4 py-2 text-center text-[10px] font-bold uppercase tracking-widest text-muted-foreground dark:text-white/50 sm:px-6">Toca para abrir la ficha completa</p>
+            </section>
+          );
+        })()}
 
         <PlayerDetailModal
           player={selectedPlayer}

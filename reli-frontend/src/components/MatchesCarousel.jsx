@@ -71,8 +71,8 @@ export default function MatchesCarousel() {
   const atEnd = index >= maxSlide;
 
   const arrowClass =
-    'grid h-10 w-10 place-items-center rounded-full border border-re-dorado/40 text-re-dorado transition active:scale-90 ' +
-    'hover:bg-re-rojo hover:text-white hover:border-re-rojo disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-re-dorado disabled:hover:border-re-dorado/40';
+    'grid h-10 w-10 place-items-center rounded-full border border-card-border dark:border-re-dorado/40 text-re-dorado transition active:scale-90 ' +
+    'hover:bg-re-rojo hover:text-white hover:border-re-rojo disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-re-dorado disabled:hover:border-re-dorado/40 dark:disabled:hover:border-re-dorado/40';
 
   const slideWidth = `calc((100% - ${(visible - 1) * GAP}px) / ${visible})`;
 
@@ -112,9 +112,9 @@ export default function MatchesCarousel() {
 
   return (
     <MotionConfig reducedMotion="user">
-    <section className="relative overflow-hidden rounded-[1.7rem] border border-re-dorado/30 bg-[#071018] px-5 py-8 text-white shadow-[0_24px_60px_rgba(0,0,0,0.28)] lg:px-8">
-      <div className="stadium-beam stadium-beam-left opacity-60" />
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(226,29,44,0.22),transparent_42%)]" />
+    <section className="relative overflow-hidden rounded-[1.7rem] border border-card-border dark:border-re-dorado/30 bg-card-bg dark:bg-[#071018] px-5 py-8 text-foreground dark:text-white shadow-card dark:shadow-[0_24px_60px_rgba(0,0,0,0.28)] lg:px-8">
+      <div className="stadium-beam stadium-beam-left opacity-60 hidden dark:block" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(226,29,44,0.08),transparent_42%)] dark:bg-[radial-gradient(circle_at_top,rgba(226,29,44,0.22),transparent_42%)]" />
       <div className="relative mb-8 flex flex-col items-center justify-between gap-4 sm:flex-row">
         <div>
           <p className="mb-2 text-[10px] font-black uppercase tracking-[0.28em] text-re-dorado">Calendario</p>
@@ -186,10 +186,10 @@ export default function MatchesCarousel() {
                   onKeyDown={(e) => { if (e.key === 'Enter') navigate(`/partidos/${match.id}`); }}
                   role="button"
                   tabIndex={0}
-                  className="group h-full cursor-pointer rounded-3xl border border-white/10 bg-black/30 p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition hover:border-re-dorado/50 lg:p-7"
+                  className="group h-full cursor-pointer rounded-3xl border border-card-border dark:border-white/10 bg-muted/5 dark:bg-black/30 p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition hover:border-re-dorado/40 dark:hover:border-re-dorado/50 lg:p-7"
                 >
                   <div className="flex justify-between items-start mb-8">
-                    <span className="rounded bg-white/5 px-2 py-1 text-[9px] font-black uppercase tracking-widest text-white/55 lg:text-[10px]">
+                    <span className="rounded bg-muted/10 dark:bg-white/5 px-2 py-1 text-[9px] font-black uppercase tracking-widest text-muted-foreground dark:text-white/55 lg:text-[10px]">
                       {match.competitionName || "LIGA"}
                       {match.jornada != null ? ` • J${match.jornada}` : ""}
                     </span>
@@ -228,11 +228,11 @@ export default function MatchesCarousel() {
                     </div>
                   </div>
 
-                  <div className="border-t border-white/10 pt-6 text-center">
+                  <div className="border-t border-card-border dark:border-white/10 pt-6 text-center">
                     <p className="text-re-rojo font-black text-xs lg:text-sm mb-1 uppercase tracking-widest">
                       {match.date ? new Date(match.date).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: '2-digit' }).toUpperCase() : "FECHA TBD"}
                     </p>
-                    <p className="text-[9px] font-black uppercase tracking-tighter text-white/45 lg:text-[10px]">
+                    <p className="text-[9px] font-black uppercase tracking-tighter text-muted-foreground dark:text-white/45 lg:text-[10px]">
                       📍 {match.location || "Sede por confirmar"}
                     </p>
                   </div>

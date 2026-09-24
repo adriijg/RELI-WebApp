@@ -3,6 +3,7 @@ package es.adri.demo.service;
 import es.adri.demo.dto.FfmSyncActionDTO;
 import es.adri.demo.dto.FfmSyncResultDTO;
 import es.adri.demo.dto.MatchRequestDTO;
+import es.adri.demo.dto.MatchDTO;
 import es.adri.demo.model.Competition;
 import es.adri.demo.model.FfmSyncRun;
 import es.adri.demo.model.Match;
@@ -10,6 +11,7 @@ import es.adri.demo.model.MatchStatus;
 import es.adri.demo.repository.CompetitionRepository;
 import es.adri.demo.repository.FfmSyncRunRepository;
 import es.adri.demo.repository.MatchRepository;
+import es.adri.demo.repository.UserRepository;
 import java.net.CookieManager;
 import java.net.CookiePolicy;
 import java.net.URI;
@@ -40,9 +42,13 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Service
 public class FfmSyncService {
+
+    private static final Logger log = LoggerFactory.getLogger(FfmSyncService.class);
 
     private static final DateTimeFormatter DATE_TIME_FORMAT = DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm");
 
@@ -69,6 +75,8 @@ public class FfmSyncService {
     private final MatchRepository matchRepository;
     private final MatchService matchService;
     private final FfmSyncRunRepository runRepository;
+    private final UserRepository userRepository;
+    private final ResendEmailService emailService;
 
     @Value("${app.ffm.base-url:https://parla.ffmadrid.es}")
     private String baseUrl;
@@ -91,11 +99,15 @@ public class FfmSyncService {
     public FfmSyncService(CompetitionRepository competitionRepository,
                           MatchRepository matchRepository,
                           MatchService matchService,
-                          FfmSyncRunRepository runRepository) {
+                          FfmSyncRunRepository runRepository,
+                          UserRepository userRepository,
+                          ResendEmailService emailService) {
         this.competitionRepository = competitionRepository;
         this.matchRepository = matchRepository;
         this.matchService = matchService;
         this.runRepository = runRepository;
+        this.userRepository = userRepository;
+        this.emailService = emailService;
     }
 
     /** Partido parseado de la web de la federacion. */
@@ -138,6 +150,7 @@ public class FfmSyncService {
             List<FfmSyncActionDTO> actions = computeActions(competition, ours, existing);
             int created = 0;
             int updated = 0;
+            List<MatchDTO> createdMatches = new ArrayList<>();
             for (int i = 0; i < ours.size(); i++) {
                 FfmMatch parsed = ours.get(i);
                 FfmSyncActionDTO action = actions.get(i);
@@ -146,7 +159,7 @@ public class FfmSyncService {
                 }
                 Match target = findExisting(existing, competition.getId(), parsed);
                 if (target == null) {
-                    matchService.createMatch(toRequest(competition, parsed, null));
+                    createdMatches.add(matchService.createMatch(toRequest(competition, parsed, null)));
                     created++;
                 } else if ("UPDATED".equals(action.getAction())) {
                     matchService.updateMatch(target.getId(), toRequest(competition, parsed, target));
@@ -161,6 +174,7 @@ public class FfmSyncService {
             run.setStatus(FfmSyncRun.Status.OK);
             run.setFinishedAt(LocalDateTime.now());
             run = runRepository.save(run);
+            notifyNewMatches(competition.getName(), createdMatches);
             FfmSyncResultDTO result = resultOf(competition, ours, actions, run.getId());
             result.setCreated(created);
             result.setUpdated(updated);
@@ -175,6 +189,27 @@ public class FfmSyncService {
             runRepository.save(run);
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
                     "Fallo al sincronizar con la federacion: " + e.getMessage());
+        }
+    }
+
+    private void notifyNewMatches(String competitionName, List<MatchDTO> matches) {
+        if (matches.isEmpty()) return;
+        StringBuilder html = new StringBuilder("<h2>Nuevos horarios de ")
+                .append(competitionName).append("</h2><p>Se han añadido estos partidos:</p><ul>");
+        for (MatchDTO match : matches) {
+            html.append("<li>Jornada ").append(match.getJornada())
+                    .append(": Real Lisiados vs ").append(match.getRival())
+                    .append(match.getDate() == null ? "" : " · " + match.getDate())
+                    .append(match.getLocation() == null ? "" : " · " + match.getLocation())
+                    .append("</li>");
+        }
+        html.append("</ul><p>Consulta el calendario en la web de RELI.</p>");
+        for (es.adri.demo.model.User user : userRepository.findByEmailVerifiedTrue()) {
+            try {
+                emailService.send(user.getEmail(), "Nuevos horarios de " + competitionName, html.toString());
+            } catch (Exception e) {
+                log.warn("No se pudo enviar el aviso de horarios a {}", user.getEmail(), e);
+            }
         }
     }
 

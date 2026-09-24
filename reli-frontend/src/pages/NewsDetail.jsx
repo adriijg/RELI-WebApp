@@ -117,16 +117,14 @@ export default function NewsDetail() {
             )}
           </div>
         </div>
+        {news.description && (
+          <div className="border-t border-card-border p-6 lg:hidden">
+            <p className="text-sm leading-relaxed text-foreground/90 whitespace-pre-line">
+              {news.description}
+            </p>
+          </div>
+        )}
       </section>
-
-      {/* Cuerpo (solo móvil: en PC va dentro del post) */}
-      {news.description && (
-        <section className="lg:hidden bg-card-bg border border-card-border rounded-3xl shadow-card p-6">
-          <p className="text-sm leading-relaxed text-foreground/90 whitespace-pre-line">
-            {news.description}
-          </p>
-        </section>
-      )}
 
       {/* Relacionadas */}
       {related.length > 0 && (

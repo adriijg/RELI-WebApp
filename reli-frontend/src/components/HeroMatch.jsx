@@ -82,13 +82,13 @@ export default function HeroMatch() {
 
   return (
     <MotionConfig reducedMotion="user">
-    <section className="gold-sweep relative w-full overflow-hidden rounded-[1.7rem] border border-re-dorado/30 bg-[#071018] shadow-[0_24px_60px_rgba(0,0,0,0.35)]">
-      <div className="stadium-beam stadium-beam-left" />
-      <div className="stadium-beam stadium-beam-right" />
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(226,29,44,0.34),transparent_46%)]" />
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/50 to-transparent" />
+    <section className="gold-sweep relative w-full overflow-hidden rounded-[1.7rem] border border-card-border dark:border-re-dorado/30 bg-card-bg dark:bg-[#071018] shadow-card dark:shadow-[0_24px_60px_rgba(0,0,0,0.35)]">
+      <div className="stadium-beam stadium-beam-left hidden dark:block" />
+      <div className="stadium-beam stadium-beam-right hidden dark:block" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(226,29,44,0.12),transparent_46%)] dark:bg-[radial-gradient(circle_at_50%_0%,rgba(226,29,44,0.34),transparent_46%)]" />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/[0.04] to-transparent dark:from-black/50" />
 
-      <div className="relative px-4 py-6 text-white lg:px-10 lg:py-8">
+      <div className="relative px-4 py-6 text-foreground dark:text-white lg:px-10 lg:py-8">
         <div className="grid w-full items-center gap-x-3 gap-y-5 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] [grid-template-areas:'left_vs_right''meta_meta_meta'] lg:grid-cols-[minmax(0,1fr)_18.5rem_minmax(0,1fr)] lg:gap-x-6 lg:[grid-template-areas:'left_meta_right']">
           <motion.div
             initial={{ opacity: 0, x: -28 }}
@@ -132,13 +132,28 @@ export default function HeroMatch() {
             </div>
 
             {isMatchLive(nextMatch) ? (
-              <div className="mt-4 rounded-2xl border border-blue-500/30 bg-blue-500/10 px-8 py-5">
-                <p className="animate-pulse text-sm font-black uppercase tracking-widest text-blue-400">Partido en juego</p>
+              <div className="mt-4 flex w-full max-w-[18.5rem] items-center gap-3 rounded-2xl border border-emerald-500/30 dark:border-blue-500/30 bg-emerald-500/10 dark:bg-blue-500/10 px-4 py-4 shadow-inner backdrop-blur-sm">
+                <motion.span
+                  animate={{ y: [0, -8, 0], rotate: [0, 15, -15, 0] }}
+                  transition={{ duration: 0.9, repeat: Infinity, ease: 'easeInOut' }}
+                  className="text-2xl lg:text-3xl shrink-0"
+                  aria-hidden="true"
+                >
+                  ⚽
+                </motion.span>
+                <div className="text-left">
+                  <p className="animate-pulse text-sm font-black uppercase tracking-widest text-emerald-600 dark:text-blue-400 leading-none">Partido en curso</p>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-foreground/60 dark:text-white/60">Disputándose</p>
+                </div>
+                <span className="ml-auto relative flex h-2.5 w-2.5 shrink-0">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-re-rojo opacity-75" />
+                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-re-rojo" />
+                </span>
               </div>
             ) : (
-              <div className="mt-4 flex w-full max-w-[18.5rem] justify-center gap-2 rounded-2xl border border-re-dorado/25 bg-black/35 px-3 py-3 shadow-inner backdrop-blur-sm lg:gap-4 lg:px-5">
+              <div className="mt-4 flex w-full max-w-[18.5rem] justify-center gap-2 rounded-2xl border border-card-border dark:border-re-dorado/25 bg-muted/10 dark:bg-black/35 px-3 py-3 shadow-inner backdrop-blur-sm lg:gap-4 lg:px-5">
                 <CountUnit value={timeLeft.days} label="Días" tone="text-re-rojo" />
-                <span className="pt-0.5 text-xl font-black leading-none text-white/20 lg:text-3xl">:</span>
+                <span className="pt-0.5 text-xl font-black leading-none text-foreground/20 dark:text-white/20 lg:text-3xl">:</span>
                 <CountUnit value={timeLeft.hours} label="Hrs" />
                 <CountUnit value={timeLeft.minutes} label="Min" />
                 <CountUnit value={timeLeft.seconds} label="Seg" tone="text-re-dorado" tick />
@@ -153,7 +168,7 @@ export default function HeroMatch() {
                 </svg>
                 <span className="text-[10px] font-black uppercase tracking-[0.2em] lg:text-[11px]">Sede oficial</span>
               </div>
-              <p className="max-w-[16rem] text-sm font-black uppercase tracking-tight text-white/80">{displayMatch.location || 'SEDE POR CONFIRMAR'}</p>
+              <p className="max-w-[16rem] text-sm font-black uppercase tracking-tight text-foreground/70 dark:text-white/80">{displayMatch.location || 'SEDE POR CONFIRMAR'}</p>
             </div>
 
             <button
@@ -170,7 +185,7 @@ export default function HeroMatch() {
   );
 }
 
-function CountUnit({ value, label, tone = 'text-white', tick = false }) {
+function CountUnit({ value, label, tone = 'text-foreground dark:text-white', tick = false }) {
   return (
     <div className="min-w-[2.4rem] text-center">
       <motion.span
@@ -182,7 +197,7 @@ function CountUnit({ value, label, tone = 'text-white', tick = false }) {
       >
         {value}
       </motion.span>
-      <span className="mt-1 block text-[8px] font-black uppercase tracking-widest text-white/45 lg:text-[9px]">{label}</span>
+      <span className="mt-1 block text-[8px] font-black uppercase tracking-widest text-foreground/45 dark:text-white/45 lg:text-[9px]">{label}</span>
     </div>
   );
 }

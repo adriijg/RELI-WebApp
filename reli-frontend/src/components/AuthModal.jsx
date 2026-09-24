@@ -1,6 +1,6 @@
 // src/components/AuthModal.jsx
 import { useState, useEffect } from 'react';
-import { loginUser, registerUser } from '../services/api';
+import { loginUser, registerUser, requestPasswordReset, resendVerification } from '../services/api';
 
 export default function AuthModal({ isOpen, onClose, initialView = 'login', onAuthSuccess }) {
   const [view, setView] = useState(initialView);
@@ -46,7 +46,10 @@ export default function AuthModal({ isOpen, onClose, initialView = 'login', onAu
     setSuccess('');
 
     try {
-      if (view === 'login') {
+      if (view === 'forgot') {
+        await requestPasswordReset(formData.email);
+        setSuccess('Si el correo existe, recibirás instrucciones para recuperar la contraseña.');
+      } else if (view === 'login') {
         const credentials = {
           identifier: formData.identifier,
           password: formData.password
@@ -63,7 +66,11 @@ export default function AuthModal({ isOpen, onClose, initialView = 'login', onAu
         };
         
         // 1. Registramos al usuario
-        await registerUser(userData);
+        const registeredUser = await registerUser(userData);
+        if (registeredUser?.emailVerified === false) {
+          setSuccess('Registro completado. Revisa tu correo y confirma la cuenta antes de iniciar sesión.');
+          return;
+        }
         setSuccess('¡Registro completado! Iniciando sesión automáticamente...');
         
         // 2. Realizamos LOGIN automático con los mismos datos
@@ -100,7 +107,7 @@ export default function AuthModal({ isOpen, onClose, initialView = 'login', onAu
                 <span className="text-8xl font-black italic select-none">RELISIADOS</span>
              </div>
              <h2 className="text-3xl font-black tracking-tighter mb-1 relative z-10">
-                {view === 'login' ? 'INICIAR SESIÓN' : 'ÚNETE AL CLUB'}
+                {view === 'login' ? 'INICIAR SESIÓN' : view === 'forgot' ? 'RECUPERAR CONTRASEÑA' : 'ÚNETE AL CLUB'}
              </h2>
              <p className="text-xs font-bold text-white/80 tracking-widest uppercase relative z-10">
                 Real Lisiados F.C. Official WebApp
@@ -144,7 +151,7 @@ export default function AuthModal({ isOpen, onClose, initialView = 'login', onAu
               />
             </div>
 
-            <div key="auth-password">
+            {view !== 'forgot' && <div key="auth-password">
               <label htmlFor="auth-password-input" className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-2">
                 Contraseña {view === 'register' && '(mín. 8 carac.)'}
               </label>
@@ -181,7 +188,7 @@ export default function AuthModal({ isOpen, onClose, initialView = 'login', onAu
                   )}
                 </button>
               </div>
-            </div>
+            </div>}
 
             {error && (
               <div className="bg-red-500/10 border border-red-500/50 text-red-500 text-[11px] font-bold p-3 rounded-lg text-center shadow-inner">
@@ -194,29 +201,51 @@ export default function AuthModal({ isOpen, onClose, initialView = 'login', onAu
               </div>
             )}
 
+            {view === 'register' && success && formData.email && (
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    await resendVerification(formData.email);
+                    setSuccess('Si la cuenta necesita confirmación, hemos reenviado el correo.');
+                  } catch (err) {
+                    setError(err.message || 'No se pudo reenviar el correo.');
+                  }
+                }}
+                className="w-full text-[10px] font-black uppercase tracking-widest text-re-dorado hover:underline"
+              >
+                Reenviar correo de confirmación
+              </button>
+            )}
+
             <button 
               type="submit" 
               disabled={loading}
               className="w-full bg-re-rojo hover:bg-re-rojo/90 text-white font-black py-4 rounded-xl shadow-lg shadow-re-rojo/20 transition-all hover:-translate-y-0.5 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? 'PROCESANDO...' : (view === 'login' ? 'ENTRAR' : 'REGISTRARME')}
+              {loading ? 'PROCESANDO...' : (view === 'login' ? 'ENTRAR' : view === 'forgot' ? 'ENVIAR ENLACE' : 'REGISTRARME')}
             </button>
           </form>
 
           <div className="mt-8 text-center" key="auth-toggle-container">
             <p className="text-xs text-muted-foreground font-bold">
-              {view === 'login' ? '¿Aún no eres del club?' : '¿Ya tienes cuenta?'}
+              {view === 'forgot' ? '¿Recuerdas tu contraseña?' : view === 'login' ? '¿Aún no eres del club?' : '¿Ya tienes cuenta?'}
               <button 
                 type="button"
                 onClick={() => {
-                  setView(view === 'login' ? 'register' : 'login');
+                  setView(view === 'forgot' ? 'login' : view === 'login' ? 'register' : 'login');
                   setError('');
                 }}
                 className="ml-2 text-re-rojo hover:underline font-black uppercase tracking-tighter"
               >
-                {view === 'login' ? 'REGÍSTRATE AQUÍ' : 'INICIAR SESIÓN'}
+                {view === 'forgot' ? 'INICIAR SESIÓN' : view === 'login' ? 'REGÍSTRATE AQUÍ' : 'INICIAR SESIÓN'}
               </button>
             </p>
+            {view === 'login' && (
+              <button type="button" onClick={() => { setView('forgot'); setError(''); setSuccess(''); }} className="mt-3 text-xs font-black uppercase tracking-widest text-re-dorado hover:underline">
+                He olvidado mi contraseña
+              </button>
+            )}
           </div>
         </div>
 

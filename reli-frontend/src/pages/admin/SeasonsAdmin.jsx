@@ -19,6 +19,16 @@ export default function SeasonsAdmin() {
     sortBy: 'name',
     direction: 'desc',
   });
+  const handleBulkDelete = async (selected) => {
+    if (!window.confirm(`¿Borrar ${selected.length} temporadas seleccionadas? Esta acción no se puede deshacer.`)) return;
+    try {
+      await Promise.all(selected.map((row) => deleteSeason(row.id)));
+      await crud.load(crud.page);
+    } catch (err) {
+      alert(err.message || 'No se pudieron borrar todas las temporadas');
+      await crud.load(crud.page);
+    }
+  };
 
   const fields = [
     { name: 'name', label: 'Nombre', type: 'text', required: true, placeholder: 'Ej. 2026/27' },
@@ -79,6 +89,7 @@ export default function SeasonsAdmin() {
           setModalOpen(true);
         }}
         onDelete={setDeleteTarget}
+        onBulkDelete={handleBulkDelete}
         searchKeys={['name']}
         emptyMessage="No hay temporadas creadas."
       />

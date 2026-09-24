@@ -8,10 +8,10 @@ const POSITION_ORDER = ['PIVOT', 'ALA', 'CIERRE', 'PORTERO'];
 const CYCLE_MS = 4800;
 
 const LANE = {
-  PIVOT: { y: 16, x0: 32, x1: 68 },
-  ALA: { y: 40, x0: 14, x1: 86 },
-  CIERRE: { y: 66, x0: 32, x1: 68 },
-  PORTERO: { y: 82, x0: 40, x1: 60 },
+  PIVOT: { y: 18, x0: 18, x1: 82 },
+  ALA: { y: 38, x0: 10, x1: 90 },
+  CIERRE: { y: 62, x0: 18, x1: 82 },
+  PORTERO: { y: 86, x0: 28, x1: 72 },
 };
 
 function prefersReducedMotion() {
@@ -37,26 +37,19 @@ function formationSlots(grouped, line, narrow) {
 
   if (line !== 'ALL') {
     const list = grouped.get(line) || [];
-    if (narrow && list.length > 4) {
-      const mid = Math.ceil(list.length / 2);
-      spread(mid, 38, 12, 88).forEach((point, index) => slots.set(list[index].playerId, point));
-      spread(list.length - mid, 62, 18, 82).forEach((point, index) => slots.set(list[mid + index].playerId, point));
-    } else {
-      spread(list.length, 48, 10, 90).forEach((point, index) => slots.set(list[index].playerId, point));
-    }
+    const points = list.length > 0
+      ? spread(list.length, 50, 14, 86)
+      : [];
+
+    points.forEach((point, index) => slots.set(list[index].playerId, point));
     return slots;
   }
 
   for (const position of POSITION_ORDER) {
     const lane = LANE[position];
     const list = grouped.get(position) || [];
-    if (narrow && position === 'ALA' && list.length > 4) {
-      const mid = Math.ceil(list.length / 2);
-      spread(mid, 32, 8, 92).forEach((point, index) => slots.set(list[index].playerId, point));
-      spread(list.length - mid, 48, 14, 86).forEach((point, index) => slots.set(list[mid + index].playerId, point));
-    } else {
-      place(position, spread(list.length, lane.y, lane.x0, lane.x1));
-    }
+    const points = list.length > 1 ? spread(list.length, lane.y, lane.x0, lane.x1) : spread(list.length, lane.y, 50, 50);
+    place(position, points);
   }
   return slots;
 }
@@ -73,9 +66,21 @@ function useNarrow() {
   return narrow;
 }
 
-function PitchMarkings() {
+function PitchMarkings({ vertical }) {
+  if (vertical) {
+    return (
+      <svg className="pointer-events-none absolute inset-3 h-[calc(100%-1.5rem)] w-[calc(100%-1.5rem)]" viewBox="0 0 180 300" preserveAspectRatio="xMidYMid meet" fill="none" aria-hidden="true">
+        <rect className="pitch-draw" x="1.5" y="1.5" width="177" height="297" stroke="rgba(255,255,255,0.45)" strokeWidth="1.2" />
+        <line className="pitch-draw" x1="1.5" y1="150" x2="178.5" y2="150" stroke="rgba(255,255,255,0.35)" strokeWidth="1" />
+        <circle className="pitch-draw" cx="90" cy="150" r="24" stroke="rgba(255,255,255,0.4)" strokeWidth="1" />
+        <circle cx="90" cy="150" r="1.6" fill="rgba(255,255,255,0.7)" />
+        <rect className="pitch-draw" x="50" y="1.5" width="80" height="32" stroke="rgba(255,255,255,0.4)" strokeWidth="1" />
+        <rect className="pitch-draw" x="50" y="266.5" width="80" height="32" stroke="rgba(255,255,255,0.4)" strokeWidth="1" />
+      </svg>
+    );
+  }
   return (
-    <svg className="pointer-events-none absolute inset-3 h-[calc(100%-1.5rem)] w-[calc(100%-1.5rem)]" viewBox="0 0 300 180" fill="none" aria-hidden="true">
+    <svg className="pointer-events-none absolute inset-3 h-[calc(100%-1.5rem)] w-[calc(100%-1.5rem)]" viewBox="0 0 300 180" preserveAspectRatio="xMidYMid meet" fill="none" aria-hidden="true">
       <rect className="pitch-draw" x="1.5" y="1.5" width="297" height="177" stroke="rgba(255,255,255,0.45)" strokeWidth="1.2" />
       <line className="pitch-draw" x1="1.5" y1="90" x2="298.5" y2="90" stroke="rgba(255,255,255,0.35)" strokeWidth="1" />
       <circle className="pitch-draw" cx="150" cy="90" r="24" stroke="rgba(255,255,255,0.4)" strokeWidth="1" />
@@ -124,8 +129,8 @@ function FeaturedPlayer({ player, seasonName, maxes, onOpen, paused, compact }) 
           <p className="text-[9px] font-black uppercase tracking-[0.18em] text-re-dorado">
             {POSITION_LABELS[player.position] || player.position}
           </p>
-          <h2 className="truncate text-lg font-black italic uppercase leading-none text-white">{label}</h2>
-          <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-white/45">
+          <h2 className="truncate text-lg font-black italic uppercase leading-none text-foreground">{label}</h2>
+          <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
             {player.appearances} PJ · {player.goals} goles
           </p>
         </div>
@@ -165,16 +170,15 @@ function FeaturedPlayer({ player, seasonName, maxes, onOpen, paused, compact }) 
             <p className="mt-3 text-[9px] font-black uppercase tracking-[0.22em] text-re-dorado">
               {POSITION_LABELS[player.position] || player.position}
             </p>
-            <h2 className="text-3xl font-black italic uppercase leading-none tracking-tighter text-white">{label}</h2>
-            {showLegal && <p className="mt-1 text-[11px] leading-snug text-white/55">{legal}</p>}
-            <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-white/40">
+            <h2 className="text-3xl font-black italic uppercase leading-none tracking-tighter text-foreground">{label}</h2>
+            {showLegal && <p className="mt-1 text-[11px] leading-snug text-muted-foreground">{legal}</p>}
+            <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
               Dorsal {player.jerseyNumber} · {seasonName || 'Temporada'}
             </p>
           </div>
           <div className="mt-4 space-y-2">
             <StatMeter label="PJ" value={player.appearances} max={maxes.appearances} tone="bg-white" />
             <StatMeter label="GOL" value={player.goals} max={maxes.goals} tone="bg-re-rojo" />
-            <StatMeter label="AST" value={player.assists} max={maxes.assists} tone="bg-re-dorado" />
           </div>
           <button
             type="button"
@@ -196,7 +200,6 @@ function statCaption(player, sortBy) {
   const value = player[sortBy] ?? 0;
   if (sortBy === 'goals') return `${value} gol${value === 1 ? '' : 'es'}`;
   if (sortBy === 'appearances') return `${value} PJ`;
-  if (sortBy === 'assists') return `${value} asist.`;
   if (sortBy === 'yellowCards') return `${value} amar.`;
   if (sortBy === 'redCards') return `${value} roja${value === 1 ? '' : 's'}`;
   if (sortBy === 'cleanSheets') return `${value} porterías`;
@@ -215,7 +218,7 @@ function PlayerToken({ player, active, dimmed, compact, sortBy, onOpen, onFocus,
       onFocus={() => onFocus(player)}
       onMouseLeave={onBlur}
       onBlur={onBlur}
-      className={`player-float overflow-hidden text-center ${compact ? 'w-14' : 'w-[4.6rem]'} ${dimmed ? 'opacity-40' : 'opacity-100'}`}
+      className={`player-float overflow-hidden text-center ${compact ? 'w-14' : 'w-[4.2rem]'} ${dimmed ? 'opacity-40' : 'opacity-100'}`}
       style={{ animationDelay: `${(player.jerseyNumber % 5) * 0.35}s` }}
       aria-label={`Ver ficha de ${label}`}
     >
@@ -270,7 +273,6 @@ export default function StadiumSquad({ grouped, players, line, seasonName, sortB
   const maxes = useMemo(() => ({
     appearances: Math.max(1, ...players.map((player) => player.appearances)),
     goals: Math.max(1, ...players.map((player) => player.goals)),
-    assists: Math.max(1, ...players.map((player) => player.assists)),
   }), [players]);
 
   useEffect(() => {
@@ -346,7 +348,7 @@ export default function StadiumSquad({ grouped, players, line, seasonName, sortB
   };
 
   return (
-    <section className="relative overflow-hidden rounded-[1.7rem] bg-[#071018] shadow-card">
+    <section className="relative overflow-hidden rounded-[1.7rem] border border-card-border bg-card-bg text-foreground shadow-card">
       <div className="stadium-beam stadium-beam-left" />
       <div className="stadium-beam stadium-beam-right" />
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(226,29,44,0.22),transparent_42%)]" />
@@ -359,7 +361,7 @@ export default function StadiumSquad({ grouped, players, line, seasonName, sortB
       ))}
 
       <div className="relative grid md:grid-cols-[240px_minmax(0,1fr)]">
-        <aside className="border-b border-white/10 md:border-b-0 md:border-r">
+        <aside className="border-b border-card-border bg-card-bg/90 md:border-b-0 md:border-r">
           <FeaturedPlayer
             player={spotlight}
             seasonName={seasonName}
@@ -372,46 +374,18 @@ export default function StadiumSquad({ grouped, players, line, seasonName, sortB
 
         <div
           ref={pitchRef}
-          className={`stadium-grass relative ${narrow ? '' : 'min-h-[520px]'}`}
+          className="stadium-grass relative w-full aspect-[180/300] sm:aspect-[300/180]"
           onMouseLeave={() => setHovering(false)}
         >
           <div
             ref={glowRef}
             className="pointer-events-none absolute left-0 top-0 z-[1] h-40 w-40 -translate-x-1/2 -translate-y-1/2 rounded-full bg-re-dorado/20 blur-3xl"
           />
-          {!narrow && <PitchMarkings />}
-          {!narrow && (
-            <div className="squad-radar pointer-events-none absolute left-1/2 top-1/2 z-[1] h-28 w-28 -translate-x-1/2 -translate-y-1/2 rounded-full opacity-70" />
-          )}
+          <PitchMarkings vertical={narrow} />
+          <div className="squad-radar pointer-events-none absolute left-1/2 top-1/2 z-[1] h-16 w-16 sm:h-28 sm:w-28 -translate-x-1/2 -translate-y-1/2 rounded-full opacity-70" />
           <div className="pointer-events-none absolute inset-0 z-[3] bg-[radial-gradient(circle_at_center,transparent_40%,rgba(0,0,0,0.45)_100%)]" />
 
-          {narrow && (
-            <div className="relative z-10 space-y-4 px-2 py-4">
-              {POSITION_ORDER.filter((position) => line === 'ALL' || position === line).map((position) => {
-                const linePlayers = grouped.get(position) || [];
-                if (!linePlayers.length) return null;
-                return (
-                  <div key={position} className="flex flex-wrap justify-center gap-x-2 gap-y-3">
-                    {linePlayers.map((player) => (
-                      <PlayerToken
-                        key={player.playerId}
-                        player={player}
-                        compact
-                        sortBy={sortBy}
-                        active={player.playerId === spotlightId}
-                        dimmed={hovering && player.playerId !== spotlightId}
-                        onOpen={onOpen}
-                        onFocus={focusPlayer}
-                        onBlur={() => setHovering(false)}
-                      />
-                    ))}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {!narrow && players.map((player) => (
+          {players.map((player) => (
             <div
               key={player.playerId}
               ref={(node) => {
@@ -423,6 +397,7 @@ export default function StadiumSquad({ grouped, players, line, seasonName, sortB
             >
               <PlayerToken
                 player={player}
+                compact={narrow}
                 sortBy={sortBy}
                 active={player.playerId === spotlightId}
                 dimmed={hovering && player.playerId !== spotlightId}

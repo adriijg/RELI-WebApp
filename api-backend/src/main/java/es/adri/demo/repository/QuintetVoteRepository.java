@@ -10,4 +10,6 @@ public interface QuintetVoteRepository extends JpaRepository<QuintetVote, Long> 
     Optional<QuintetVote> findByUserIdAndSeasonIdAndJornada(Long userId, Long seasonId, Integer jornada);
 
     List<QuintetVote> findBySeasonIdAndJornadaOrderByCreatedAtAsc(Long seasonId, Integer jornada);
+
+    List<QuintetVote> findBySeasonId(Long seasonId);
 }

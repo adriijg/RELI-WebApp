@@ -73,14 +73,24 @@ export const loginUser = (credentials) =>
 
 export const registerUser = (userData) =>
     apiFetch('/users/register', { method: 'POST', body: userData, auth: false });
+export const verifyEmail = (token) => apiFetch('/users/verify-email', { params: { token }, auth: false });
+export const resendVerification = (email) => apiFetch('/users/verify-email/resend', { method: 'POST', body: { email }, auth: false });
+export const requestPasswordReset = (email) => apiFetch('/users/password-reset/request', { method: 'POST', body: { email }, auth: false });
+export const confirmPasswordReset = (token, password) => apiFetch('/users/password-reset/confirm', { method: 'POST', body: { token, password }, auth: false });
 
 export const saveQuintetVote = (body) => apiFetch('/quintet/votes', { method: 'POST', body });
 export const getMyQuintetVote = (seasonId, jornada) => apiFetch('/quintet/me', { params: { seasonId, jornada } });
+export const deleteQuintetVote = (seasonId, jornada) => apiFetch('/quintet/me', { method: 'DELETE', params: { seasonId, jornada } });
 export const getQuintetTally = (seasonId, jornada) => apiFetch('/quintet/tally', { params: { seasonId, jornada }, auth: false });
 export const getQuintetBallots = (seasonId, jornada) => apiFetch('/quintet/ballots', { params: { seasonId, jornada } });
+export const getQuintetSeasonTally = (seasonId) => apiFetch('/quintet/season-tally', { params: { seasonId }, auth: false });
+export const getQuintetStatus = (seasonId, jornada) => apiFetch('/quintet/status', { params: { seasonId, jornada }, auth: false });
+export const openQuintet = (seasonId, jornada) => apiFetch('/quintet/open', { method: 'POST', params: { seasonId, jornada } });
+export const closeQuintet = (seasonId, jornada) => apiFetch('/quintet/close', { method: 'POST', params: { seasonId, jornada } });
 
 /* ---------- Partidos ---------- */
 export const getMatches = (params) => apiFetch('/matches', { params });
+export const getNextMatch = () => apiFetch('/matches/next', { auth: false });
 export const getMatch = (id) => apiFetch(`/matches/${id}`);
 export const getMatchDetail = (id) => apiFetch(`/matches/${id}/detail`);
 export const getMatchesByCompetition = (competitionId) => apiFetch(`/matches/competition/${competitionId}`);
@@ -106,6 +116,16 @@ export const getPlayerSeasonStats = (params) => apiFetch('/players/season-stats'
 export const createPlayer = (body) => apiFetch('/players', { method: 'POST', body });
 export const updatePlayer = (id, body) => apiFetch(`/players/${id}`, { method: 'PUT', body });
 export const deletePlayer = (id) => apiFetch(`/players/${id}`, { method: 'DELETE' });
+
+/* ---------- Roster por temporada ---------- */
+export const getPlayerSeasons = (params) => apiFetch('/player-seasons', { params });
+export const getRosterBySeason = (seasonId) => apiFetch('/player-seasons', { params: { seasonId } });
+export const assignPlayerToSeason = (body) => apiFetch('/player-seasons', { method: 'POST', body });
+export const unassignPlayerFromSeason = (seasonId, playerId) => apiFetch(`/player-seasons/${seasonId}/${playerId}`, { method: 'DELETE' });
+export const scrapeRoster = (seasonId) => apiFetch('/admin/scrape/roster', { params: { seasonId } });
+export const importScrapedRoster = (seasonId, players) => apiFetch('/admin/scrape/roster/import', { method: 'POST', params: { seasonId }, body: players });
+export const scrapeStats = (seasonId) => apiFetch('/admin/scrape/stats', { method: 'POST', params: { seasonId } });
+export const scrapeMatchActa = (matchId) => apiFetch(`/admin/scrape/match/${matchId}/acta`, { method: 'POST' });
 
 /* ---------- Temporadas ---------- */
 export const getSeasons = (params) => apiFetch('/seasons', { params });

@@ -22,6 +22,8 @@ import es.adri.demo.repository.MatchCallUpRepository;
 import es.adri.demo.repository.PlayerRepository;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -52,10 +54,22 @@ public class MatchService {
         this.playerRepository = playerRepository;
     }
 
+    @Cacheable(value = "homeMatches", key = "#pageable.pageNumber + '-' + #pageable.pageSize + '-' + #pageable.sort.toString()")
     public PagedResponseDTO<MatchDTO> findAllMatches(Pageable pageable) {
         Page<MatchDTO> page = matchRepository.findAll(pageable)
                 .map(this::toDto);
         return toPagedResponse(page);
+    }
+
+    public PagedResponseDTO<MatchDTO> findMatchesByStatus(es.adri.demo.model.MatchStatus status, Pageable pageable) {
+        return toPagedResponse(matchRepository.findByStatus(status, pageable).map(this::toDto));
+    }
+
+    @Cacheable(value = "nextMatch")
+    public MatchDTO findNextMatch() {
+        Page<MatchDTO> page = matchRepository.findAll(PageRequest.of(0, 1, org.springframework.data.domain.Sort.by("date").ascending()))
+                .map(this::toDto);
+        return page.getContent().isEmpty() ? null : page.getContent().get(0);
     }
 
     public List<MatchDTO> findMatchesByCompetitionId(Long competitionId) {
@@ -114,6 +128,7 @@ public class MatchService {
         return new RivalInfoDTO(rival, recent, headToHead, rivalWins, draws, ourWins);
     }
 
+    @CacheEvict(value = {"homeMatches", "nextMatch"}, allEntries = true)
     @Transactional
     public MatchGoalDTO addGoal(Long matchId, MatchGoalRequestDTO request) {
         Match match = getMatchById(matchId);
@@ -125,6 +140,7 @@ public class MatchService {
         return toGoalDto(matchGoalRepository.save(goal));
     }
 
+    @CacheEvict(value = {"homeMatches", "nextMatch"}, allEntries = true)
     @Transactional
     public void removeGoal(Long matchId, Long goalId) {
         MatchGoal goal = matchGoalRepository.findById(goalId)
@@ -133,6 +149,7 @@ public class MatchService {
         matchGoalRepository.delete(goal);
     }
 
+    @CacheEvict(value = {"homeMatches", "nextMatch"}, allEntries = true)
     @Transactional
     public MatchCallUpDTO addCallUp(Long matchId, MatchCallUpRequestDTO request) {
         Match match = getMatchById(matchId);
@@ -149,6 +166,7 @@ public class MatchService {
         return toCallUpDto(matchCallUpRepository.save(callUp));
     }
 
+    @CacheEvict(value = {"homeMatches", "nextMatch"}, allEntries = true)
     @Transactional
     public void removeCallUp(Long matchId, Long callUpId) {
         MatchCallUp callUp = matchCallUpRepository.findById(callUpId)
@@ -157,6 +175,7 @@ public class MatchService {
         matchCallUpRepository.delete(callUp);
     }
 
+    @CacheEvict(value = {"homeMatches", "nextMatch"}, allEntries = true)
     @Transactional
     public MatchDTO createMatch(MatchRequestDTO matchRequestDTO) {
         Match match = new Match();
@@ -164,6 +183,7 @@ public class MatchService {
         return toDto(matchRepository.save(match));
     }
 
+    @CacheEvict(value = {"homeMatches", "nextMatch"}, allEntries = true)
     @Transactional
     public MatchDTO updateMatch(Long id, MatchRequestDTO matchRequestDTO) {
         Match match = getMatchById(id);
@@ -171,6 +191,7 @@ public class MatchService {
         return toDto(matchRepository.save(match));
     }
 
+    @CacheEvict(value = {"homeMatches", "nextMatch"}, allEntries = true)
     @Transactional
     public void deleteMatch(Long id) {
         matchRepository.deleteGoalsByMatchId(id);

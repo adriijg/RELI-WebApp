@@ -8,7 +8,6 @@ const FALLBACK_PHOTO = 'https://pjefzhrnoftaovlvnjaz.supabase.co/storage/v1/obje
 const STAT_ITEMS = [
   { key: 'appearances', label: 'PJ', hint: 'PJ', color: 'text-sky-500' },
   { key: 'goals', label: 'Goles', hint: 'GOL', color: 'text-re-rojo' },
-  { key: 'assists', label: 'Asist.', hint: 'AST', color: 'text-emerald-500' },
   { key: 'yellowCards', label: 'TA', hint: 'TA', color: 'text-amber-400' },
   { key: 'redCards', label: 'TR', hint: 'TR', color: 'text-re-rojo' },
 ];
@@ -216,7 +215,6 @@ export default function PlayerDetailModal({ player, seasonId, seasonName, onClos
                       </div>
                       <div className="flex items-center gap-3 shrink-0 text-center">
                         <MiniStat label="G" value={stat.goals} color="text-re-rojo" />
-                        <MiniStat label="A" value={stat.assists} color="text-emerald-500" />
                         <MiniStat label="TA" value={stat.yellowCards} color="text-amber-400" />
                         <MiniStat label="TR" value={stat.redCards} color="text-re-rojo" />
                       </div>

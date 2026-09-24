@@ -32,6 +32,9 @@ public class User extends BaseEntity {
     @Column(nullable = false)
     private String password;
 
+    // Existing rows remain usable; new registrations explicitly start unverified.
+    private Boolean emailVerified = true;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private Role role;

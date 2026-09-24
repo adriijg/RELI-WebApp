@@ -16,6 +16,18 @@ export default function UsersAdmin() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [actionError, setActionError] = useState('');
 
+  const handleBulkDelete = async (selected) => {
+    if (!window.confirm(`¿Borrar ${selected.length} usuarios seleccionados? Esta acción no se puede deshacer.`)) return;
+    setActionError('');
+    try {
+      await Promise.all(selected.map((row) => deleteUser(row.id)));
+      await load();
+    } catch (err) {
+      setActionError(err.message || 'No se pudieron borrar todos los usuarios');
+      await load();
+    }
+  };
+
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
@@ -118,6 +130,7 @@ export default function UsersAdmin() {
           setActionError('');
           setDeleteTarget(row);
         }}
+        onBulkDelete={handleBulkDelete}
         searchKeys={['username', 'email', 'role']}
         emptyMessage="No hay usuarios registrados."
       />

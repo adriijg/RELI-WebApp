@@ -1,11 +1,22 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import logo from '../assets/reli-badge.png';
-import { getMatchDetail, getMatches, getStats } from '../services/api';
+import { getMatchDetail, getMatches, getStats, getCompetitions, getPlayerSeasonStats, getQuintetStatus, getQuintetTally, deleteQuintetVote, getAllPlayers, getMyQuintetVote, openQuintet, closeQuintet, saveQuintetVote } from '../services/api';
+import { useApp } from '../context/AppContext';
+import { rememberAdminMatch } from '../utils/adminRecentMatches';
 import { STATUS_LABELS } from '../constants/matchStatus';
 import { jerseyForCompetition } from '../constants/jerseys';
 import { POSITION_LABELS } from '../constants/positions';
 import { isMatchLive } from '../utils/matches';
+
+const FALLBACK_PHOTO = 'https://pjefzhrnoftaovlvnjaz.supabase.co/storage/v1/object/public/images/default-player.png';
+const QUINTET_SLOTS = [
+  { x: 50, y: 16 },
+  { x: 22, y: 36 },
+  { x: 78, y: 36 },
+  { x: 50, y: 56 },
+  { x: 50, y: 78 },
+];
 
 function formatDateTime(date) {
   if (!date) return null;
@@ -163,9 +174,21 @@ function buildRivalInfo(detail, allMatches, teamMatches) {
 export default function MatchDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user, isAdmin, openAuth } = useApp();
   const [detail, setDetail] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [quintet, setQuintet] = useState(null);
+  const [quintetPlayers, setQuintetPlayers] = useState([]);
+  const [quintetLoading, setQuintetLoading] = useState(false);
+  const [quintetSeasonId, setQuintetSeasonId] = useState(null);
+  const [myVoteIds, setMyVoteIds] = useState(null);
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [voteSaving, setVoteSaving] = useState(false);
+  const [voteError, setVoteError] = useState('');
+  const [quintetStatus, setQuintetStatus] = useState(null);
+  const isVoteOpen = quintetStatus?.open === true;
+  const [allPlayersMap, setAllPlayersMap] = useState(new Map());
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -178,6 +201,7 @@ export default function MatchDetail() {
       ]);
       if (detailResult.status === 'rejected') throw detailResult.reason;
       const data = detailResult.value;
+      if (isAdmin) rememberAdminMatch(data.match);
       const statsValue = statsResult.status === 'fulfilled' ? statsResult.value : [];
       const matchStats = Array.isArray(statsValue) ? statsValue : statsValue?.content ?? [];
       const allMatches = matchesResult.status === 'fulfilled' ? getMatchList(matchesResult.value) : [];
@@ -201,6 +225,157 @@ export default function MatchDetail() {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    const jornada = detail?.match?.jornada;
+    const competitionId = detail?.match?.competitionId;
+    if (jornada == null || competitionId == null) return;
+    let cancelled = false;
+    (async () => {
+      setQuintetLoading(true);
+      try {
+        const competitionsData = await getCompetitions({ size: 200 });
+        const competitions = Array.isArray(competitionsData) ? competitionsData : competitionsData?.content ?? [];
+        const competition = competitions.find((c) => String(c.id) === String(competitionId));
+        const seasonId = competition?.seasonId;
+        if (!seasonId) return;
+        if (cancelled) return;
+        setQuintetSeasonId(seasonId);
+        const [tally, stats] = await Promise.all([
+          getQuintetTally(seasonId, jornada).catch(() => null),
+          getPlayerSeasonStats({ seasonId }).catch(() => []),
+        ]);
+        if (cancelled) return;
+        setQuintet(tally);
+        // stats trae playerId, mapear a id para reutilizar lógica existente
+        let mapped = (Array.isArray(stats) ? stats : []).map((p) => ({
+          id: p.playerId,
+          name: p.name,
+          nickname: p.nickname,
+          surnames: p.surnames,
+          jerseyNumber: p.jerseyNumber,
+          position: p.position,
+          photoUrl: p.photoUrl,
+        }));
+        // solo convocados de ese partido
+        const callups = detail?.callups || [];
+        const callupIds = new Set(callups.map((c) => String(c.playerId ?? c.id)));
+        if (callups.length > 0) {
+          mapped = mapped.filter((p) => callupIds.has(String(p.id)));
+        } else {
+          mapped = [];
+        }
+        if (mapped.length > 0) setQuintetPlayers(mapped);
+        else {
+          const fallback = await getAllPlayers().catch(() => []);
+          let fb = Array.isArray(fallback) ? fallback : [];
+          if (callups.length > 0) {
+            fb = fb.filter((p) => callupIds.has(String(p.id)));
+          } else {
+            fb = [];
+          }
+          setQuintetPlayers(fb);
+        }
+      } finally {
+        if (!cancelled) setQuintetLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [detail?.match?.jornada, detail?.match?.competitionId]);
+
+  useEffect(() => {
+    if (!quintetSeasonId || !detail?.match?.jornada) { setQuintetStatus(null); return; }
+    getQuintetStatus(quintetSeasonId, detail.match.jornada).then(setQuintetStatus).catch(() => setQuintetStatus({ open: false }));
+  }, [quintetSeasonId, detail?.match?.jornada]);
+
+  useEffect(() => {
+    getAllPlayers().then((list) => {
+      const m = new Map();
+      (Array.isArray(list) ? list : []).forEach((p) => m.set(p.id, p));
+      // también añadir los de quintetPlayers por si tienen nick actualizado por temporada
+      quintetPlayers.forEach((p) => { if (!m.has(p.id)) m.set(p.id, p); });
+      setAllPlayersMap(m);
+    }).catch(() => {});
+  }, [quintetPlayers]);
+
+  useEffect(() => {
+    const jornada = detail?.match?.jornada;
+    if (!user || !quintetSeasonId || jornada == null) {
+      setMyVoteIds(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const mine = await getMyQuintetVote(quintetSeasonId, jornada).catch(() => null);
+        if (cancelled) return;
+        const ids = mine?.playerIds?.length === 5 ? mine.playerIds.map(Number) : null;
+        setMyVoteIds(ids);
+        setSelectedIds(ids ?? []);
+      } catch {
+        if (!cancelled) setMyVoteIds(null);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user, quintetSeasonId, detail?.match?.jornada]);
+
+  const toggleQuintetPlayer = (playerId) => {
+    if (!user) {
+      openAuth('login');
+      return;
+    }
+    if (!isVoteOpen) return;
+    const numericId = Number(playerId);
+    setVoteError('');
+    setSelectedIds((current) => {
+      if (current.includes(numericId)) return current.filter((item) => item !== numericId);
+      if (current.length >= 5) return current;
+      return [...current, numericId];
+    });
+  };
+
+  const submitQuintetVote = async () => {
+    const jornada = detail?.match?.jornada;
+    const matchId = detail?.match?.id;
+    if (!user) {
+      openAuth('login');
+      return;
+    }
+    if (!isVoteOpen) return;
+    if (!quintetSeasonId || jornada == null || selectedIds.length !== 5) return;
+    setVoteSaving(true);
+    setVoteError('');
+    try {
+      const ballot = await saveQuintetVote({
+        seasonId: Number(quintetSeasonId),
+        jornada,
+        matchId,
+        playerIds: selectedIds,
+      });
+      const ids = (ballot?.playerIds ?? selectedIds).map(Number);
+      setMyVoteIds(ids);
+      setSelectedIds(ids);
+      const tally = await getQuintetTally(quintetSeasonId, jornada).catch(() => null);
+      if (tally) setQuintet(tally);
+    } catch (err) {
+      setVoteError(err.message || 'No se pudo guardar tu voto');
+    } finally {
+      setVoteSaving(false);
+    }
+  };
+
+  const deleteMyVote = async () => {
+    if (!quintetSeasonId || !detail?.match?.jornada) return;
+    try {
+      await deleteQuintetVote(quintetSeasonId, detail.match.jornada);
+      setMyVoteIds(null);
+      setSelectedIds([]);
+      const s = await getQuintetStatus(quintetSeasonId, detail.match.jornada).catch(() => null);
+      if (s) setQuintetStatus(s);
+      const tally = await getQuintetTally(quintetSeasonId, detail.match.jornada).catch(() => null);
+      if (tally) setQuintet(tally);
+    } catch (e) { alert(e.message || 'No se pudo borrar'); }
+  };
 
   if (loading) {
     return (
@@ -261,11 +436,18 @@ export default function MatchDetail() {
   const carded = stats.filter((s) => (s?.yellowCards ?? 0) > 0 || (s?.redCards ?? 0) > 0);
   const formattedDate = formatDateTime(match.date);
   const finished = match.status === 'FINISHED' && match.ourGoals != null && match.rivalGoals != null;
+  const displayName = (playerId, fallback) => {
+    const p = allPlayersMap.get(playerId);
+    if (p) return p.nickname || p.name || fallback;
+    const q = quintetPlayers.find((x) => String(x.id) === String(playerId));
+    if (q) return q.nickname || q.name || fallback;
+    return fallback;
+  };
 
   return (
     <main className="max-w-4xl mx-auto p-3 sm:p-6 space-y-4 sm:space-y-8">
       {/* Cabecera */}
-      <section className="bg-card-bg border border-card-border rounded-3xl sm:rounded-[40px] shadow-2xl overflow-hidden">
+      <section className="bg-card-bg dark:bg-[#071018] border border-card-border dark:border-re-dorado/30 rounded-3xl sm:rounded-[40px] shadow-card dark:shadow-[0_24px_60px_rgba(0,0,0,0.28)] overflow-hidden">
         <div className="bg-re-rojo px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
           <button
             onClick={() => navigate(-1)}
@@ -350,7 +532,7 @@ export default function MatchDetail() {
       </section>
 
       {/* Goleadores */}
-      <section className="bg-card-bg border border-card-border rounded-3xl shadow-card p-4 sm:p-6 lg:p-8">
+      <section className="bg-card-bg dark:bg-[#071018] border border-card-border dark:border-re-dorado/30 rounded-3xl shadow-card dark:shadow-[0_24px_60px_rgba(0,0,0,0.28)] p-4 sm:p-6 lg:p-8">
         <div className="flex items-center justify-between mb-4 sm:mb-6">
           <h3 className="text-lg sm:text-xl lg:text-2xl font-black italic tracking-tighter uppercase">Goleadores</h3>
           <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-muted-foreground">
@@ -369,12 +551,12 @@ export default function MatchDetail() {
             {scorers.map((scorer) => (
               <li
                 key={scorer.playerId}
-                className="flex items-center gap-2 sm:gap-4 bg-muted/5 border border-card-border rounded-2xl px-3 sm:px-4 py-2.5 sm:py-3"
+                className="flex items-center gap-2 sm:gap-4 bg-muted/5 dark:bg-white/5 border border-card-border dark:border-white/10 rounded-2xl px-3 sm:px-4 py-2.5 sm:py-3"
               >
                 <span className="shrink-0 w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-re-rojo text-white font-black text-xs sm:text-sm flex items-center justify-center">
                   {scorer.jerseyNumber}
                 </span>
-                <span className="font-black text-xs sm:text-sm flex-1 min-w-0 truncate">{scorer.playerName}</span>
+                <span className="font-black text-xs sm:text-sm flex-1 min-w-0 truncate text-foreground dark:text-white">{displayName(scorer.playerId, scorer.playerName)}</span>
                 <span className="text-re-rojo font-black text-[10px] sm:text-xs tracking-widest uppercase shrink-0">
                   ⚽ {scorer.minutes.filter((m) => m != null).map((m) => `${m}'`).join(', ') || '—'}
                 </span>
@@ -385,7 +567,7 @@ export default function MatchDetail() {
       </section>
 
       {/* Tarjetas */}
-      <section className="bg-card-bg border border-card-border rounded-3xl shadow-card p-4 sm:p-6 lg:p-8">
+      <section className="bg-card-bg dark:bg-[#071018] border border-card-border dark:border-re-dorado/30 rounded-3xl shadow-card dark:shadow-[0_24px_60px_rgba(0,0,0,0.28)] p-4 sm:p-6 lg:p-8">
         <div className="flex items-center justify-between mb-4 sm:mb-6">
           <h3 className="text-lg sm:text-xl lg:text-2xl font-black italic tracking-tighter uppercase">Tarjetas</h3>
           <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-muted-foreground">
@@ -402,12 +584,12 @@ export default function MatchDetail() {
             {carded.map((s) => (
               <li
                 key={s.playerId}
-                className="flex items-center gap-2 sm:gap-4 bg-muted/5 border border-card-border rounded-2xl px-3 sm:px-4 py-2.5 sm:py-3"
+                className="flex items-center gap-2 sm:gap-4 bg-muted/5 dark:bg-white/5 border border-card-border dark:border-white/10 rounded-2xl px-3 sm:px-4 py-2.5 sm:py-3"
               >
                 <span className="shrink-0 w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-re-azul-oscuro text-white font-black text-xs sm:text-sm flex items-center justify-center">
                   {jerseyByPlayer.get(s.playerId) ?? '—'}
                 </span>
-                <span className="font-black text-xs sm:text-sm flex-1 min-w-0 truncate">{s.playerName}</span>
+                <span className="font-black text-xs sm:text-sm flex-1 min-w-0 truncate">{displayName(s.playerId, s.playerName)}</span>
                 <span className="shrink-0 flex items-center gap-2 text-[10px] sm:text-xs font-black tracking-widest uppercase">
                   {(s.yellowCards ?? 0) > 0 && (
                     <span className="inline-flex items-center gap-1">
@@ -429,7 +611,7 @@ export default function MatchDetail() {
       </section>
 
       {/* Convocados */}
-      <section className="bg-card-bg border border-card-border rounded-3xl shadow-card p-4 sm:p-6 lg:p-8">
+      <section className="bg-card-bg dark:bg-[#071018] border border-card-border dark:border-re-dorado/30 rounded-3xl shadow-card dark:shadow-[0_24px_60px_rgba(0,0,0,0.28)] p-4 sm:p-6 lg:p-8">
         <div className="flex items-center justify-between mb-4 sm:mb-6">
           <h3 className="text-lg sm:text-xl lg:text-2xl font-black italic tracking-tighter uppercase">Convocados</h3>
           <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-muted-foreground">
@@ -446,13 +628,13 @@ export default function MatchDetail() {
             {callups.map((player) => (
               <li
                 key={player.id}
-                className="flex items-center gap-2 sm:gap-3 bg-muted/5 border border-card-border rounded-2xl px-3 sm:px-4 py-2.5 sm:py-3"
+                className="flex items-center gap-2 sm:gap-3 bg-muted/5 dark:bg-white/5 border border-card-border dark:border-white/10 rounded-2xl px-3 sm:px-4 py-2.5 sm:py-3"
               >
                 <span className="shrink-0 w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-re-azul-oscuro text-white font-black text-xs sm:text-sm flex items-center justify-center">
-                  {historicalJersey(player.playerId, player.jerseyNumber)}
+                  {historicalJersey(player.playerId ?? player.id, player.jerseyNumber)}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="font-black text-xs sm:text-sm truncate">{player.playerName}</p>
+                  <p className="font-black text-xs sm:text-sm truncate">{displayName(player.playerId ?? player.id, player.playerName)}</p>
                   <p className="text-[8px] sm:text-[9px] font-black uppercase tracking-widest text-muted-foreground">
                     {POSITION_LABELS[player.position] || player.position}
                   </p>
@@ -463,9 +645,194 @@ export default function MatchDetail() {
         )}
       </section>
 
+      {/* Quinteto ideal de la jornada */}
+      {match.jornada != null && (
+        <section className="bg-card-bg dark:bg-[#071018] border border-card-border dark:border-re-dorado/30 rounded-3xl shadow-card dark:shadow-[0_24px_60px_rgba(0,0,0,0.28)] p-4 sm:p-6 lg:p-8">
+          <div className="flex items-center justify-between mb-4 sm:mb-6">
+            <h3 className="text-lg sm:text-xl lg:text-2xl font-black italic tracking-tighter uppercase">
+              Quinteto ideal · J{match.jornada}
+            </h3>
+            <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+              {selectedIds.length}/5
+            </span>
+          </div>
+
+          {quintetStatus && (
+            <div className={`mb-3 rounded-xl border px-3 py-2 text-[11px] font-black uppercase tracking-widest ${isVoteOpen ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' : 'bg-re-rojo/10 text-re-rojo border-re-rojo/20'}`}>
+              {isVoteOpen ? `Votación abierta · cierra jueves 23:59${quintetStatus.closesAt ? ` (${new Date(quintetStatus.closesAt).toLocaleString('es-ES', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' })})` : ''}` : 'Votación cerrada · espera a que el admin la abra'}
+            </div>
+          )}
+          {isAdmin && quintetSeasonId && match.jornada != null && (
+            <div className="mb-3 flex flex-wrap gap-2">
+              <button type="button" onClick={async () => { try { const s = await openQuintet(quintetSeasonId, match.jornada); setQuintetStatus(s); } catch (e) { alert(e.message); } }} className="rounded-full bg-emerald-600 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-white">Abrir votación</button>
+              <button type="button" onClick={async () => { try { const s = await closeQuintet(quintetSeasonId, match.jornada); setQuintetStatus(s); } catch (e) { alert(e.message); } }} className="rounded-full bg-re-rojo px-4 py-2 text-[10px] font-black uppercase tracking-widest text-white">Cerrar votación</button>
+            </div>
+          )}
+
+          {quintetLoading ? (
+            <div className="h-20 animate-pulse rounded-2xl bg-muted/10" />
+          ) : (
+            <>
+              {!user ? (
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-dashed border-card-border bg-muted/5 px-4 py-3">
+                  <p className="text-xs font-bold text-muted-foreground">
+                    Entra para votar tu quinteto de esta jornada.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => openAuth('login')}
+                    className="rounded-full bg-re-rojo px-4 py-2 text-[10px] font-black uppercase tracking-widest text-white"
+                  >
+                    Entrar para votar
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {myVoteIds && (
+                    <div className="space-y-2">
+                      <p className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-2 text-center text-[11px] font-black uppercase tracking-widest text-emerald-600">
+                        Tu voto está guardado · puedes cambiarlo
+                      </p>
+                      {isVoteOpen && (
+                        <button type="button" onClick={deleteMyVote} className="w-full rounded-full border border-re-rojo/30 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-re-rojo hover:bg-re-rojo hover:text-white transition-colors">Borrar mi voto</button>
+                      )}
+                    </div>
+                  )}
+                  {quintetPlayers.length === 0 ? (
+                    <p className="text-[11px] font-bold text-muted-foreground">Aún no hay convocados para este partido.</p>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {quintetPlayers.map((player) => {
+                        const numericId = Number(player.id);
+                        const taken = selectedIds.includes(numericId);
+                        return (
+                          <button
+                            key={player.id}
+                            type="button"
+                            onClick={() => toggleQuintetPlayer(player.id)}
+                            className={`rounded-full border px-3 py-1.5 text-[11px] font-black uppercase ${
+                              taken
+                                ? 'border-re-rojo bg-re-rojo text-white'
+                                : 'border-card-border bg-card-bg text-foreground/70 hover:border-re-rojo/50'
+                            }`}
+                          >
+                            {player.nickname || player.name}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {voteError && (
+                    <p className="rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2 text-center text-[11px] font-bold text-red-500">
+                      {voteError}
+                    </p>
+                  )}
+                  <div className="flex items-center justify-between gap-2">
+                    <button
+                      type="button"
+                      onClick={() => { setSelectedIds([]); setVoteError(''); }}
+                      className="text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:underline"
+                    >
+                      Limpiar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={submitQuintetVote}
+                      disabled={selectedIds.length !== 5 || voteSaving || !isVoteOpen}
+                      className="rounded-full bg-re-rojo px-4 py-2 text-[10px] font-black uppercase tracking-widest text-white disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      {voteSaving ? 'Guardando...' : myVoteIds ? 'Actualizar voto' : 'Enviar voto'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <div className="mt-4 border-t border-card-border pt-4 space-y-4">
+                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                  {quintet?.published ? 'Quinteto de la afición · desde el martes' : 'Recuento en vivo · votando'}
+                </p>
+                {quintet && (quintet.quintet || []).length > 0 ? (
+                  <>
+                    <div className="stadium-grass relative min-h-[340px] overflow-hidden rounded-[1.4rem] border border-re-dorado/35 shadow-[0_18px_50px_rgba(0,0,0,0.35)]">
+                      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(193,154,91,0.18),transparent_46%)]" />
+                      <div className="pointer-events-none absolute inset-3 rounded-sm border border-re-dorado/25" />
+                      <div className="pointer-events-none absolute left-3 right-3 top-1/2 h-px bg-white/25" />
+                      <div className="pointer-events-none absolute left-1/2 top-1/2 h-20 w-20 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/30 sm:h-24 sm:w-24" />
+                      <div className="pointer-events-none absolute bottom-2 left-1/2 h-10 w-24 -translate-x-1/2 border border-b-0 border-white/30" />
+                      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_42%,rgba(0,0,0,0.4)_100%)]" />
+                      {quintet.quintet.map((row, index) => {
+                        const slot = QUINTET_SLOTS[index];
+                        const player = quintetPlayers.find((p) => String(p.id) === String(row.playerId));
+                        if (!slot) return null;
+                        return (
+                          <div
+                            key={row.playerId}
+                            className="absolute z-10 w-20 -translate-x-1/2 -translate-y-1/2 text-center"
+                            style={{ left: `${slot.x}%`, top: `${slot.y}%` }}
+                          >
+                            <span className="relative mx-auto block w-fit">
+                              <img
+                                src={player?.photoUrl || FALLBACK_PHOTO}
+                                alt=""
+                                className="relative h-10 w-10 rounded-full object-cover ring-2 ring-re-dorado shadow-lg"
+                                onError={(event) => { event.target.src = FALLBACK_PHOTO; }}
+                              />
+                              <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-re-rojo text-[10px] font-black text-white">
+                                {player?.jerseyNumber ?? '•'}
+                              </span>
+                            </span>
+                            <span className="mt-1 block text-[10px] font-black uppercase leading-tight text-white">
+                              {player?.nickname || player?.name || `Jugador ${row.playerId}`}
+                            </span>
+                            <span className="block text-[8px] font-bold uppercase tracking-widest text-re-dorado">
+                              {row.votes} {row.votes === 1 ? 'voto' : 'votos'}
+                            </span>
+                          </div>
+                        );
+                      })}
+                      <div className="absolute bottom-3 left-3 right-3 z-20 flex items-center justify-between text-[9px] font-black uppercase tracking-[0.18em] text-white/70">
+                        <span>Quinteto J{match.jornada}</span>
+                        <span>{quintet.totalVotes} {quintet.totalVotes === 1 ? 'voto' : 'votos'}</span>
+                      </div>
+                    </div>
+                    <ol className="space-y-2 sm:space-y-3">
+                      {quintet.quintet.map((row, index) => {
+                        const player = quintetPlayers.find((p) => String(p.id) === String(row.playerId));
+                        return (
+                          <li
+                            key={row.playerId}
+                            className="flex items-center gap-2 sm:gap-3 bg-muted/5 dark:bg-white/5 border border-card-border dark:border-white/10 rounded-2xl px-3 sm:px-4 py-2.5 sm:py-3"
+                          >
+                            <span className="shrink-0 w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-re-rojo text-white font-black text-xs sm:text-sm flex items-center justify-center">
+                              {index + 1}
+                            </span>
+                            <span className="font-black text-xs sm:text-sm flex-1 min-w-0 truncate">
+                              {player?.nickname || player?.name || `Jugador ${row.playerId}`}
+                            </span>
+                            <span className="text-re-rojo font-black text-[10px] sm:text-xs tracking-widest uppercase shrink-0">
+                              {row.votes} {row.votes === 1 ? 'voto' : 'votos'}
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ol>
+                  </>
+                ) : (
+                  <p className="text-center text-muted-foreground font-bold text-xs sm:text-sm py-6 bg-muted/5 rounded-2xl border border-dashed border-card-border">
+                    {quintet && !quintet.published
+                      ? 'La votación de esta jornada sigue abierta. Elige tus 5 arriba.'
+                      : 'Todavía no hay quinteto votado para esta jornada. ¡Sé el primero!'}
+                  </p>
+                )}
+              </div>
+            </>
+          )}
+        </section>
+      )}
+
       {/* Últimos partidos del rival */}
       {rivalInfo && (
-        <section className="bg-card-bg border border-card-border rounded-3xl shadow-card p-4 sm:p-6 lg:p-8">
+        <section className="bg-card-bg dark:bg-[#071018] border border-card-border dark:border-re-dorado/30 rounded-3xl shadow-card dark:shadow-[0_24px_60px_rgba(0,0,0,0.28)] p-4 sm:p-6 lg:p-8">
           <h3 className="text-lg sm:text-xl lg:text-2xl font-black italic tracking-tighter uppercase mb-4 sm:mb-6">
             Últimos partidos de {rivalInfo.rivalName}
           </h3>
@@ -477,7 +844,7 @@ export default function MatchDetail() {
               const mRivalGoals = mIsHome ? m.rivalGoals : m.ourGoals;
               const mDate = m.date ? new Date(m.date).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }) : '';
               return (
-                <div key={m.id} className="flex items-center gap-2 sm:gap-3 bg-muted/5 border border-card-border rounded-2xl px-3 sm:px-4 py-2.5 sm:py-3">
+                <div key={m.id} className="flex items-center gap-2 sm:gap-3 bg-muted/5 dark:bg-white/5 border border-card-border dark:border-white/10 rounded-2xl px-3 sm:px-4 py-2.5 sm:py-3">
                   <span className="text-[9px] sm:text-[10px] font-bold text-muted-foreground tracking-widest shrink-0 w-20 text-center">{mDate}</span>
                   <span className={`text-[8px] sm:text-[9px] font-black px-1.5 py-0.5 rounded-full uppercase tracking-widest shrink-0 ${mIsHome ? 'bg-emerald-500/15 text-emerald-500' : 'bg-blue-500/15 text-blue-500'}`}>
                     {mIsHome ? 'Local' : 'Visitante'}
@@ -506,7 +873,7 @@ export default function MatchDetail() {
 
       {/* Histórico contra ellos */}
       {rivalInfo && (
-        <section className="bg-card-bg border border-card-border rounded-3xl shadow-card p-4 sm:p-6 lg:p-8">
+        <section className="bg-card-bg dark:bg-[#071018] border border-card-border dark:border-re-dorado/30 rounded-3xl shadow-card dark:shadow-[0_24px_60px_rgba(0,0,0,0.28)] p-4 sm:p-6 lg:p-8">
           <div className="flex items-center justify-between mb-4 sm:mb-6">
             <h3 className="text-lg sm:text-xl lg:text-2xl font-black italic tracking-tighter uppercase">
               Histórico vs {rivalInfo.rivalName}
@@ -526,7 +893,7 @@ export default function MatchDetail() {
               const resultGoals = getResultGoals(m);
               const mDate = m.date ? new Date(m.date).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }) : '';
               return (
-                <div key={m.id} className="flex items-center gap-2 sm:gap-3 bg-muted/5 border border-card-border rounded-2xl px-3 sm:px-4 py-2.5 sm:py-3">
+                <div key={m.id} className="flex items-center gap-2 sm:gap-3 bg-muted/5 dark:bg-white/5 border border-card-border dark:border-white/10 rounded-2xl px-3 sm:px-4 py-2.5 sm:py-3">
                   <span className="text-[9px] sm:text-[10px] font-bold text-muted-foreground tracking-widest shrink-0 w-20 text-center">{mDate}</span>
                   <span className={`text-[8px] sm:text-[9px] font-black px-1.5 py-0.5 rounded-full uppercase tracking-widest shrink-0 ${mIsHome ? 'bg-emerald-500/15 text-emerald-500' : 'bg-blue-500/15 text-blue-500'}`}>
                     {mIsHome ? 'Local' : 'Visitante'}

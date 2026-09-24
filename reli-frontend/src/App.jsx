@@ -25,6 +25,7 @@ import CompetitionsAdmin from './pages/admin/CompetitionsAdmin';
 import StatsAdmin from './pages/admin/StatsAdmin';
 import UsersAdmin from './pages/admin/UsersAdmin';
 import SyncAdmin from './pages/admin/SyncAdmin';
+import EmailActionPage from './pages/EmailActionPage';
 
 function PublicLayout() {
   const { theme, toggleTheme, user, isAdmin, openAuth, handleLogout } = useApp();
@@ -72,6 +73,7 @@ export default function App() {
           <Route path="/jugadores" element={<PlayersPage />} />
           <Route path="/quinteto" element={<QuintetPage />} />
           <Route path="/calendario" element={<CalendarPage />} />
+          <Route path="/auth" element={<EmailActionPage />} />
         </Route>
         <Route
           path="/admin"
