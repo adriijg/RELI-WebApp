@@ -5,12 +5,24 @@ const getToken = () => localStorage.getItem('re-token');
 const handleResponse = async (response) => {
     if (response.status === 204) return null;
 
-    const data = await response.json().catch(() => null);
+    const contentType = response.headers.get('content-type') || '';
+    let data = null;
+    if (contentType.includes('application/json')) {
+        data = await response.json().catch(() => null);
+    } else {
+        const text = await response.text().catch(() => '');
+        data = text === '' ? null : text;
+    }
 
     if (!response.ok) {
-        let message = data?.message || data?.error || `Error del servidor (${response.status})`;
-        if (data?.fieldErrors && typeof data.fieldErrors === 'object') {
-            message = Object.values(data.fieldErrors).join('. ');
+        let message;
+        if (typeof data === 'string') {
+            message = data || `Error del servidor (${response.status})`;
+        } else {
+            message = data?.message || data?.error || `Error del servidor (${response.status})`;
+            if (data?.fieldErrors && typeof data.fieldErrors === 'object') {
+                message = Object.values(data.fieldErrors).join('. ');
+            }
         }
         if (response.status === 401) {
             message = 'Sesión no válida o caducada. Cierra sesión y vuelve a iniciarla.';
@@ -70,6 +82,8 @@ export const toPage = (data) => {
 /* ---------- Auth ---------- */
 export const loginUser = (credentials) =>
     apiFetch('/users/login', { method: 'POST', body: credentials, auth: false });
+export const googleLogin = (idToken) =>
+    apiFetch('/auth/google', { method: 'POST', body: { idToken }, auth: false });
 
 export const registerUser = (userData) =>
     apiFetch('/users/register', { method: 'POST', body: userData, auth: false });
@@ -139,7 +153,10 @@ export const createCompetition = (body) => apiFetch('/competitions', { method: '
 export const updateCompetition = (id, body) => apiFetch(`/competitions/${id}`, { method: 'PUT', body });
 export const deleteCompetition = (id) => apiFetch(`/competitions/${id}`, { method: 'DELETE' });
 export const getFfmSyncRuns = () => apiFetch('/admin/sync/ffm/runs');
-export const previewFfmSync = (competitionId) =>
+export const getEmailStatus = () => apiFetch('/admin/emails/status');
+export const sendTestEmail = (to) => apiFetch('/admin/emails/test', { method: 'POST', body: { to } });
+export const sendNextMatchTestEmail = (competitionId, to) =>
+  apiFetch('/admin/emails/next-match-test', { method: 'POST', params: { competitionId }, body: { to } });export const previewFfmSync = (competitionId) =>
   apiFetch('/admin/sync/ffm/preview', { method: 'POST', params: { competitionId } });
 export const applyFfmSync = (competitionId) =>
   apiFetch('/admin/sync/ffm/apply', { method: 'POST', params: { competitionId } });

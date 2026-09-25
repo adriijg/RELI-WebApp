@@ -25,6 +25,7 @@ import CompetitionsAdmin from './pages/admin/CompetitionsAdmin';
 import StatsAdmin from './pages/admin/StatsAdmin';
 import UsersAdmin from './pages/admin/UsersAdmin';
 import SyncAdmin from './pages/admin/SyncAdmin';
+import EmailsAdmin from './pages/admin/EmailsAdmin';
 import EmailActionPage from './pages/EmailActionPage';
 
 function PublicLayout() {
@@ -92,6 +93,7 @@ export default function App() {
           <Route path="estadisticas" element={<StatsAdmin />} />
           <Route path="usuarios" element={<UsersAdmin />} />
           <Route path="sincronizacion" element={<SyncAdmin />} />
+          <Route path="correos" element={<EmailsAdmin />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

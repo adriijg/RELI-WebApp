@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchHomeMatches } from '../utils/matches';
 import logo from '../assets/reli-badge.png';
@@ -7,22 +7,31 @@ export default function LastMatches() {
   const navigate = useNavigate();
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(true);
+  const pollingRef = useRef(null);
 
-  useEffect(() => {
-    fetchHomeMatches().then(list => {
+  const loadMatches = useCallback(async () => {
+    try {
+      const list = await fetchHomeMatches();
       const finished = list
         .filter(m => m.status === 'FINISHED' && m.ourGoals != null && m.rivalGoals != null)
-        .sort((a,b) => new Date(b.date) - new Date(a.date))
-        .slice(0,5);
+        .sort((a,b) => new Date(a.date) - new Date(b.date))
+        .slice(-5);
       setMatches(finished);
-    }).catch(()=>{}).finally(()=>setLoading(false));
+    } catch {}
   }, []);
+
+  useEffect(() => {
+    setLoading(true);
+    loadMatches().finally(() => setLoading(false));
+    pollingRef.current = setInterval(loadMatches, 30000);
+    return () => { if (pollingRef.current) clearInterval(pollingRef.current); };
+  }, [loadMatches]);
 
   if (loading) return <div className="h-32 rounded-3xl bg-card-bg animate-pulse" />;
   if (matches.length === 0) return null;
 
-  const last = matches[0];
-  const rest = matches.slice(1);
+  const last = matches[matches.length - 1];
+  const rest = matches.slice(0, -1);
 
   return (
     <section className="rounded-[1.7rem] border border-card-border dark:border-re-dorado/30 bg-card-bg dark:bg-[#071018] p-5 sm:p-6 shadow-card">

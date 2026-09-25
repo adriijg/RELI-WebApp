@@ -124,7 +124,7 @@ export default function Navbar({ theme, user, isAdmin, onToggleTheme, onOpenAuth
                         onClick={() => navigate('/admin')}
                         className="rounded-full border border-white/15 bg-white/5 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.2em] text-white transition-colors hover:bg-white/10"
                       >
-                        Admin
+                        Panel
                       </button>
                     )}
                     <button onClick={onLogout} className="rounded-full border border-white/15 bg-white/5 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.2em] text-white transition-colors hover:bg-white/10">Cerrar</button>
@@ -161,9 +161,9 @@ export default function Navbar({ theme, user, isAdmin, onToggleTheme, onOpenAuth
                         onClick={() => { setIsMenuOpen(false); navigate('/admin'); }}
                         className="w-full rounded-2xl border border-white/15 bg-white/5 py-3 text-sm font-black uppercase tracking-[0.2em] text-white transition-colors hover:bg-white/10"
                       >
-                        Admin
-                      </button>
-                    )}
+                         Panel
+                       </button>
+                     )}
                     <button onClick={() => { onLogout(); setIsMenuOpen(false); }} className="w-full rounded-2xl border border-white/15 bg-white/5 py-3 text-sm font-black uppercase tracking-[0.2em] text-white transition-colors hover:bg-white/10">Cerrar sesión</button>
                  </div>
               ) : (

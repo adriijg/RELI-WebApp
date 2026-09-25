@@ -1,6 +1,6 @@
 // src/components/AuthModal.jsx
-import { useState, useEffect } from 'react';
-import { loginUser, registerUser, requestPasswordReset, resendVerification } from '../services/api';
+import { useState, useEffect, useRef } from 'react';
+import { loginUser, registerUser, requestPasswordReset, resendVerification, googleLogin } from '../services/api';
 
 export default function AuthModal({ isOpen, onClose, initialView = 'login', onAuthSuccess }) {
   const [view, setView] = useState(initialView);
@@ -14,6 +14,9 @@ export default function AuthModal({ isOpen, onClose, initialView = 'login', onAu
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const googleScriptRef = useRef(false);
+  const googleBtnRef = useRef(null);
 
   // Sincronizar el estado interno de la vista con la prop initialView cada vez que se abra el modal
   useEffect(() => {
@@ -24,6 +27,69 @@ export default function AuthModal({ isOpen, onClose, initialView = 'login', onAu
       setShowPassword(false);
     }
   }, [isOpen, initialView]);
+
+  useEffect(() => {
+    if (!isOpen || googleScriptRef.current) return;
+    googleScriptRef.current = true;
+    const script = document.createElement('script');
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true;
+    script.defer = true;
+    document.body.appendChild(script);
+    return () => {
+      document.body.removeChild(script);
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen || view !== 'login') return;
+    const initGoogle = () => {
+      try {
+        if (window.google && googleBtnRef.current) {
+          window.google.accounts.id.initialize({
+            client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+            callback: handleGoogleCredential,
+            auto_select: false,
+            cancel_on_tap_outside: true,
+          });
+          window.google.accounts.id.renderButton(
+            googleBtnRef.current,
+            { theme: 'outline', size: 'large', text: 'signin_with', shape: 'rectangular' }
+          );
+        }
+      } catch (e) {
+        console.error('Error inicializando Google Sign-In:', e);
+      }
+    };
+    if (window.google) {
+      initGoogle();
+    } else {
+      const handler = setInterval(() => {
+        if (window.google) {
+          clearInterval(handler);
+          initGoogle();
+        }
+      }, 100);
+      return () => clearInterval(handler);
+    }
+  }, [isOpen, view]);
+
+  const handleGoogleCredential = async (response) => {
+    if (!response.credential) return;
+    setGoogleLoading(true);
+    setError('');
+    try {
+      const data = await googleLogin(response.credential);
+      if (data.token) {
+        localStorage.setItem('re-token', data.token);
+        onAuthSuccess(data.user);
+      }
+    } catch (err) {
+      setError(err.message || 'Error en el inicio de sesión con Google');
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -226,6 +292,15 @@ export default function AuthModal({ isOpen, onClose, initialView = 'login', onAu
               {loading ? 'PROCESANDO...' : (view === 'login' ? 'ENTRAR' : view === 'forgot' ? 'ENVIAR ENLACE' : 'REGISTRARME')}
             </button>
           </form>
+
+          {view === 'login' && (
+            <div className="mt-6 space-y-4">
+              <div ref={googleBtnRef} className="flex justify-center" />
+              {googleLoading && (
+                <div className="text-center text-xs font-bold text-re-dorado animate-pulse">Iniciando sesión con Google...</div>
+              )}
+            </div>
+          )}
 
           <div className="mt-8 text-center" key="auth-toggle-container">
             <p className="text-xs text-muted-foreground font-bold">

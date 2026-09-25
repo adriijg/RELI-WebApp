@@ -32,6 +32,9 @@ public class User extends BaseEntity {
     @Column(nullable = false)
     private String password;
 
+    @Column(nullable = true, unique = true)
+    private String googleId;
+
     // Existing rows remain usable; new registrations explicitly start unverified.
     private Boolean emailVerified = true;
 

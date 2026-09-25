@@ -1,0 +1,26 @@
+services:
+  backend:
+    build:
+      context: ./api-backend
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    env_file:
+      - ./api-backend/.env
+    networks:
+      - app-network
+
+  frontend:
+    build:
+      context: ./reli-frontend
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge

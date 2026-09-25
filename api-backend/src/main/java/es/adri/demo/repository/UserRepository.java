@@ -19,4 +19,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
     boolean existsByEmailAndIdNot(String email, Long id);
 
     java.util.List<User> findByEmailVerifiedTrue();
+
+    Optional<User> findByGoogleId(String googleId);
 }

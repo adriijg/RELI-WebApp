@@ -34,7 +34,7 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(org.springframework.security.config.http.SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/users/register", "/api/users/login", "/api/users/verify-email", "/api/users/password-reset/**").permitAll()
+                        .requestMatchers("/api/users/register", "/api/users/login", "/api/auth/google", "/api/users/verify-email/**", "/api/users/password-reset/**").permitAll()
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**").permitAll()
                         // Listado de usuarios: solo admin (antes de permitir el resto de GET)
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/users").hasRole("ADMIN")
@@ -67,12 +67,15 @@ public class SecurityConfig {
         configuration.setAllowedOriginPatterns(Arrays.asList(
                 "http://localhost:5173",
                 "http://127.0.0.1:5173",
-                "https://*.devtunnels.ms",
-                "https://*.ngrok-free.dev",
-                "https://*.ngrok-free.app",
-                "https://*.ngrok.app",
-                "https://*.ngrok.io"
-        ));
+                "http://reallisiados.duckdns.org:5173",
+                "http://reallisiados.duckdns.org",
+                "http://88.0.71.141",
+                 "https://*.devtunnels.ms",
+                 "https://*.ngrok-free.dev",
+                 "https://*.ngrok-free.app",
+                 "https://*.ngrok.app",
+                 "https://*.ngrok.io"
+         ));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "Accept"));
         configuration.setAllowCredentials(true);

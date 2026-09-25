@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { confirmPasswordReset, verifyEmail } from '../services/api';
 
 export default function EmailActionPage() {
@@ -10,7 +10,14 @@ export default function EmailActionPage() {
   const verifyToken = params.get('verifyEmail');
 
   useEffect(() => {
-    if (!verifyToken || resetToken) return;
+    if (resetToken) {
+      setState({ loading: false, message: '', error: '' });
+      return;
+    }
+    if (!verifyToken) {
+      setState({ loading: false, message: '', error: 'Enlace no válido. Revisa el correo o solicita uno nuevo.' });
+      return;
+    }
     verifyEmail(verifyToken)
       .then((message) => setState({ loading: false, message: message || 'Email confirmado correctamente.', error: '' }))
       .catch((error) => setState({ loading: false, message: '', error: error.message || 'No se pudo confirmar el email.' }));
@@ -43,6 +50,11 @@ export default function EmailActionPage() {
         ) : null}
         {state.message && <p className="mt-4 rounded-xl bg-emerald-500/10 p-3 text-sm font-bold text-emerald-600">{state.message}</p>}
         {state.error && <p className="mt-4 rounded-xl bg-re-rojo/10 p-3 text-sm font-bold text-re-rojo">{state.error}</p>}
+        {!state.loading && (
+          <Link to="/" className="mt-6 inline-block text-xs font-black uppercase tracking-widest text-re-dorado hover:underline">
+            Volver al inicio
+          </Link>
+        )}
       </section>
     </main>
   );
