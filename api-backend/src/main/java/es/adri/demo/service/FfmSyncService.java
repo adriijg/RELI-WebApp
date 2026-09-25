@@ -151,6 +151,7 @@ public class FfmSyncService {
             int created = 0;
             int updated = 0;
             List<MatchDTO> createdMatches = new ArrayList<>();
+            List<String> updatedDetails = new ArrayList<>();
             for (int i = 0; i < ours.size(); i++) {
                 FfmMatch parsed = ours.get(i);
                 FfmSyncActionDTO action = actions.get(i);
@@ -162,7 +163,9 @@ public class FfmSyncService {
                     createdMatches.add(matchService.createMatch(toRequest(competition, parsed, null)));
                     created++;
                 } else if ("UPDATED".equals(action.getAction())) {
-                    matchService.updateMatch(target.getId(), toRequest(competition, parsed, target));
+                    MatchDTO dto = matchService.updateMatch(target.getId(), toRequest(competition, parsed, target));
+                    updatedDetails.add("Jornada " + dto.getJornada() + ": Real Lisiados vs " + dto.getRival()
+                            + (action.getDetail() == null || action.getDetail().isBlank() ? "" : " (" + action.getDetail() + ")"));
                     updated++;
                 }
             }
@@ -174,7 +177,7 @@ public class FfmSyncService {
             run.setStatus(FfmSyncRun.Status.OK);
             run.setFinishedAt(LocalDateTime.now());
             run = runRepository.save(run);
-            notifyNewMatches(competition.getName(), createdMatches);
+            notifyScheduleNews(competition, createdMatches, updatedDetails);
             FfmSyncResultDTO result = resultOf(competition, ours, actions, run.getId());
             result.setCreated(created);
             result.setUpdated(updated);
@@ -192,25 +195,93 @@ public class FfmSyncService {
         }
     }
 
-    private void notifyNewMatches(String competitionName, List<MatchDTO> matches) {
-        if (matches.isEmpty()) return;
-        StringBuilder html = new StringBuilder("<h2>Nuevos horarios de ")
-                .append(competitionName).append("</h2><p>Se han añadido estos partidos:</p><ul>");
-        for (MatchDTO match : matches) {
-            html.append("<li>Jornada ").append(match.getJornada())
-                    .append(": Real Lisiados vs ").append(match.getRival())
-                    .append(match.getDate() == null ? "" : " · " + match.getDate())
-                    .append(match.getLocation() == null ? "" : " · " + match.getLocation())
-                    .append("</li>");
+    /** Asunto + cuerpo HTML del aviso de horarios / próximo partido. */
+    public record ScheduleMail(String subject, String html) {
+    }
+
+    /**
+     * Envía a una única dirección el aviso del próximo partido de una competición.
+     * Pensado para probar la configuración de correo desde el panel admin sin
+     * lanzar una sincronización real ni spamear a todos los usuarios.
+     */
+    @Transactional(readOnly = true)
+    public void sendNextMatchPreview(Long competitionId, String recipient) {
+        if (!emailService.isEnabled()) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                    "El envío de correos está desactivado (EMAIL_ENABLED=false)");
         }
-        html.append("</ul><p>Consulta el calendario en la web de RELI.</p>");
+        Competition competition = getCompetition(competitionId);
+        Match next = findNextScheduledMatch(competitionId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "No hay próximo partido programado para esta competición"));
+        ScheduleMail mail = buildScheduleMail(competition, next, List.of(), List.of());
+        emailService.send(recipient, "[PRUEBA] " + mail.subject(),
+                "<p><em>Correo de prueba enviado desde el panel admin. Solo lo has recibido tú.</em></p>"
+                        + mail.html());
+    }
+
+    private java.util.Optional<Match> findNextScheduledMatch(Long competitionId) {
+        return matchRepository.findFirstByCompetitionIdAndStatusAndDateGreaterThanEqualOrderByDateAsc(
+                competitionId, MatchStatus.SCHEDULED, LocalDateTime.now());
+    }
+
+    /**
+     * Avisa por email a todos los usuarios verificados cuando el scraping trae
+     * novedades (partidos nuevos o cambios de horario/sede). El correo destaca
+     * el próximo partido por jugar. Si no hay novedades, no se envía nada
+     * para no spamear en las sincronizaciones programadas sin cambios.
+     */
+    private void notifyScheduleNews(Competition competition, List<MatchDTO> createdMatches, List<String> updatedDetails) {
+        if (createdMatches.isEmpty() && updatedDetails.isEmpty()) return;
+        Match next = findNextScheduledMatch(competition.getId()).orElse(null);
+        ScheduleMail mail = buildScheduleMail(competition, next, createdMatches, updatedDetails);
         for (es.adri.demo.model.User user : userRepository.findByEmailVerifiedTrue()) {
             try {
-                emailService.send(user.getEmail(), "Nuevos horarios de " + competitionName, html.toString());
+                emailService.send(user.getEmail(), mail.subject(), mail.html());
             } catch (Exception e) {
                 log.warn("No se pudo enviar el aviso de horarios a {}", user.getEmail(), e);
             }
         }
+    }
+
+    private ScheduleMail buildScheduleMail(Competition competition, Match next,
+                                           List<MatchDTO> createdMatches, List<String> updatedDetails) {
+        String subject;
+        StringBuilder html = new StringBuilder();
+        if (next != null) {
+            subject = "Próximo partido: Real Lisiados vs " + next.getRival();
+            html.append("<h2>Próximo partido</h2>")
+                    .append("<p><strong>Real Lisiados vs ").append(next.getRival()).append("</strong></p>")
+                    .append("<p>")
+                    .append(next.getDate() == null ? "Fecha por confirmar" : "Fecha: " + next.getDate())
+                    .append(next.getLocation() == null ? "" : "<br>Sede: " + next.getLocation())
+                    .append(next.getJornada() == null ? "" : "<br>Jornada " + next.getJornada())
+                    .append("<br>Competición: ").append(competition.getName())
+                    .append("</p>");
+        } else {
+            subject = "Nuevos horarios de " + competition.getName();
+            html.append("<h2>Novedades en ").append(competition.getName()).append("</h2>");
+        }
+        if (!createdMatches.isEmpty()) {
+            html.append("<p>Partidos añadidos:</p><ul>");
+            for (MatchDTO match : createdMatches) {
+                html.append("<li>Jornada ").append(match.getJornada())
+                        .append(": Real Lisiados vs ").append(match.getRival())
+                        .append(match.getDate() == null ? "" : " · " + match.getDate())
+                        .append(match.getLocation() == null ? "" : " · " + match.getLocation())
+                        .append("</li>");
+            }
+            html.append("</ul>");
+        }
+        if (!updatedDetails.isEmpty()) {
+            html.append("<p>Partidos actualizados (cambios de horario, sede o resultado):</p><ul>");
+            for (String detail : updatedDetails) {
+                html.append("<li>").append(detail).append("</li>");
+            }
+            html.append("</ul>");
+        }
+        html.append("<p>Consulta el calendario completo en la web de RELI.</p>");
+        return new ScheduleMail(subject, html.toString());
     }
 
     /** Sincroniza todas las competiciones configuradas (usado por el programador). */

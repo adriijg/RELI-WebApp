@@ -1,0 +1,41 @@
+# Compose para el NAS Synology: usa las imagenes ya publicadas en Docker Hub
+# (no necesita el codigo fuente, solo este fichero + el .env real).
+#
+# 1. Sube las imagenes desde el PC:
+#      docker tag reli-webapp-backend:latest TU_USUARIO/reli-backend:latest
+#      docker tag reli-webapp-frontend:latest TU_USUARIO/reli-frontend:latest
+#      docker push TU_USUARIO/reli-backend:latest
+#      docker push TU_USUARIO/reli-frontend:latest
+# 2. Cambia abajo TU_USUARIO por tu usuario de Docker Hub.
+# 3. En el NAS, deja este fichero como docker-compose.yml y coloca tu
+#    api-backend/.env real en ./api-backend/.env (misma carpeta).
+# 4. En el NAS: docker compose pull && docker compose up -d
+#
+# Puertos: el frontend escucha en el 8081 del NAS (el 80 lo usa el propio DSM).
+# Expónlo con el Reverse Proxy de DSM (ver README del proyecto o notas) para
+# servirlo en http://reallisiados.duckdns.org sin puerto.
+
+services:
+  backend:
+    image: TU_USUARIO/reli-backend:latest
+    ports:
+      - "8080:8080"
+    env_file:
+      - ./api-backend/.env
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  frontend:
+    image: TU_USUARIO/reli-frontend:latest
+    ports:
+      - "8081:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge

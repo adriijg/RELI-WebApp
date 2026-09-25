@@ -14,6 +14,9 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
 
     List<Match> findByCompetitionId(Long competitionId);
 
+    java.util.Optional<Match> findFirstByCompetitionIdAndStatusAndDateGreaterThanEqualOrderByDateAsc(
+            Long competitionId, es.adri.demo.model.MatchStatus status, LocalDateTime date);
+
     org.springframework.data.domain.Page<Match> findByStatus(es.adri.demo.model.MatchStatus status, org.springframework.data.domain.Pageable pageable);
 
     @Query("SELECT m FROM Match m WHERE m.rival = :rival AND m.status = es.adri.demo.model.MatchStatus.FINISHED "

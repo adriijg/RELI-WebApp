@@ -25,6 +25,10 @@ public class ResendEmailService {
         this.resendClient = resendClient;
     }
 
+    public boolean isEnabled() {
+        return enabled;
+    }
+
     public void send(String recipient, String subject, String html) {
         if (!enabled) return;
         if (apiKey == null || apiKey.isBlank()) {
