@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion, MotionConfig } from 'framer-motion';
-import { getAllPlayers, getPlayerSeasonStats, getSeasons, toPage } from '../services/api';
+import { getPlayerSeasonStats, getSeasons, toPage } from '../services/api';
 import { jerseyForSeason } from '../constants/jerseys';
 import { POSITION_LABELS } from '../constants/positions';
 import PlayerDetailModal from '../components/PlayerDetailModal';
@@ -16,24 +16,6 @@ const SORT_OPTIONS = [
   { value: 'redCards', label: 'Rojas' },
   { value: 'cleanSheets', label: 'Porterías 0' },
 ];
-
-function emptyPlayer(player, seasonId) {
-  return {
-    playerId: player.id,
-    name: player.name,
-    nickname: player.nickname,
-    surnames: player.surnames,
-    jerseyNumber: jerseyForSeason(player.id, seasonId, player.jerseyNumber),
-    position: player.position,
-    photoUrl: player.photoUrl,
-    goals: 0,
-    assists: 0,
-    yellowCards: 0,
-    redCards: 0,
-    appearances: 0,
-    cleanSheets: 0,
-  };
-}
 
 export default function PlayersPage() {
   const [players, setPlayers] = useState([]);

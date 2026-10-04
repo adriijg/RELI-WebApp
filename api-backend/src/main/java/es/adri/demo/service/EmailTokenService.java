@@ -24,25 +24,24 @@ public class EmailTokenService {
     private static final long TOKEN_HOURS = 24;
 
     private final EmailTokenRepository tokenRepository;
-    private final ResendEmailService emailService;
+    private final EmailService emailService;
+    private final EmailTemplateService templateService;
 
     @Value("${app.email.frontend-url:http://localhost:5173}")
     private String frontendUrl;
 
-    public EmailTokenService(EmailTokenRepository tokenRepository, ResendEmailService emailService) {
+    public EmailTokenService(EmailTokenRepository tokenRepository, EmailService emailService,
+                             EmailTemplateService templateService) {
         this.tokenRepository = tokenRepository;
         this.emailService = emailService;
+        this.templateService = templateService;
     }
 
     @Transactional
     public void sendVerification(User user) {
         String token = createToken(user, EmailToken.Type.VERIFY_EMAIL);
-        emailService.send(user.getEmail(), "Confirma tu email en RELI", """
-                <h2>Bienvenido a RELI, %s</h2>
-                <p>Confirma tu dirección de correo para activar tu cuenta:</p>
-                <p><a href="%s?verifyEmail=%s">Confirmar email</a></p>
-                <p>Este enlace caduca en 24 horas.</p>
-                """.formatted(user.getUsername(), frontendUrl, token));
+        emailService.send(user.getEmail(), "Confirma tu email en RELI",
+                templateService.verification(user.getUsername(), frontendUrl + "?verifyEmail=" + token));
     }
 
     @Transactional
@@ -57,12 +56,8 @@ public class EmailTokenService {
     @Transactional
     public void sendPasswordReset(User user) {
         String token = createToken(user, EmailToken.Type.RESET_PASSWORD);
-        emailService.send(user.getEmail(), "Recupera tu contraseña de RELI", """
-                <h2>Recuperación de contraseña</h2>
-                <p>Hemos recibido una solicitud para cambiar la contraseña de tu cuenta RELI.</p>
-                <p><a href="%s?resetPassword=%s">Cambiar contraseña</a></p>
-                <p>Si no lo has solicitado, ignora este mensaje. El enlace caduca en 1 hora.</p>
-                """.formatted(frontendUrl, token));
+        emailService.send(user.getEmail(), "Recupera tu contraseña de RELI",
+                templateService.passwordReset(frontendUrl + "?resetPassword=" + token));
     }
 
     @Transactional

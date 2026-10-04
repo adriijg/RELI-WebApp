@@ -4,19 +4,14 @@ import logo from '../assets/reli-badge.png';
 import { getMatchDetail, getMatches, getStats, getCompetitions, getPlayerSeasonStats, getQuintetStatus, getQuintetTally, deleteQuintetVote, getAllPlayers, getMyQuintetVote, openQuintet, closeQuintet, saveQuintetVote } from '../services/api';
 import { useApp } from '../context/AppContext';
 import { rememberAdminMatch } from '../utils/adminRecentMatches';
+import AdminMatchEditButton from '../components/admin/AdminMatchEditButton';
 import { STATUS_LABELS } from '../constants/matchStatus';
 import { jerseyForCompetition } from '../constants/jerseys';
 import { POSITION_LABELS } from '../constants/positions';
 import { isMatchLive } from '../utils/matches';
+import { getMatchOutcome, scoreTextClass } from '../utils/matchResult';
 
 const FALLBACK_PHOTO = 'https://pjefzhrnoftaovlvnjaz.supabase.co/storage/v1/object/public/images/default-player.png';
-const QUINTET_SLOTS = [
-  { x: 50, y: 16 },
-  { x: 22, y: 36 },
-  { x: 78, y: 36 },
-  { x: 50, y: 56 },
-  { x: 50, y: 78 },
-];
 
 function formatDateTime(date) {
   if (!date) return null;
@@ -460,6 +455,7 @@ export default function MatchDetail() {
             {match.jornada != null ? ` • J${match.jornada}` : ''}
           </span>
         </div>
+        <AdminMatchEditButton matchId={match.id} variant="bar" />
 
         <div className="p-4 sm:p-5">
           <div className="flex justify-center mb-4 sm:mb-6">
@@ -484,7 +480,7 @@ export default function MatchDetail() {
 
             <div className="shrink-0 text-center px-1 sm:px-2">
               {finished ? (
-                <span className="text-re-rojo font-black italic text-3xl sm:text-4xl lg:text-5xl tracking-tighter block leading-none">
+                <span className={`${scoreTextClass(getMatchOutcome(match.ourGoals, match.rivalGoals))} font-black italic text-3xl sm:text-4xl lg:text-5xl tracking-tighter block leading-none`}>
                   {leftGoals} - {rightGoals}
                 </span>
               ) : (
@@ -753,48 +749,10 @@ export default function MatchDetail() {
                 </p>
                 {quintet && (quintet.quintet || []).length > 0 ? (
                   <>
-                    <div className="stadium-grass relative min-h-[340px] overflow-hidden rounded-[1.4rem] border border-re-dorado/35 shadow-[0_18px_50px_rgba(0,0,0,0.35)]">
-                      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(193,154,91,0.18),transparent_46%)]" />
-                      <div className="pointer-events-none absolute inset-3 rounded-sm border border-re-dorado/25" />
-                      <div className="pointer-events-none absolute left-3 right-3 top-1/2 h-px bg-white/25" />
-                      <div className="pointer-events-none absolute left-1/2 top-1/2 h-20 w-20 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/30 sm:h-24 sm:w-24" />
-                      <div className="pointer-events-none absolute bottom-2 left-1/2 h-10 w-24 -translate-x-1/2 border border-b-0 border-white/30" />
-                      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_42%,rgba(0,0,0,0.4)_100%)]" />
-                      {quintet.quintet.map((row, index) => {
-                        const slot = QUINTET_SLOTS[index];
-                        const player = quintetPlayers.find((p) => String(p.id) === String(row.playerId));
-                        if (!slot) return null;
-                        return (
-                          <div
-                            key={row.playerId}
-                            className="absolute z-10 w-20 -translate-x-1/2 -translate-y-1/2 text-center"
-                            style={{ left: `${slot.x}%`, top: `${slot.y}%` }}
-                          >
-                            <span className="relative mx-auto block w-fit">
-                              <img
-                                src={player?.photoUrl || FALLBACK_PHOTO}
-                                alt=""
-                                className="relative h-10 w-10 rounded-full object-cover ring-2 ring-re-dorado shadow-lg"
-                                onError={(event) => { event.target.src = FALLBACK_PHOTO; }}
-                              />
-                              <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-re-rojo text-[10px] font-black text-white">
-                                {player?.jerseyNumber ?? '•'}
-                              </span>
-                            </span>
-                            <span className="mt-1 block text-[10px] font-black uppercase leading-tight text-white">
-                              {player?.nickname || player?.name || `Jugador ${row.playerId}`}
-                            </span>
-                            <span className="block text-[8px] font-bold uppercase tracking-widest text-re-dorado">
-                              {row.votes} {row.votes === 1 ? 'voto' : 'votos'}
-                            </span>
-                          </div>
-                        );
-                      })}
-                      <div className="absolute bottom-3 left-3 right-3 z-20 flex items-center justify-between text-[9px] font-black uppercase tracking-[0.18em] text-white/70">
+                    <div className="flex items-center justify-between text-[9px] font-black uppercase tracking-[0.18em] text-muted-foreground">
                         <span>Quinteto J{match.jornada}</span>
                         <span>{quintet.totalVotes} {quintet.totalVotes === 1 ? 'voto' : 'votos'}</span>
                       </div>
-                    </div>
                     <ol className="space-y-2 sm:space-y-3">
                       {quintet.quintet.map((row, index) => {
                         const player = quintetPlayers.find((p) => String(p.id) === String(row.playerId));
@@ -852,7 +810,7 @@ export default function MatchDetail() {
                   <span className="flex-1 min-w-0 text-xs sm:text-sm font-black uppercase truncate">{m.rival}</span>
                   <span className="font-black text-sm sm:text-base shrink-0">
                     {mOurGoals != null && mRivalGoals != null ? (
-                      <span className={mOurGoals > mRivalGoals ? 'text-emerald-500' : mOurGoals < mRivalGoals ? 'text-re-rojo' : 'text-muted-foreground'}>
+                      <span className={scoreTextClass(getMatchOutcome(mOurGoals, mRivalGoals))}>
                         {mOurGoals} - {mRivalGoals}
                       </span>
                     ) : (
@@ -880,7 +838,7 @@ export default function MatchDetail() {
             </h3>
             <div className="flex items-center gap-2 sm:gap-3">
               <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-emerald-500">{rivalInfo.ourWins ?? 0}V</span>
-              <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-muted-foreground">{rivalInfo.draws ?? 0}E</span>
+              <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-yellow-500">{rivalInfo.draws ?? 0}E</span>
               <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-re-rojo">{rivalInfo.rivalWins ?? 0}D</span>
             </div>
           </div>
@@ -901,7 +859,7 @@ export default function MatchDetail() {
                   <span className="flex-1 min-w-0 text-xs sm:text-sm font-black uppercase truncate">{m.rival}</span>
                   <span className="font-black text-sm sm:text-base shrink-0">
                     {mOurGoals != null && mRivalGoals != null ? (
-                      <span className={resultGoals.ourGoals > resultGoals.rivalGoals ? 'text-emerald-500' : resultGoals.ourGoals < resultGoals.rivalGoals ? 'text-re-rojo' : 'text-muted-foreground'}>
+                      <span className={scoreTextClass(getMatchOutcome(resultGoals.ourGoals, resultGoals.rivalGoals))}>
                         {mOurGoals} - {mRivalGoals}
                       </span>
                     ) : (

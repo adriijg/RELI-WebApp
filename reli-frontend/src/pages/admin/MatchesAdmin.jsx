@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import PageHeader from '../../components/admin/PageHeader';
 import DataTable from '../../components/admin/DataTable';
@@ -9,6 +9,7 @@ import { createMatch, deleteMatch, getCompetitions, getMatches, getSeasons, toPa
 import { STATUS_LABELS } from '../../constants/matchStatus';
 import { POSITION_LABELS } from '../../constants/positions';
 import { rememberAdminMatch } from '../../utils/adminRecentMatches';
+import { getMatchOutcome, scoreTextClass } from '../../utils/matchResult';
 
 const TIME_OPTIONS = (() => {
   const opts = [];
@@ -33,7 +34,7 @@ function useRosterPlayers(matchId) {
   const [players, setPlayers] = useState([]);
   const [detail, setDetail] = useState(null);
   const [loading, setLoading] = useState(true);
-  const load = async () => {
+  const load = useCallback(async () => {
     if (!matchId) return;
     setLoading(true);
     try {
@@ -62,8 +63,8 @@ function useRosterPlayers(matchId) {
         }
       } catch { const all = await getAllPlayers().catch(()=>[]); setPlayers(Array.isArray(all)?all:[]); }
     } catch { setDetail(null); } finally { setLoading(false); }
-  };
-  useEffect(() => { load(); }, [matchId]);
+  }, [matchId]);
+  useEffect(() => { load(); }, [load]);
   return { players, detail, setDetail, loading, reload: load };
 }
 
@@ -83,7 +84,9 @@ function GoleadoresSection({ matchId }) {
       } else if (delta > 0) {
         await createStat({ playerId: Number(playerId), matchId, goals: delta, assists: 0, yellowCards: 0, redCards: 0, mvp: false, attended: true });
       }
-    } catch {}
+    } catch {
+      // Ignorar errores al sincronizar estadísticas
+    }
   };
   const handleAdd = async (e) => {
     e.preventDefault();
@@ -198,7 +201,9 @@ function ConvocadosSection({ matchId }) {
           const existing = Array.isArray(list) ? list.find(s => String(s.playerId) === String(player.id)) : null;
           if (!existing) await createStat({ playerId: Number(player.id), matchId, goals: 0, assists: 0, yellowCards: 0, redCards: 0, mvp: false, attended: true });
           else if (!existing.attended) await updateStat(existing.id, { playerId: Number(player.id), matchId, goals: existing.goals||0, assists: existing.assists||0, yellowCards: existing.yellowCards||0, redCards: existing.redCards||0, mvp: !!existing.mvp, attended: true });
-        } catch {}
+} catch {
+      // Ignorar errores al sincronizar estadísticas
+    }
       } catch (err) {
         setDetail(prev => prev ? { ...prev, callups: (prev.callups||[]).filter(c => String(c.playerId) !== String(player.id)) } : prev);
         alert(err.message || 'Error');
@@ -232,7 +237,6 @@ function ConvocadosSection({ matchId }) {
 }
 
 function TarjetasSection({ matchId }) {
-  const [detail, setDetail] = useState(null);
   const [stats, setStats] = useState([]);
   const [players, setPlayers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -240,11 +244,10 @@ function TarjetasSection({ matchId }) {
   const [yellow, setYellow] = useState(0);
   const [red, setRed] = useState(0);
   const [saving, setSaving] = useState(false);
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const [d, s, all] = await Promise.all([getMatchDetail(matchId).catch(()=>null), getStats({ matchId, size: 200 }).catch(()=>null), getAllPlayers().catch(()=>[])]);
-      setDetail(d);
       const list = s?.content || s || [];
       setStats(Array.isArray(list)?list:[]);
       // roster para selector
@@ -261,8 +264,8 @@ function TarjetasSection({ matchId }) {
         } else setPlayers(Array.isArray(all)?all:[]);
       } catch { setPlayers(Array.isArray(all)?all:[]); }
     } finally { setLoading(false); }
-  };
-  useEffect(()=>{ load(); }, [matchId]);
+  }, [matchId]);
+  useEffect(()=>{ load(); }, [load]);
   const carded = stats.filter(s => (s.yellowCards||0)>0 || (s.redCards||0)>0);
   const handleSave = async (e) => {
     e.preventDefault();
@@ -379,7 +382,7 @@ function ActaExtra({ matchId }) {
 }
 
 export default function MatchesAdmin() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -442,7 +445,7 @@ export default function MatchesAdmin() {
     { key: 'rival', label: 'Rival', className: 'min-w-[160px]', render: (v) => <span className="font-black text-[15px] leading-none tracking-tight">{v}</span> },
     { key: 'date', label: 'Fecha', className: 'w-28', render: v => v ? <span className="text-[13px] font-bold text-foreground">{new Date(v).toLocaleDateString('es-ES',{day:'2-digit',month:'short',year:'2-digit'})}</span> : <span className="text-muted-foreground">—</span> },
     { key: 'status', label: 'Estado', className: 'w-28', render: v => <span className={`inline-block px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${v==='FINISHED'?'bg-emerald-500/15 text-emerald-600': v==='POSTPONED'?'bg-orange-500/15 text-orange-600': v==='IN_PROGRESS'?'bg-blue-500/15 text-blue-600':'bg-re-rojo/15 text-re-rojo'}`}>{STATUS_LABELS[v]||v}</span> },
-    { key: 'score', label: 'Resultado', className: 'w-24 text-center', render: (_, row) => row.status==='FINISHED' && row.ourGoals!=null && row.rivalGoals!=null ? <span className="font-black text-[18px] leading-none text-re-rojo">{row.ourGoals}-{row.rivalGoals}</span> : <span className="text-muted-foreground font-bold text-sm">—</span> },
+    { key: 'score', label: 'Resultado', className: 'w-24 text-center', render: (_, row) => row.status==='FINISHED' && row.ourGoals!=null && row.rivalGoals!=null ? <span className={`font-black text-[18px] leading-none ${scoreTextClass(getMatchOutcome(row.ourGoals, row.rivalGoals))}`}>{row.ourGoals}-{row.rivalGoals}</span> : <span className="text-muted-foreground font-bold text-sm">—</span> },
   ];
 
   const handleOpenCreate = () => { setEditing(null); setModalOpen(true); };
@@ -456,8 +459,13 @@ export default function MatchesAdmin() {
     const editId = searchParams.get('edit');
     if (!editId || crud.loading || modalOpen) return;
     const row = crud.rows.find(item => String(item.id) === String(editId));
-    if (row) handleOpenEdit(row);
-  }, [searchParams, crud.loading, crud.rows, modalOpen]);
+    if (row) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      handleOpenEdit(row);
+      // limpiar el parámetro para no reabrir el modal al cerrarlo
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, crud.loading, crud.rows, modalOpen, setSearchParams]);
   const handleSubmit = async (values) => {
     const time = normalizeTime(values.time);
     const { time: _ignored, ...rest } = values;
@@ -470,7 +478,7 @@ export default function MatchesAdmin() {
   const [selectedMatchIds, setSelectedMatchIds] = useState(new Set());
   const [mobileBulkMode, setMobileBulkMode] = useState(false);
   const [longPressRow, setLongPressRow] = useState(null);
-  const longPressTimer = useState(() => ({ current: null }))[0];
+  const longPressTimer = useRef(null);
   const filteredRows = (() => {
     const q = mobileQuery.trim().toLowerCase();
     if (!q) return seasonRows;
@@ -581,7 +589,7 @@ export default function MatchesAdmin() {
                   </span>
                   <span className="shrink-0 text-right">
                     {row.status==='FINISHED' && row.ourGoals!=null ? (
-                      <span className="block font-black text-[18px] leading-none text-re-rojo">{row.ourGoals}-{row.rivalGoals}</span>
+                      <span className={`block font-black text-[18px] leading-none ${scoreTextClass(getMatchOutcome(row.ourGoals, row.rivalGoals))}`}>{row.ourGoals}-{row.rivalGoals}</span>
                     ) : (
                       <span className={`block w-2 h-2 rounded-full mx-auto ${row.status==='FINISHED'?'bg-emerald-500': row.status==='POSTPONED'?'bg-orange-500': row.status==='IN_PROGRESS'?'bg-blue-500':'bg-re-rojo'}`} />
                     )}
@@ -616,9 +624,11 @@ export default function MatchesAdmin() {
         onClose={()=>setModalOpen(false)}
         onSubmit={handleSubmit}
         extra={editing?.id ? <ActaExtra matchId={editing.id} /> : null}
+        onDelete={editing?.id ? () => setDeleteTarget(editing) : undefined}
+        deleteLabel="Borrar partido y todos sus datos"
       />
 
-      <ConfirmDeleteModal open={Boolean(deleteTarget)} title="¿Borrar partido?" message={`Se eliminará el partido contra "${deleteTarget?.rival}" de forma permanente.`} onClose={()=>setDeleteTarget(null)} onConfirm={async()=>{ await crud.remove(deleteTarget.id); setDeleteTarget(null); }} />
+      <ConfirmDeleteModal open={Boolean(deleteTarget)} title="¿Borrar partido?" message={`Se eliminará el partido contra "${deleteTarget?.rival}" de forma permanente, incluyendo goles, convocados y estadísticas.`} onClose={()=>setDeleteTarget(null)} onConfirm={async()=>{ await crud.remove(deleteTarget.id); setDeleteTarget(null); setModalOpen(false); setEditing(null); }} />
     </div>
   );
 }

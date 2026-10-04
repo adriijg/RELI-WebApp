@@ -55,6 +55,7 @@ export default function DataTable({
 
   useEffect(() => {
     const visibleIds = new Set(rows.map((row) => String(row.id)));
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSelectedIds((current) => new Set([...current].filter((id) => visibleIds.has(id))));
   }, [rows]);
 

@@ -5,6 +5,8 @@ import { motion, MotionConfig } from 'framer-motion';
 import logo from '../assets/reli-badge.png';
 import { STATUS_LABELS } from '../constants/matchStatus';
 import { fetchHomeMatches, pickFeaturedMatch, selectCarouselMatches } from '../utils/matches';
+import { getMatchOutcome, scoreTextClass } from '../utils/matchResult';
+import AdminMatchEditButton from './admin/AdminMatchEditButton';
 
 const NAME_LIMIT = 14;
 
@@ -193,8 +195,11 @@ export default function MatchesCarousel() {
                       {match.competitionName || "LIGA"}
                       {match.jornada != null ? ` • J${match.jornada}` : ""}
                     </span>
-                    <span className={`text-[9px] lg:text-[10px] font-black px-3 py-1 rounded-full uppercase bg-re-dorado text-re-azul-oscuro shadow-[0_5px_15px_-5px_rgba(193,154,91,0.5)]`}>
-                      {STATUS_LABELS[match.status] || match.status}
+                    <span className="flex flex-col items-end gap-1.5">
+                      <span className={`text-[9px] lg:text-[10px] font-black px-3 py-1 rounded-full uppercase bg-re-dorado text-re-azul-oscuro shadow-[0_5px_15px_-5px_rgba(193,154,91,0.5)]`}>
+                        {STATUS_LABELS[match.status] || match.status}
+                      </span>
+                      <AdminMatchEditButton matchId={match.id} />
                     </span>
                   </div>
 
@@ -210,7 +215,7 @@ export default function MatchesCarousel() {
                       <TeamName name={left.name} />
                     </div>
 
-                    <div className="text-re-rojo font-black italic text-2xl lg:text-3xl tracking-tighter">
+                    <div className={`font-black italic text-2xl lg:text-3xl tracking-tighter ${match.status === 'FINISHED' && match.ourGoals != null && match.rivalGoals != null ? scoreTextClass(getMatchOutcome(match.ourGoals, match.rivalGoals)) : 'text-re-rojo'}`}>
                       {match.status === 'FINISHED' && match.ourGoals != null && match.rivalGoals != null
                         ? `${leftGoals} - ${rightGoals}`
                         : 'VS'}

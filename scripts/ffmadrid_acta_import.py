@@ -119,27 +119,40 @@ def map_players(our_side: dict, players: list[dict]) -> tuple[dict, list[dict]]:
     return mapping, warnings
 
 
-def find_match(api: str, token: str, competition_id: int, acta: dict) -> dict | None:
+def find_match(api: str, token: str, competition_id: int, acta: dict, side_data: dict) -> dict | None:
     headers = {"Authorization": f"Bearer {token}"}
     r = requests.get(f"{api}/matches", params={"size": 500},
                      headers=headers, timeout=30)
     r.raise_for_status()
     content = r.json().get("content", [])
-    # Rival en la BD = el otro equipo del acta
-    our_name = acta["our_side_name"]
-    rival_side = acta.get("visitante") or acta.get("away") or {}
-    rival_name = rival_side.get("nombre") if norm(our_name) == norm(acta["local"]["nombre"]) \
-        else acta["local"]["nombre"]
+    # Buscar el partido por jornada y competicion
+    side_name = norm(side_data.get("nombre", ""))
+    other_name = None
+    if norm(acta["local"]["nombre"]) == side_name:
+        other_name = norm(acta["visitante"]["nombre"]) if acta.get("visitante") else None
+    else:
+        other_name = norm(acta["local"]["nombre"]) if acta.get("local") else None
     for m in content:
         if m.get("competitionId") != competition_id:
             continue
-        if (m.get("jornada") or 0) == (acta.get("jornada") or 0) \
-                and norm(m.get("rival", "")) == norm(rival_name):
+        if (m.get("jornada") or 0) != (acta.get("jornada") or 0):
+            continue
+        rival_bd = norm(m.get("rival", ""))
+        if rival_bd == (other_name or ""):
+            return m
+    # Si no coincide el rival, devolver el primer partido de esa jornada
+    for m in content:
+        if m.get("competitionId") != competition_id:
+            continue
+        if (m.get("jornada") or 0) == (acta.get("jornada") or 0):
             return m
     return None
 
 
 def main() -> int:
+    import sys
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
     ap = argparse.ArgumentParser(description="Importa acta FFM a la BD")
     src = ap.add_mutually_exclusive_group(required=True)
     src.add_argument("--acta", default="", help="JSON del acta (ffmadrid_acta.py --out)")
@@ -173,18 +186,21 @@ def main() -> int:
         acta_mod.f.login(session, ffm_user, ffm_pass)
         acta = acta_mod.parse_acta(acta_mod.fetch_acta(session, args.codacta), args.codacta)
 
-    # Lado nuestro: el que contiene LISIADOS
-    if "LISIADOS" in norm(acta["local"].get("nombre")):
-        our_side, our_flag = acta["local"], "local"
-    elif "LISIADOS" in norm(acta["visitante"].get("nombre")):
-        our_side, our_flag = acta["visitante"], "visitante"
-    else:
-        print(f"El acta {acta.get('codacta')} no es del Real Lisiados: "
-              f"{acta['local'].get('nombre')} vs {acta['visitante'].get('nombre')}", file=sys.stderr)
+    # Procesar ambos equipos (local y visitante)
+    sides = []
+    for side_name, side_data, flag in [
+        ("local", acta["local"], "local"),
+        ("visitante", acta["visitante"], "visitante"),
+    ]:
+        if side_data is None:
+            continue
+        sides.append((side_name, side_data, flag))
+
+    if not sides:
+        print(f"El acta {acta.get('codacta')} no tiene datos de equipos.", file=sys.stderr)
         return 2
-    acta["our_side_name"] = our_side["nombre"]
-    our_goals = [g for g in acta["goles"] if g.get("equipo") == our_flag]
-    our_cards = [t for t in acta["tarjetas"] if t.get("equipo") == our_flag]
+
+    acta["our_side_name"] = sides[0][1]["nombre"]
 
     if not args.admin_pass:
         print("Falta clave admin (RELI_ADMIN_PASS / ADMIN_PASSWORD).", file=sys.stderr)
@@ -199,7 +215,7 @@ def main() -> int:
         if not args.competition_id:
             print("--competition-id es obligatorio sin --match-id", file=sys.stderr)
             return 2
-        match = find_match(args.api, token, args.competition_id, acta)
+        match = find_match(args.api, token, args.competition_id, acta, side_data)
         if match is None:
             print("No hay partido en la BD para esa jornada/rival.", file=sys.stderr)
             return 2
@@ -209,96 +225,119 @@ def main() -> int:
     resultado = acta.get("resultado") or {}
     visitante = (acta.get("visitante") or acta.get("away") or {}).get("nombre")
     print(f"Acta {acta.get('codacta')}: {acta['local']['nombre']} "
-          f"{resultado.get('home', '?')}-{resultado.get('away', '?')} vs {visitante} "
-          f"-> lado nuestro: {our_flag} ({our_side['nombre']})")
+          f"{resultado.get('home', '?')}-{resultado.get('away', '?')} vs {visitante}")
 
     players = load_players(args.api, token)
-    mapping, warnings = map_players(our_side, players)
-    for w in warnings:
-        print(f"  AVISO dorsal {w['dorsal']} acta={w['acta']!r}: {w['problema']}"
-              + (f" bd={w['bd']!r}" if w.get("bd") else ""))
 
-    # Agregados por jugador (dorsal BD)
-    per_player: dict[int, dict] = {}
-    for conv in our_side["titulares"] + our_side["suplentes"]:
-        per_player.setdefault(conv["dorsal"], {"goals": [], "yellow": 0, "red": 0, "called": True})
-    for g in our_goals:
-        for conv in our_side["titulares"] + our_side["suplentes"]:
-            if norm(conv["nombre"]) == norm(g["jugador"]):
-                per_player[conv["dorsal"]]["goals"].append(g["minuto"])
-                break
-    for t in our_cards:
-        for conv in our_side["titulares"] + our_side["suplentes"]:
-            if norm(conv["nombre"]) == norm(t["jugador"]):
-                entry = per_player[conv["dorsal"]]
-                if t["tipo"] == "AMARILLA":
-                    entry["yellow"] += 1
-                elif t["tipo"] == "ROJA":
-                    entry["red"] += 1
-                elif t["tipo"] == "DOBLE_AMARILLA":
-                    entry["yellow"] += 1
-                    entry["red"] += 1
-                break
+    total_created = {"callups": 0, "goals": 0, "stats": 0, "stats_updated": 0}
+    total_imported = 0
 
-    detail = requests.get(f"{args.api}/matches/{match_id}/detail",
-                          headers=headers, timeout=30).json()
-    existing_goals = {(g["playerId"], g.get("minute")) for g in detail.get("goals", [])}
-    existing_callups = {c["playerId"] for c in detail.get("callups", [])}
-    stats = requests.get(f"{args.api}/stats",
-                         params={"matchId": match_id, "size": 200},
-                         headers=headers, timeout=30).json().get("content", [])
-    stat_by_player = {s["playerId"]: s for s in stats}
+    for side_name, side_data, flag in sides:
+        mapping, warnings = map_players(side_data, players)
+        for w in warnings:
+            try:
+                msg = f"  AVISO dorsal {w['dorsal']} acta={w['acta']!r}: {w['problema']}" + (f" bd={w['bd']!r}" if w.get("bd") else "")
+                print(msg)
+            except Exception:
+                pass
 
-    plan: list[str] = []
-    for dorsal, agg in sorted(per_player.items()):
-        player = mapping.get(dorsal)
-        if player is None:
-            plan.append(f"SKIP dorsal {dorsal}: sin mapeo")
+        per_player: dict[int, dict] = {}
+        for conv in side_data["titulares"] + side_data["suplentes"]:
+            per_player.setdefault(conv["dorsal"], {"goals": [], "yellow": 0, "red": 0, "called": True})
+
+        side_goals = [g for g in acta["goles"] if g.get("equipo") == flag]
+        for g in side_goals:
+            for conv in side_data["titulares"] + side_data["suplentes"]:
+                if norm(conv["nombre"]) == norm(g["jugador"]):
+                    per_player[conv["dorsal"]]["goals"].append(g["minuto"])
+                    break
+
+        side_cards = [t for t in acta["tarjetas"] if t.get("equipo") == flag]
+        for t in side_cards:
+            for conv in side_data["titulares"] + side_data["suplentes"]:
+                if norm(conv["nombre"]) == norm(t["jugador"]):
+                    entry = per_player[conv["dorsal"]]
+                    if t["tipo"] == "AMARILLA":
+                        entry["yellow"] += 1
+                    elif t["tipo"] == "ROJA":
+                        entry["red"] += 1
+                    elif t["tipo"] == "DOBLE_AMARILLA":
+                        entry["yellow"] += 1
+                        entry["red"] += 1
+                    break
+
+        detail = requests.get(f"{args.api}/matches/{match_id}/detail",
+                              headers=headers, timeout=30).json()
+        existing_goals = {(g["playerId"], g.get("minute")) for g in detail.get("goals", [])}
+        existing_callups = {c["playerId"] for c in detail.get("callups", [])}
+        stats_resp = requests.get(f"{args.api}/stats",
+                                   params={"matchId": match_id, "size": 200},
+                                   headers=headers, timeout=30).json()
+        stats_list = stats_resp.get("content", [])
+        stat_by_player = {s["playerId"]: s for s in stats_list}
+
+        plan: list[str] = []
+        for dorsal, agg in sorted(per_player.items()):
+            player = mapping.get(dorsal)
+            if player is None:
+                plan.append(f"SKIP dorsal {dorsal}: sin mapeo")
+                continue
+            pid = player["id"]
+            plan.append(f"{player['name']} (dorsal {dorsal}->id {pid}): "
+                        f"goles={agg['goals'] or '-'}, amarillas={agg['yellow']}, rojas={agg['red']}")
+        print(f"\n--- {side_data['nombre']} ({flag}) ---")
+        print("\n".join(f"  {line}" for line in plan))
+
+        if not do_write:
+            print(f"\nDRY-RUN {side_data['nombre']}: {len(per_player)} convocados, "
+                  f"{sum(len(v['goals']) for v in per_player.values())} goles.")
             continue
-        pid = player["id"]
-        plan.append(f"{player['name']} (dorsal {dorsal}->id {pid}): "
-                    f"goles={agg['goals'] or '-'}, amarillas={agg['yellow']}, rojas={agg['red']}")
-    print("\n".join(f"  {line}" for line in plan))
 
-    if not do_write:
-        print(f"\nDRY-RUN: {len(per_player)} convocados, "
-              f"{sum(len(v['goals']) for v in per_player.values())} goles nuestros. "
-              f"Nada escrito (usa --apply).")
-        return 0
-
-    created = {"callups": 0, "goals": 0, "stats": 0, "stats_updated": 0}
-    for dorsal, agg in per_player.items():
-        player = mapping.get(dorsal)
-        if player is None:
-            continue
-        pid = player["id"]
-        if pid not in existing_callups:
-            requests.post(f"{args.api}/matches/{match_id}/callups",
-                          json={"playerId": pid}, headers=headers, timeout=30).raise_for_status()
-            created["callups"] += 1
-        for minute in agg["goals"]:
-            if (pid, minute) not in existing_goals:
-                requests.post(f"{args.api}/matches/{match_id}/goals",
-                              json={"playerId": pid, "minute": minute},
+        for dorsal, agg in per_player.items():
+            player = mapping.get(dorsal)
+            if player is None:
+                continue
+            pid = player["id"]
+            if pid not in existing_callups:
+                requests.post(f"{args.api}/matches/{match_id}/callups",
+                              json={"playerId": pid}, headers=headers, timeout=30).raise_for_status()
+                total_created["callups"] += 1
+            for minute in agg["goals"]:
+                if (pid, minute) not in existing_goals:
+                    requests.post(f"{args.api}/matches/{match_id}/goals",
+                                  json={"playerId": pid, "minute": minute},
+                                  headers=headers, timeout=30).raise_for_status()
+                    total_created["goals"] += 1
+            payload = {"playerId": pid, "matchId": match_id,
+                       "goals": len(agg["goals"]), "assists": 0,
+                       "yellowCards": agg["yellow"], "redCards": agg["red"],
+                       "mvp": False, "attended": True}
+            existing = stat_by_player.get(pid)
+            if existing is None:
+                requests.post(f"{args.api}/stats", json=payload,
                               headers=headers, timeout=30).raise_for_status()
-                created["goals"] += 1
-        payload = {"playerId": pid, "matchId": match_id,
-                   "goals": len(agg["goals"]), "assists": 0,
-                   "yellowCards": agg["yellow"], "redCards": agg["red"],
-                   "mvp": False, "attended": True}
-        existing = stat_by_player.get(pid)
-        if existing is None:
-            requests.post(f"{args.api}/stats", json=payload,
-                          headers=headers, timeout=30).raise_for_status()
-            created["stats"] += 1
-        elif any(existing.get(k) != v for k, v in payload.items()
-                 if k not in ("playerId", "matchId")):
-            requests.put(f"{args.api}/stats/{existing['id']}", json=payload,
-                         headers=headers, timeout=30).raise_for_status()
-            created["stats_updated"] += 1
-    print(f"Aplicado: {created}")
-    return 0
+                total_created["stats"] += 1
+            elif any(existing.get(k) != v for k, v in payload.items()
+                     if k not in ("playerId", "matchId")):
+                requests.put(f"{args.api}/stats/{existing['id']}", json=payload,
+                             headers=headers, timeout=30).raise_for_status()
+                total_created["stats_updated"] += 1
+        total_imported += 1
+        print(f"{side_data['nombre']}: importado correctamente")
 
+    print(f"\nAplicado: {total_created}")
+    print(f"Equipos importados: {total_imported}/{len(sides)}")
+
+    # Output roster data for scrapeSeason
+    if args.competition_id:
+        for side_name, side_data, flag in sides:
+            mapping, _ = map_players(side_data, players)
+            for dorsal, agg in sorted(per_player.items()):
+                player = mapping.get(dorsal)
+                if player is None: continue
+                print(f"ROSTER:{side_data['nombre']}:{player['name']}:{player.get('nickname','' )}:{dorsal}:{agg.get('goals',[]).__len__()}")
+
+    return 0
 
 if __name__ == "__main__":
     raise SystemExit(main())

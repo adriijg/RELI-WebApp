@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { motion } from 'framer-motion';
 import { useApp } from '../context/AppContext';
 import { getAllPlayers, getCompetitions, getMatches, getMatchDetail, getPlayerSeasonStats, getQuintetBallots, getQuintetSeasonTally, getQuintetStatus, getQuintetTally, deleteQuintetVote, getMyQuintetVote, getSeasons, openQuintet, closeQuintet, saveQuintetVote, toPage } from '../services/api';
 import { jerseyForSeason } from '../constants/jerseys';
@@ -9,11 +8,11 @@ const FALLBACK_PHOTO = 'https://pjefzhrnoftaovlvnjaz.supabase.co/storage/v1/obje
 const VOTES_KEY = 'reli-quinteto-votes';
 const LEGACY_KEY = 'reli-quinteto';
 const SLOTS = [
-  { id: 'pivot', x: 50, y: 16 },
-  { id: 'ala-izq', x: 22, y: 36 },
-  { id: 'ala-der', x: 78, y: 36 },
-  { id: 'cierre', x: 50, y: 56 },
-  { id: 'portero', x: 50, y: 78 },
+  { id: 'jugador-1' },
+  { id: 'jugador-2' },
+  { id: 'jugador-3' },
+  { id: 'jugador-4' },
+  { id: 'jugador-5' },
 ];
 
 function emptyLineup() {
@@ -156,7 +155,9 @@ export default function QuintetPage() {
           } else {
             squad = [];
           }
-        } catch {}
+} catch {
+          // Ignorar errores al obtener detalle del partido
+        }
       }
       setPlayers(squad);
     } catch {
@@ -323,7 +324,6 @@ export default function QuintetPage() {
     try {
       await deleteQuintetVote(seasonId, match.jornada);
       setSaved(null);
-      setMyVoteIds(null);
       setLineup(emptyLineup());
       // limpia localStorage por si quedó
       try {
@@ -333,7 +333,9 @@ export default function QuintetPage() {
           delete all[key];
           localStorage.setItem('reli-quinteto-votes', JSON.stringify(all));
         }
-      } catch {}
+      } catch {
+          // Ignorar errores al limpiar localStorage
+        }
       const s = await getQuintetStatus(seasonId, match.jornada).catch(() => null);
       if (s) setQuintetStatus(s);
       await refreshPublic(seasonId, match);
@@ -394,65 +396,64 @@ export default function QuintetPage() {
       )}
 
       <section className="space-y-3">
-        <div className="stadium-grass relative min-h-[400px] overflow-hidden rounded-[1.4rem] border border-re-dorado/35 shadow-[0_18px_50px_rgba(0,0,0,0.35)]">
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(193,154,91,0.18),transparent_46%)]" />
-          <div className="pointer-events-none absolute inset-3 rounded-sm border border-re-dorado/25" />
-          <div className="pointer-events-none absolute left-3 right-3 top-1/2 h-px bg-white/25" />
-          <div className="pointer-events-none absolute left-1/2 top-1/2 h-20 w-20 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/30 sm:h-24 sm:w-24" />
-          <div className="pointer-events-none absolute bottom-2 left-1/2 h-10 w-24 -translate-x-1/2 border border-b-0 border-white/30" />
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_42%,rgba(0,0,0,0.4)_100%)]" />
-
-          {SLOTS.map((slot, index) => {
-            const player = playerById(displayLineup[slot.id]);
-            const armed = !locked && activeSlot === slot.id;
-            return (
-              <button
-                key={slot.id}
-                type="button"
-                onClick={() => {
-                  if (!isVoteOpen) return;
-                  if (!voterKey) { openAuth('login'); return; }
-                  if (player) clearSlot(slot.id);
-                  else setActiveSlot(slot.id);
-                }}
-                className="absolute z-10 w-20 -translate-x-1/2 -translate-y-1/2 text-center"
-                style={{ left: `${slot.x}%`, top: `${slot.y}%` }}
-                aria-label={player ? `Quitar a ${player.nickname || player.name}` : `Hueco ${index + 1}`}
-              >
-                {player ? (
-                  <motion.span layoutId={`quintet-${player.id}`} className="block">
-                    <span className="relative mx-auto block w-fit">
-                      <span className={`absolute -inset-1 rounded-full ${armed ? 'bg-re-dorado/40 blur-sm' : ''}`} />
+        <div className="rounded-[1.4rem] border border-re-dorado/20 bg-card-bg/80 px-3 py-3">
+          <p className="text-[9px] font-black uppercase tracking-[0.2em] text-re-dorado">
+            {!voterKey ? 'Entra para votar' : locked ? 'Tu voto' : 'Tu quinteto'} · {match ? `J${match.jornada}` : ''}
+          </p>
+          <ol className="mt-2 space-y-2">
+            {SLOTS.map((slot, index) => {
+              const player = playerById(displayLineup[slot.id]);
+              const armed = !locked && activeSlot === slot.id;
+              return (
+                <li
+                  key={slot.id}
+                  className={`flex items-center gap-2 rounded-xl border px-3 py-2 ${armed ? 'border-re-dorado bg-re-dorado/10' : 'border-card-border bg-black/5'}`}
+                >
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-re-rojo text-[11px] font-black text-white">
+                    {index + 1}
+                  </span>
+                  {player ? (
+                    <>
                       <img
                         src={player.photoUrl || FALLBACK_PHOTO}
                         alt=""
-                        className="relative h-10 w-10 rounded-full object-cover ring-2 ring-re-dorado shadow-lg"
+                        className="h-7 w-7 rounded-full object-cover"
                         onError={(event) => { event.target.src = FALLBACK_PHOTO; }}
                       />
-                      <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-re-rojo text-[10px] font-black text-white">
-                        {player.jerseyNumber}
+                      <span className="min-w-0 flex-1 truncate text-xs font-black uppercase">
+                        {player.nickname || player.name}
+                        <span className="mt-0.5 block text-[9px] font-bold tracking-widest text-re-dorado">
+                          {POSITION_LABELS[player.position] || player.position}
+                        </span>
                       </span>
-                    </span>
-                    <span className="mt-1 block text-[10px] font-black uppercase leading-tight text-white">
-                      {player.nickname || player.name}
-                    </span>
-                    <span className="block text-[8px] font-bold uppercase tracking-widest text-re-dorado">
-                      {POSITION_LABELS[player.position] || player.position}
-                    </span>
-                  </motion.span>
-                ) : (
-                  <span className={`mx-auto flex h-10 w-10 items-center justify-center rounded-full border text-[11px] font-black text-re-dorado ${armed ? 'border-re-dorado bg-re-dorado/20 shadow-[0_0_18px_rgba(193,154,91,0.45)]' : 'border-white/40 bg-black/25'}`}>
-                    {index + 1}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-
-          <div className="absolute bottom-3 left-3 right-3 z-20 flex items-center justify-between text-[9px] font-black uppercase tracking-[0.18em] text-white/70">
-            <span>{!voterKey ? 'Entra para votar' : locked ? 'Tu voto' : 'Tu quinteto'}</span>
-            <span>{match ? `J${match.jornada}` : ''}</span>
-          </div>
+                      {!locked && isVoteOpen && (
+                        <button
+                          type="button"
+                          onClick={() => clearSlot(slot.id)}
+                          className="shrink-0 rounded-full border border-re-rojo/40 px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-re-rojo hover:bg-re-rojo hover:text-white"
+                          aria-label={`Quitar a ${player.nickname || player.name}`}
+                        >
+                          Quitar
+                        </button>
+                      )}
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!isVoteOpen) return;
+                        if (!voterKey) { openAuth('login'); return; }
+                        setActiveSlot(slot.id);
+                      }}
+                      className="flex-1 py-1 text-left text-[11px] font-bold uppercase tracking-widest text-foreground/40"
+                    >
+                      Hueco {index + 1} · tócalo y elige abajo
+                    </button>
+                  )}
+                </li>
+              );
+            })}
+          </ol>
         </div>
 
         {isVoteOpen && players.length === 0 && (
@@ -577,27 +578,6 @@ export default function QuintetPage() {
           <p className="mt-1 text-[11px] text-foreground/60">
             Suma de todas las jornadas: 4 jugadores de campo más votados + portero más votado.
           </p>
-          <div className="stadium-grass relative mt-3 min-h-[280px] overflow-hidden rounded-[1.2rem] border border-re-dorado/35">
-            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(193,154,91,0.18),transparent_46%)]" />
-            <div className="pointer-events-none absolute inset-3 rounded-sm border border-re-dorado/25" />
-            <div className="pointer-events-none absolute left-3 right-3 top-1/2 h-px bg-white/25" />
-            <div className="pointer-events-none absolute left-1/2 top-1/2 h-20 w-20 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/30" />
-            {seasonTally.yearlyQuintet.map((row, index) => {
-              const slot = SLOTS[index];
-              const player = playerById(row.playerId);
-              if (!slot) return null;
-              return (
-                <div key={row.playerId} className="absolute z-10 w-20 -translate-x-1/2 -translate-y-1/2 text-center" style={{ left: `${slot.x}%`, top: `${slot.y}%` }}>
-                  <span className="relative mx-auto block w-fit">
-                    <img src={player?.photoUrl || FALLBACK_PHOTO} alt="" className="relative h-10 w-10 rounded-full object-cover ring-2 ring-re-dorado shadow-lg" onError={(e) => { e.target.src = FALLBACK_PHOTO; }} />
-                    <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-re-rojo text-[10px] font-black text-white">{player?.jerseyNumber ?? '•'}</span>
-                  </span>
-                  <span className="mt-1 block text-[10px] font-black uppercase leading-tight text-white">{player?.nickname || player?.name || `Jugador ${row.playerId}`}</span>
-                  <span className="block text-[8px] font-bold uppercase tracking-widest text-re-dorado">{row.votes} votos</span>
-                </div>
-              );
-            })}
-          </div>
           <ol className="mt-3 space-y-2">
             {(seasonTally.yearlyQuintet || []).map((row, index) => {
               const player = playerById(row.playerId);

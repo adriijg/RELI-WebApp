@@ -11,10 +11,12 @@ export default function EmailActionPage() {
 
   useEffect(() => {
     if (resetToken) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setState({ loading: false, message: '', error: '' });
       return;
     }
     if (!verifyToken) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setState({ loading: false, message: '', error: 'Enlace no válido. Revisa el correo o solicita uno nuevo.' });
       return;
     }

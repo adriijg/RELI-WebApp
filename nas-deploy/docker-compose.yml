@@ -1,0 +1,24 @@
+services:
+  backend:
+    image: reli-webapp-backend:latest
+    ports:
+      - "8080:8080"
+    env_file:
+      - ./.env
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  frontend:
+    image: reli-webapp-frontend:latest
+    ports:
+      - "8081:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge

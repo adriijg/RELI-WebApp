@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion, MotionConfig } from 'framer-motion';
 import { fetchHomeMatches, isMatchLive } from '../utils/matches';
 import { STATUS_LABELS } from '../constants/matchStatus';
+import AdminMatchEditButton from './admin/AdminMatchEditButton';
 
 const WEEKDAYS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
 
@@ -99,7 +100,10 @@ function CalendarMatch({ match, navigate }) {
         </p>
       </div>
 
-      <span className="text-lg text-re-dorado transition-colors group-hover:text-re-rojo" aria-hidden="true">→</span>
+      <span className="flex shrink-0 flex-col items-end gap-1.5">
+        <span className="text-lg text-re-dorado transition-colors group-hover:text-re-rojo" aria-hidden="true">→</span>
+        <AdminMatchEditButton matchId={match.id} />
+      </span>
     </motion.button>
   );
 }

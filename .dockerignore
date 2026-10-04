@@ -1,0 +1,15 @@
+# Contexto de build del backend es la raiz del repo (ver docker-compose.yml):
+# solo se necesitan api-backend/ y scripts/. Se excluye el resto para no
+# enviar basura al daemon ni filtrar secretos (.env) en la imagen.
+.git/
+.github/
+reli-frontend/node_modules/
+reli-frontend/dist/
+api-backend/target/
+scripts/__pycache__/
+*.log
+**/*.log
+.env
+api-backend/.env
+reli-frontend/.env
+.ngrok.pid

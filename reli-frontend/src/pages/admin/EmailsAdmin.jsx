@@ -3,6 +3,7 @@ import PageHeader from '../../components/admin/PageHeader';
 import {
   getCompetitions,
   getEmailStatus,
+  fetchEmailPreviewHtml,
   sendNextMatchTestEmail,
   sendTestEmail,
   toPage,
@@ -29,6 +30,9 @@ export default function EmailsAdmin() {
   const [sending, setSending] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [previewType, setPreviewType] = useState('test');
+  const [previewHtml, setPreviewHtml] = useState('');
+  const [previewLoading, setPreviewLoading] = useState(false);
 
   useEffect(() => {
     getEmailStatus().then(setStatus).catch(() => setStatus(null));
@@ -69,11 +73,21 @@ export default function EmailsAdmin() {
     }
   };
 
+  useEffect(() => {
+    let cancelled = false;
+    setPreviewLoading(true);
+    fetchEmailPreviewHtml(previewType, competitionId)
+      .then((html) => { if (!cancelled) setPreviewHtml(html); })
+      .catch(() => { if (!cancelled) setPreviewHtml(''); })
+      .finally(() => { if (!cancelled) setPreviewLoading(false); });
+    return () => { cancelled = true; };
+  }, [previewType, competitionId]);
+
   return (
     <div>
       <PageHeader
         title="Correos"
-        subtitle="Estado de Resend y envío de correos de prueba sin molestar a los usuarios."
+        subtitle="Estado del SMTP y envío de correos de prueba sin molestar a los usuarios."
       />
 
       {(message || error) && (
@@ -89,8 +103,8 @@ export default function EmailsAdmin() {
         ) : (
           <div>
             <StatusRow label="Envío activado" ok={status.enabled} value={status.enabled ? 'Sí' : 'No (EMAIL_ENABLED=false)'} />
-            <StatusRow label="API Key" ok={status.apiKeyConfigured} value={status.apiKeyConfigured ? 'Configurada' : 'Falta RESEND_API_KEY'} />
-            <StatusRow label="Remitente" ok={status.fromConfigured} value={status.from || 'Falta RESEND_FROM'} />
+            <StatusRow label="SMTP Gmail" ok={status.smtpConfigured} value={status.smtpConfigured ? 'Configurado' : 'Falta GMAIL_USER / GMAIL_PASSWORD'} />
+            <StatusRow label="Remitente" ok={status.fromConfigured} value={status.from || 'Falta GMAIL_USER'} />
             <div className="flex items-center justify-between gap-4 py-3">
               <span className="text-xs font-black uppercase tracking-widest text-muted-foreground">URL frontend</span>
               <span className="text-sm font-bold break-all text-right">{status.frontendUrl || '—'}</span>
@@ -98,13 +112,13 @@ export default function EmailsAdmin() {
           </div>
         )}
         <p className="mt-4 text-xs font-bold text-muted-foreground">
-          El remitente debe ser de un dominio verificado en Resend. Sin verificar, Resend solo deja enviar a tu propio correo de registro.
+          El envío usa Gmail SMTP (smtp.gmail.com:587) con una contraseña de aplicación de 16 letras (no la contraseña normal de Gmail).
         </p>
       </section>
 
       <section className="bg-card-bg border border-card-border rounded-3xl shadow-card p-6 lg:p-8 mb-6">
         <h2 className="text-sm font-black uppercase tracking-widest mb-2">Correo de prueba</h2>
-        <p className="text-xs font-bold text-muted-foreground mb-4">Comprueba que Resend envía correctamente a una dirección concreta.</p>
+        <p className="text-xs font-bold text-muted-foreground mb-4">Comprueba que el SMTP envía correctamente a una dirección concreta.</p>
         <form onSubmit={handleTest} className="flex flex-col sm:flex-row gap-3">
           <input
             type="email"
@@ -124,7 +138,7 @@ export default function EmailsAdmin() {
         </form>
       </section>
 
-      <section className="bg-card-bg border border-card-border rounded-3xl shadow-card p-6 lg:p-8">
+      <section className="bg-card-bg border border-card-border rounded-3xl shadow-card p-6 lg:p-8 mb-6">
         <h2 className="text-sm font-black uppercase tracking-widest mb-2">Probar aviso de próximo partido</h2>
         <p className="text-xs font-bold text-muted-foreground mb-4">
           Envía a una sola dirección el mismo correo que recibirían todos los usuarios tras el scraping, sin lanzar sincronización.
@@ -155,6 +169,45 @@ export default function EmailsAdmin() {
             {sending ? 'Enviando...' : 'Enviar aviso'}
           </button>
         </form>
+      </section>
+
+      <section className="bg-card-bg border border-card-border rounded-3xl shadow-card p-6 lg:p-8">
+        <h2 className="text-sm font-black uppercase tracking-widest mb-2">Vista previa de la plantilla</h2>
+        <p className="text-xs font-bold text-muted-foreground mb-4">
+          Así se ve el correo en Gmail / Outlook (cabecera roja como el Navbar, tarjeta blanca y pie oscuro). No se envía nada.
+        </p>
+        <div className="flex flex-wrap gap-2 mb-4">
+          {[
+            { id: 'test', label: 'Prueba' },
+            { id: 'verify', label: 'Verificación' },
+            { id: 'reset', label: 'Contraseña' },
+            { id: 'match', label: 'Próximo partido' },
+          ].map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => setPreviewType(t.id)}
+              className={`px-4 py-2 rounded-xl text-[11px] font-black uppercase tracking-widest border transition-all ${previewType === t.id ? 'bg-re-rojo text-white border-re-rojo' : 'bg-muted/10 text-muted-foreground border-card-border hover:border-re-rojo'}`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+        <div className="rounded-2xl overflow-hidden border border-card-border bg-[#F1F5F9]">
+          {previewLoading ? (
+            <p className="p-8 text-sm font-bold text-muted-foreground text-center">Cargando vista previa...</p>
+          ) : previewHtml ? (
+            <iframe
+              title="Vista previa del correo"
+              srcDoc={previewHtml}
+              className="w-full bg-white"
+              style={{ height: '640px', border: 0 }}
+              sandbox=""
+            />
+          ) : (
+            <p className="p-8 text-sm font-bold text-muted-foreground text-center">Inicia el backend para ver la plantilla.</p>
+          )}
+        </div>
       </section>
     </div>
   );

@@ -1,0 +1,29 @@
+# Secrets / entorno
+.env
+api-backend/.env
+reli-frontend/.env
+nas-deploy/.env
+
+# Logs
+*.log
+*.err
+api-backend/*.log
+api-backend/*.err
+
+# Imágenes Docker exportadas
+nas-deploy/*.tar
+
+# Python
+scripts/__pycache__/
+*.pyc
+
+# Node
+node_modules/
+reli-frontend/dist/
+
+# Generados
+email-preview.html
+
+# Scripts de prueba puntuales
+test-ngrok.*
+stop-ngrok-test.ps1

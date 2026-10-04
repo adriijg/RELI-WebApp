@@ -46,8 +46,11 @@ export default function PlayerDetailModal({ player, seasonId, seasonName, onClos
   useEffect(() => {
     if (!player) return undefined;
     let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoadingMatches(true);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMatchesError('');
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMatches([]);
 
     Promise.all([

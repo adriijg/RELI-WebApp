@@ -141,7 +141,7 @@ export default function SyncAdmin() {
           </button>
         </div>
         <p className="mt-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-          La programada (lunes y jueves 08:00) está apagada hasta tener hosting fijo.
+          La programada (lunes y jueves 08:00) está activa.
         </p>
       </section>
 

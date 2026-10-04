@@ -29,12 +29,16 @@ export async function fetchHomeMatches() {
         return parsed.data;
       }
     }
-  } catch {}
+} catch {
+      // Ignorar errores de cache
+    }
   const data = await getMatches({ page: 0, size: 500, sortBy: 'date', direction: 'desc' });
   const list = data?.content ?? (Array.isArray(data) ? data : []);
   memoryCache = list;
   memoryAt = now;
-  try { sessionStorage.setItem(CACHE_KEY, JSON.stringify({ at: now, data: list })); } catch {}
+  try { sessionStorage.setItem(CACHE_KEY, JSON.stringify({ at: now, data: list })); } catch {
+      // Ignorar errores de cache
+    }
   return list;
 }
 

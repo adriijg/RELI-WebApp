@@ -4,9 +4,11 @@ import { useNavigate } from 'react-router-dom';
 import { motion, MotionConfig } from 'framer-motion';
 import logo from '../assets/reli-badge.png';
 import { fetchHomeMatches, pickFeaturedMatch, isMatchLive } from '../utils/matches';
+import { useApp } from '../context/AppContext';
 
 export default function HeroMatch() {
   const navigate = useNavigate();
+  const { isAdmin } = useApp();
   const [nextMatch, setNextMatch] = useState(null);
   const [loading, setLoading] = useState(true);
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
@@ -177,6 +179,15 @@ export default function HeroMatch() {
             >
               Más información del encuentro
             </button>
+            {isAdmin && nextMatch?.id != null && /^\d+$/.test(String(nextMatch.id)) && (
+              <button
+                type="button"
+                onClick={() => navigate(`/admin/partidos?edit=${nextMatch.id}`)}
+                className="mt-2 w-full max-w-xs rounded-full border border-re-dorado/50 py-2.5 text-[10px] font-black uppercase tracking-widest text-re-dorado transition hover:bg-re-dorado hover:text-white"
+              >
+                ✎ Editar en admin
+              </button>
+            )}
           </motion.div>
         </div>
       </div>

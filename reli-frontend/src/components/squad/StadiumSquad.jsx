@@ -27,7 +27,7 @@ function spread(count, y, x0, x1) {
   }));
 }
 
-function formationSlots(grouped, line, narrow) {
+function formationSlots(grouped, line) {
   const slots = new Map();
   const place = (position, points) => {
     (grouped.get(position) || []).forEach((player, index) => {
@@ -262,13 +262,13 @@ export default function StadiumSquad({ grouped, players, line, seasonName, sortB
   );
 
   const slots = useMemo(() => {
-    const home = formationSlots(grouped, 'ALL', narrow);
+    const home = formationSlots(grouped, 'ALL');
     if (line === 'ALL') return home;
-    const focused = formationSlots(grouped, line, narrow);
+    const focused = formationSlots(grouped, line);
     const merged = new Map(home);
     for (const [id, point] of focused) merged.set(id, point);
     return merged;
-  }, [grouped, line, narrow]);
+  }, [grouped, line]);
 
   const maxes = useMemo(() => ({
     appearances: Math.max(1, ...players.map((player) => player.appearances)),
@@ -277,6 +277,7 @@ export default function StadiumSquad({ grouped, players, line, seasonName, sortB
 
   useEffect(() => {
     if (!visible.length) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSpotlightId((current) => (
       visible.some((player) => player.playerId === current) ? current : visible[0].playerId
     ));

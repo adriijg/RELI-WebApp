@@ -10,7 +10,7 @@ import lombok.NoArgsConstructor;
 public class EmailStatusDTO {
 
     private boolean enabled;
-    private boolean apiKeyConfigured;
+    private boolean smtpConfigured;
     private String from;
     private boolean fromConfigured;
     private String frontendUrl;

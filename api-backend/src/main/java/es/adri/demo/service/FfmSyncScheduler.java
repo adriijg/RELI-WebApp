@@ -8,8 +8,8 @@ import org.springframework.stereotype.Component;
 
 /**
  * Sincronizacion programada con la federacion (lunes y jueves a las 08:00).
- * Apagada por defecto: se activa con {@code app.ffm.sync-schedule-enabled=true}
- * cuando el backend corra en un hosting fijo. Las credenciales van por
+ * Activa por defecto (hay dominio/hosting fijo): se apaga con
+ * {@code FFM_SYNC_ENABLED=false}. Las credenciales van por
  * variables de entorno (FFM_USER / FFM_PASS), nunca en el repo.
  */
 @Component

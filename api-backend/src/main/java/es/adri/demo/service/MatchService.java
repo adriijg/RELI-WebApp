@@ -194,8 +194,10 @@ public class MatchService {
     @CacheEvict(value = {"homeMatches", "nextMatch"}, allEntries = true)
     @Transactional
     public void deleteMatch(Long id) {
+        // Borra todo lo asociado al partido: goles, convocados y estadísticas
         matchRepository.deleteGoalsByMatchId(id);
         matchRepository.deleteCallUpsByMatchId(id);
+        matchRepository.deleteStatsByMatchId(id);
         matchRepository.delete(getMatchById(id));
     }
 

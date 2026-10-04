@@ -156,7 +156,18 @@ export const getFfmSyncRuns = () => apiFetch('/admin/sync/ffm/runs');
 export const getEmailStatus = () => apiFetch('/admin/emails/status');
 export const sendTestEmail = (to) => apiFetch('/admin/emails/test', { method: 'POST', body: { to } });
 export const sendNextMatchTestEmail = (competitionId, to) =>
-  apiFetch('/admin/emails/next-match-test', { method: 'POST', params: { competitionId }, body: { to } });export const previewFfmSync = (competitionId) =>
+  apiFetch('/admin/emails/next-match-test', { method: 'POST', params: { competitionId }, body: { to } });
+export const fetchEmailPreviewHtml = async (type, competitionId) => {
+  const token = localStorage.getItem('re-token');
+  const url = new URL(`${API_URL}/admin/emails/preview`, window.location.origin);
+  url.searchParams.set('type', type);
+  if (type === 'match' && competitionId) url.searchParams.set('competitionId', competitionId);
+  const response = await fetch(url, {
+    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+  });
+  if (!response.ok) throw new Error(`No se pudo cargar la vista previa (${response.status})`);
+  return response.text();
+};export const previewFfmSync = (competitionId) =>
   apiFetch('/admin/sync/ffm/preview', { method: 'POST', params: { competitionId } });
 export const applyFfmSync = (competitionId) =>
   apiFetch('/admin/sync/ffm/apply', { method: 'POST', params: { competitionId } });
@@ -164,6 +175,40 @@ export const getStandings = (competitionId, jornada) => {
   const params = {};
   if (jornada != null) params.jornada = jornada;
   return apiFetch(`/competitions/${competitionId}/standings`, { params });
+};
+
+/* ---------- Partidos neutros (otros equipos) ---------- */
+export const getNeutralMatches = (competitionId, jornada) => {
+  const params = { competitionId };
+  if (jornada != null) params.jornada = jornada;
+  return apiFetch('/neutral-matches', { params });
+};
+export const saveNeutralMatch = (body) => apiFetch('/neutral-matches', { method: 'POST', body });
+export const deleteNeutralMatch = (id) => apiFetch(`/neutral-matches/${id}`, { method: 'DELETE' });
+
+/* ---------- Actas FFM por jornada (admin, bajo demanda) ---------- */
+export const getRoundActas = (competitionId, jornada) =>
+  apiFetch('/admin/ffm-actas/jornada', { params: { competitionId, jornada } });
+export const fetchActaHtml = (codacta, expectedHome, expectedAway) =>
+  apiFetch(`/admin/ffm-actas/${codacta}`, { params: { expectedHome, expectedAway } });
+export const fetchActaPdf = async (codacta) => {
+  const token = getToken();
+  const url = new URL(`${API_URL}/admin/ffm-actas/${codacta}/pdf`, window.location.origin);
+  const response = await fetch(url, {
+    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+  });
+  if (!response.ok) {
+    const text = await response.text().catch(() => '');
+    let message = `No se pudo descargar el acta (${response.status})`;
+    try {
+      const data = JSON.parse(text);
+      if (data?.message) message = data.message;
+    } catch { if (text) message = text; }
+    const error = new Error(message);
+    error.status = response.status;
+    throw error;
+  }
+  return response.blob();
 };
 
 /* ---------- Estadísticas ---------- */

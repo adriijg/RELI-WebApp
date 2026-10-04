@@ -10,6 +10,7 @@ import es.adri.demo.repository.CompetitionRepository;
 import es.adri.demo.repository.PlayerRepository;
 import es.adri.demo.repository.PlayerSeasonRepository;
 import es.adri.demo.repository.SeasonRepository;
+import java.net.CookieHandler;
 import java.net.CookieManager;
 import java.net.CookiePolicy;
 import java.net.URI;
@@ -80,6 +81,7 @@ public class RosterScrapeService {
         checkCredentials();
         Map<String, ScrapedPlayerDTO> byName = new LinkedHashMap<>();
         try {
+            CookieHandler.setDefault(new CookieManager(null, CookiePolicy.ACCEPT_ALL));
             HttpClient client = HttpClient.newBuilder()
                     .cookieHandler(new CookieManager(null, CookiePolicy.ACCEPT_ALL))
                     .followRedirects(HttpClient.Redirect.NEVER)
@@ -90,7 +92,6 @@ public class RosterScrapeService {
                 String competicion = comp.getFfmCompeticion().trim();
                 String grupo = comp.getFfmGrupo() == null ? "" : comp.getFfmGrupo().trim();
                 String temporada = comp.getFfmTemporada() == null ? "" : comp.getFfmTemporada().trim();
-                // descubrir jornadas: fetch 1 y parsear round options
                 String firstHtml = fetchJornada(client, competicion, grupo, temporada, 1);
                 List<Integer> rounds = roundRange(firstHtml);
                 if (rounds.isEmpty()) rounds = List.of(1);
@@ -99,19 +100,33 @@ public class RosterScrapeService {
                     List<String> codactas = extractCodactas(html);
                     for (String codacta : codactas) {
                         try {
-                            String actaHtml = fetchActa(client, codacta);
-                            Map<String, Integer> players = parseActaRoster(actaHtml);
-                            for (Map.Entry<String, Integer> e : players.entrySet()) {
-                                String fullName = e.getKey();
-                                String norm = normalize(fullName);
-                                ScrapedPlayerDTO dto = byName.get(norm);
-                                if (dto == null) {
-                                    String[] split = splitName(fullName);
-                                    dto = new ScrapedPlayerDTO(fullName, split[0], split[1], e.getValue(), 1);
-                                    byName.put(norm, dto);
-                                } else {
-                                    dto.setAppearances(dto.getAppearances() + 1);
-                                    // keep first dorsal
+                            String script = "scripts/ffmadrid_acta_import.py";
+                            if (!java.nio.file.Files.exists(java.nio.file.Paths.get(script))) script = "../scripts/ffmadrid_acta_import.py";
+                            if (!java.nio.file.Files.exists(java.nio.file.Paths.get(script))) script = "E:/Proyectos/RELI-WebApp/scripts/ffmadrid_acta_import.py";
+                            ProcessBuilder pb = new ProcessBuilder("python", script, "--codacta", codacta, "--competition-id", String.valueOf(comp.getId()), "--ffm-our-code", comp.getFfmOurCode() == null ? "" : comp.getFfmOurCode().trim(), "--api", "http://localhost:" + serverPort + "/api", "--admin-user", adminUsername, "--admin-pass", adminPassword, "--apply", "--ffm-competicion", competicion, "--ffm-grupo", grupo, "--ffm-temporada", temporada);
+                            Map<String,String> env = pb.environment();
+                            env.put("FFM_USER", ffmUser); env.put("FFM_PASS", ffmPassword); env.put("ADMIN_USERNAME", adminUsername); env.put("ADMIN_PASSWORD", adminPassword);
+                            pb.redirectErrorStream(true);
+                            Process proc = pb.start();
+                            String out = new String(proc.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+                            proc.waitFor();
+                            for (String line : out.split("\\r?\\n")) {
+                                if (line.startsWith("ROSTER:")) {
+                                    String[] parts = line.split(":");
+                                    if (parts.length >= 4) {
+                                        String fullName = parts[2];
+                                        String nickname = parts[3];
+                                        int dorsal = parts.length >= 5 ? Integer.parseInt(parts[4]) : 99;
+                                        String norm = normalize(fullName);
+                                        ScrapedPlayerDTO dto = byName.get(norm);
+                                        if (dto == null) {
+                                            String[] split = splitName(fullName);
+                                            dto = new ScrapedPlayerDTO(fullName, split[0], split[1], dorsal, 1);
+                                            byName.put(norm, dto);
+                                        } else {
+                                            dto.setAppearances(dto.getAppearances() + 1);
+                                        }
+                                    }
                                 }
                             }
                         } catch (Exception ex) {
@@ -144,42 +159,25 @@ public class RosterScrapeService {
             login(client);
             String html = fetchJornada(client, comp.getFfmCompeticion().trim(), comp.getFfmGrupo() == null ? "" : comp.getFfmGrupo().trim(), comp.getFfmTemporada().trim(), jornada);
             List<String> codactas = extractCodactas(html);
-            String target = null;
-            String ourTeamCandidate = null;
-            // La jornada trae varias actas. El rival puede tener variantes de escritura en FFM,
-            // pero Real Lisiados identifica de forma única nuestro partido de la jornada.
+            int imported = 0;
             for (String cod : codactas) {
                 try {
-                    String actaHtml = fetchActa(client, cod);
-                    if (!hasOurTeam(actaHtml)) continue;
-                    if (ourTeamCandidate == null) ourTeamCandidate = cod;
-                    if (isExpectedActa(actaHtml, match.getRival())) {
-                        target = cod;
-                        break;
-                    }
+                    String script = "scripts/ffmadrid_acta_import.py";
+                    if (!java.nio.file.Files.exists(java.nio.file.Paths.get(script))) script = "../scripts/ffmadrid_acta_import.py";
+                    if (!java.nio.file.Files.exists(java.nio.file.Paths.get(script))) script = "E:/Proyectos/RELI-WebApp/scripts/ffmadrid_acta_import.py";
+                    ProcessBuilder pb = new ProcessBuilder("python", script, "--codacta", cod, "--competition-id", String.valueOf(comp.getId()), "--ffm-our-code", comp.getFfmOurCode() == null ? "" : comp.getFfmOurCode().trim(), "--api", "http://localhost:" + serverPort + "/api", "--admin-user", adminUsername, "--admin-pass", adminPassword, "--apply", "--ffm-competicion", comp.getFfmCompeticion().trim(), "--ffm-grupo", comp.getFfmGrupo() == null ? "" : comp.getFfmGrupo().trim(), "--ffm-temporada", comp.getFfmTemporada().trim());
+                    Map<String,String> env = pb.environment();
+                    env.put("FFM_USER", ffmUser); env.put("FFM_PASS", ffmPassword); env.put("ADMIN_USERNAME", adminUsername); env.put("ADMIN_PASSWORD", adminPassword);
+                    pb.redirectErrorStream(true);
+                    Process proc = pb.start();
+                    String out = new String(proc.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+                    int exit = proc.waitFor();
+                    if (exit == 0) imported++;
                 } catch (Exception ignored) {}
             }
-            if (target == null) target = ourTeamCandidate;
-            if (target == null) {
-                throw new ResponseStatusException(HttpStatus.NOT_FOUND,
-                        "No se encontró el acta de Real Lisiados vs " + match.getRival() + " para J" + jornada);
-            }
-
-            String script = "scripts/ffmadrid_acta_import.py";
-            if (!java.nio.file.Files.exists(java.nio.file.Paths.get(script))) script = "../scripts/ffmadrid_acta_import.py";
-            if (!java.nio.file.Files.exists(java.nio.file.Paths.get(script))) script = "E:/Proyectos/RELI-WebApp/scripts/ffmadrid_acta_import.py";
-            ProcessBuilder pb = new ProcessBuilder("python", script, "--codacta", target, "--match-id", String.valueOf(matchId), "--api", "http://localhost:" + serverPort + "/api", "--admin-user", adminUsername, "--admin-pass", adminPassword, "--apply", "--ffm-competicion", comp.getFfmCompeticion().trim(), "--ffm-grupo", comp.getFfmGrupo() == null ? "" : comp.getFfmGrupo().trim(), "--ffm-temporada", comp.getFfmTemporada().trim());
-            Map<String,String> env = pb.environment();
-            env.put("FFM_USER", ffmUser); env.put("FFM_PASS", ffmPassword); env.put("ADMIN_USERNAME", adminUsername); env.put("ADMIN_PASSWORD", adminPassword);
-            pb.redirectErrorStream(true);
-            Process proc = pb.start();
-            String out = new String(proc.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-            int exit = proc.waitFor();
-            if (exit != 0) throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Importador falló: " + out);
-            Matcher m = Pattern.compile("callups.:\\s*(\\d+).*goals.:\\s*(\\d+).*stats.:\\s*(\\d+).*stats_updated.:\\s*(\\d+)", Pattern.CASE_INSENSITIVE).matcher(out);
-            int callups=0, goals=0, stats=0, statsUpd=0;
-            if (m.find()) { callups=Integer.parseInt(m.group(1)); goals=Integer.parseInt(m.group(2)); stats=Integer.parseInt(m.group(3)); statsUpd=Integer.parseInt(m.group(4)); }
-            return new es.adri.demo.dto.StatsScrapeResultDTO(1, callups, goals, stats, statsUpd, 0, "Acta " + target + " importada");
+            if (imported == 0) throw new ResponseStatusException(HttpStatus.NOT_FOUND,
+                    "No se encontró acta para J" + jornada);
+            return new es.adri.demo.dto.StatsScrapeResultDTO(imported, 0, 0, 0, 0, 0, "Actas de J" + jornada + " importadas (" + imported + ")");
         } catch (ResponseStatusException e) { throw e; }
         catch (Exception e) { throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Fallo al scrapear acta: " + e.getMessage()); }
     }
@@ -314,13 +312,20 @@ public class RosterScrapeService {
         String body = "NUser=" + urlEncode(ffmUser) + "&NPass=" + urlEncode(ffmPassword) + "&LoginAjax=1";
         HttpResponse<String> login = client.send(HttpRequest.newBuilder(URI.create(baseUrl + "/nfg/NLogin"))
                 .header("Content-Type", "application/x-www-form-urlencoded")
+                .header("User-Agent", "Mozilla/5.0 (RELI-WebApp)")
                 .POST(HttpRequest.BodyPublishers.ofString(body)).timeout(Duration.ofSeconds(30)).build(), HttpResponse.BodyHandlers.ofString());
         String loc = login.headers().firstValue("Location").orElse("");
-        if (login.statusCode() != 302 || !loc.contains("NLogin"))
+        if (login.statusCode() == 302 && loc.contains("NLogin")) {
+            HttpResponse<String> sess = client.send(HttpRequest.newBuilder(URI.create(baseUrl + loc)).GET().timeout(Duration.ofSeconds(30)).header("User-Agent", "Mozilla/5.0 (RELI-WebApp)").build(), HttpResponse.BodyHandlers.ofString());
+            if (!sess.body().contains("estado=\"1\"") && !sess.body().contains("estado='1'"))
+                throw new IllegalStateException("Login rechazado por la federación");
+        } else if (login.statusCode() == 200) {
+            String testUrl = baseUrl + "/nfg/NPcd/NFG_CmpJornada?cod_primaria=" + urlEncode(codPrimaria) + "&CodCompeticion=" + urlEncode("320164") + "&CodGrupo=" + urlEncode("320174") + "&CodTemporada=21&CodJornada=1&cod_agrupacion=1&Sch_Tipo_Juego=3";
+            HttpResponse<String> sess = client.send(HttpRequest.newBuilder(URI.create(testUrl)).GET().timeout(Duration.ofSeconds(30)).header("User-Agent", "Mozilla/5.0 (RELI-WebApp)").build(), HttpResponse.BodyHandlers.ofString());
+            if (sess.body().contains("Novanet | Login")) throw new IllegalStateException("Login rechazado por la federación");
+        } else {
             throw new IllegalStateException("Login inesperado: HTTP " + login.statusCode());
-        HttpResponse<String> sess = client.send(HttpRequest.newBuilder(URI.create(baseUrl + loc)).GET().timeout(Duration.ofSeconds(30)).build(), HttpResponse.BodyHandlers.ofString());
-        if (!sess.body().contains("estado=\"1\"") && !sess.body().contains("estado='1'"))
-            throw new IllegalStateException("Login rechazado por la federación");
+        }
     }
 
     private String fetchJornada(HttpClient client, String competicion, String grupo, String temporada, int round) throws Exception {
@@ -328,24 +333,22 @@ public class RosterScrapeService {
                 + "&CodCompeticion=" + urlEncode(competicion) + "&CodGrupo=" + urlEncode(grupo)
                 + "&CodTemporada=" + urlEncode(temporada) + "&CodJornada=" + round
                 + "&cod_agrupacion=" + urlEncode(codAgrupacion) + "&Sch_Tipo_Juego=" + urlEncode(tipoJuego);
-        HttpResponse<byte[]> resp = client.send(HttpRequest.newBuilder(URI.create(url)).GET().timeout(Duration.ofSeconds(30)).build(), HttpResponse.BodyHandlers.ofByteArray());
+        HttpResponse<byte[]> resp = client.send(HttpRequest.newBuilder(URI.create(url)).GET().timeout(Duration.ofSeconds(30)).header("User-Agent","Mozilla/5.0 (RELI-WebApp)").build(), HttpResponse.BodyHandlers.ofByteArray());
         if (resp.statusCode() != 200) throw new IllegalStateException("FFM jornada HTTP " + resp.statusCode());
         return decode(resp.body());
     }
 
     private String fetchActa(HttpClient client, String codacta) throws Exception {
-        String url = baseUrl + "/nfg/NPcd/NFG_CmpPartido?cod_primaria=1000128&CodActa=" + codacta + "&cod_acta=" + codacta;
-        HttpResponse<byte[]> resp = client.send(HttpRequest.newBuilder(URI.create(url)).GET().timeout(Duration.ofSeconds(30)).build(), HttpResponse.BodyHandlers.ofByteArray());
+        String url = baseUrl + "/nfg/NPcd/NFG_CmpPartido?cod_primaria=" + urlEncode(codPrimaria) + "&CodActa=" + codacta + "&cod_acta=" + codacta;
+        HttpResponse<byte[]> resp = client.send(HttpRequest.newBuilder(URI.create(url)).GET().timeout(Duration.ofSeconds(30)).header("User-Agent","Mozilla/5.0 (RELI-WebApp)").build(), HttpResponse.BodyHandlers.ofByteArray());
         if (resp.statusCode() != 200) throw new IllegalStateException("Acta HTTP " + resp.statusCode());
         return decodeActa(resp.body());
     }
 
     private static String decode(byte[] bytes) {
-        CharsetDecoder dec = StandardCharsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT).onUnmappableCharacter(CodingErrorAction.REPORT);
-        try { return dec.decode(ByteBuffer.wrap(bytes)).toString(); } catch (CharacterCodingException e) { return new String(bytes, java.nio.charset.Charset.forName("windows-1252")); }
+        try { return new String(bytes, java.nio.charset.Charset.forName("iso-8859-15")); } catch (Exception e) { return new String(bytes, java.nio.charset.Charset.forName("windows-1252")); }
     }
     private static String decodeActa(byte[] bytes) {
-        try { return new String(bytes, StandardCharsets.UTF_8); } catch (Exception e) {}
         try { return new String(bytes, java.nio.charset.Charset.forName("iso-8859-15")); } catch (Exception e) { return new String(bytes, java.nio.charset.Charset.forName("windows-1252")); }
     }
 
@@ -365,7 +368,6 @@ public class RosterScrapeService {
     }
 
     private Map<String,Integer> parseActaRoster(String html) {
-        // encontrar los dos bloques de equipo por tituloprograma
         List<String> names = new ArrayList<>();
         Matcher tm = RE_EQUIPOS.matcher(html);
         while (tm.find()) names.add(clean(tm.group(1)));
@@ -381,42 +383,25 @@ public class RosterScrapeService {
         } else {
             localBlock = html;
         }
-        // decidir qué bloque es el nuestro (contiene LISIADOS)
-        boolean localOurs = home.toUpperCase().contains("LISIADOS") || home.toUpperCase().contains("REAL");
-        // si no detectamos, buscar bloque que contenga al menos un dorsal+nombre y que el otro no
-        String targetBlock;
-        if (localOurs) targetBlock = localBlock;
-        else {
-            boolean awayOurs = away.toUpperCase().contains("LISIADOS");
-            targetBlock = awayOurs ? awayBlock : "";
-            if (targetBlock.isEmpty()) {
-                // fallback: si solo un bloque tiene jugadores, usar ese; si ambos, preferir local
-                long c1 = RE_PLAYER_ROW.matcher(localBlock).results().count();
-                long c2 = RE_PLAYER_ROW.matcher(awayBlock).results().count();
-                targetBlock = c1 >= c2 ? localBlock : awayBlock;
-                // si ninguno parece nuestro, devolver vacío para no contaminar
-                if (!localBlock.toUpperCase().contains("LISIADOS") && !awayBlock.toUpperCase().contains("LISIADOS") && c1>0 && c2>0) {
-                    // intentar detectar por primer titular que coincida con dorsal conocido? simplificar: tomar ambos?
-                    // para roster histórico queremos solo nuestro equipo, así que si no hay LISIADOS, ignorar
-                    if (!home.toUpperCase().contains("LISIADOS") && !away.toUpperCase().contains("LISIADOS")) return Map.of();
-                }
-            }
-        }
         Map<String,Integer> out = new LinkedHashMap<>();
-        // Titulares + suplentes dentro del bloque
-        Matcher pr = RE_PLAYER_ROW.matcher(targetBlock);
+        parseBlock(localBlock, out);
+        parseBlock(awayBlock, out);
+        return out;
+    }
+
+    private void parseBlock(String block, Map<String,Integer> out) {
+        if (block == null || block.isEmpty()) return;
+        Matcher pr = RE_PLAYER_ROW.matcher(block);
         while (pr.find()) {
             int dorsal = Integer.parseInt(pr.group(1));
             String nombre = clean(pr.group(2));
             if (nombre == null || nombre.length() < 3) continue;
-            // filtrar cuerpo técnico que a veces aparece con dorsal 0
             if (nombre.toUpperCase().contains("ENTRENADOR") || nombre.toUpperCase().contains("DELEGADO")) continue;
             out.putIfAbsent(nombre, dorsal);
         }
-        return out;
     }
 
-    private boolean isExpectedActa(String html, String rival) {
+    private boolean isExpectedActa(String html, String rival, String ourCode) {
         List<String> teams = new ArrayList<>();
         Matcher matcher = RE_EQUIPOS.matcher(html);
         while (matcher.find()) {
@@ -425,7 +410,9 @@ public class RosterScrapeService {
         }
         if (teams.size() < 2) return false;
 
-        boolean hasOurTeam = teams.stream().anyMatch(team -> team.contains("LISIADOS"));
+        boolean hasOurTeam = ourCode != null && !ourCode.isBlank()
+                ? teams.stream().anyMatch(team -> normalize(team).contains(ourCode.toUpperCase()))
+                : teams.stream().anyMatch(team -> team.contains("LISIADOS"));
         String normalizedRival = normalize(rival);
         boolean hasRival = normalizedRival.isBlank()
                 || teams.stream().anyMatch(team -> team.equals(normalizedRival)
@@ -434,11 +421,15 @@ public class RosterScrapeService {
         return hasOurTeam && hasRival;
     }
 
-    private boolean hasOurTeam(String html) {
+    private boolean hasOurTeam(String html, String ourCode) {
         Matcher matcher = RE_EQUIPOS.matcher(html);
         while (matcher.find()) {
             String team = normalize(clean(matcher.group(1)));
-            if (team.contains("LISIADOS")) return true;
+            if (ourCode != null && !ourCode.isBlank()) {
+                if (team.contains(ourCode.toUpperCase())) return true;
+            } else if (team.contains("LISIADOS")) {
+                return true;
+            }
         }
         return false;
     }
@@ -447,7 +438,6 @@ public class RosterScrapeService {
         if (s==null) return null;
         s = s.replaceAll("<[^>]+>", " ");
         s = s.replaceAll("&nbsp;", " ");
-        s = java.net.URLDecoder.decode(s, StandardCharsets.UTF_8);
         s = s.replaceAll("\\s+", " ").trim();
         // unescape html
         s = s.replaceAll("&amp;", "&");

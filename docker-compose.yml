@@ -1,8 +1,9 @@
 services:
   backend:
     build:
-      context: ./api-backend
-      dockerfile: Dockerfile
+      # Contexto raiz: el Dockerfile necesita api-backend/ + scripts/ (los .py van dentro de la imagen)
+      context: .
+      dockerfile: ./api-backend/Dockerfile
     ports:
       - "8080:8080"
     env_file:
@@ -14,6 +15,12 @@ services:
     build:
       context: ./reli-frontend
       dockerfile: Dockerfile
+      args:
+        VITE_API_URL: /api
+        VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID}
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
+        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY}
+        VITE_SUPABASE_BUCKET: ${VITE_SUPABASE_BUCKET}
     ports:
       - "80:80"
     depends_on:

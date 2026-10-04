@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, MotionConfig } from 'framer-motion';
-import { getCompetitions, getSeasons, getStandings, getMatchesByCompetition, toPage } from '../services/api';
+import { getCompetitions, getSeasons, getStandings, getMatchesByCompetition, toPage, getNeutralMatches, saveNeutralMatch, deleteNeutralMatch, getRoundActas, fetchActaHtml, fetchActaPdf } from '../services/api';
+import { useApp } from '../context/AppContext';
 import { STATUS_LABELS } from '../constants/matchStatus';
+import AdminMatchEditButton from '../components/admin/AdminMatchEditButton';
 import { computeStandings } from '../utils/standings';
+import { getMatchOutcome, scoreTextClass } from '../utils/matchResult';
 
 function formatDate(dateStr) {
   if (!dateStr) return 'Por confirmar';
@@ -47,7 +50,7 @@ function MatchRow({ match, navigate }) {
 
       <div className="shrink-0 text-center px-1 sm:px-2">
         {finished && match.ourGoals != null && match.rivalGoals != null ? (
-          <span className="text-re-rojo font-black italic text-base sm:text-xl tracking-tighter">
+          <span className={`${scoreTextClass(getMatchOutcome(match.ourGoals, match.rivalGoals))} font-black italic text-base sm:text-xl tracking-tighter`}>
             {isHome ? match.ourGoals : match.rivalGoals} - {isHome ? match.rivalGoals : match.ourGoals}
           </span>
         ) : live ? (
@@ -72,13 +75,19 @@ function MatchRow({ match, navigate }) {
           {STATUS_LABELS[match.status] || match.status}
         </span>
       </div>
+      <div className="shrink-0" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+        <AdminMatchEditButton matchId={match.id} />
+      </div>
     </div>
   );
 }
 
-function RoundRow({ game, onClick }) {
+function RoundRow({ game, onClick, dbId }) {
   const finished = game.homeGoals != null && game.awayGoals != null;
   const clickable = typeof onClick === 'function';
+  const ourOutcome = game.ours && game.ourGoals != null && game.rivalGoals != null
+    ? getMatchOutcome(game.ourGoals, game.rivalGoals)
+    : null;
   return (
     <div
       onClick={onClick}
@@ -104,7 +113,7 @@ function RoundRow({ game, onClick }) {
 
       <div className="shrink-0 text-center px-1 sm:px-2">
         {finished ? (
-          <span className="text-re-rojo font-black italic text-base sm:text-xl tracking-tighter">
+          <span className={`${ourOutcome ? scoreTextClass(ourOutcome) : 'text-re-rojo'} font-black italic text-base sm:text-xl tracking-tighter`}>
             {game.homeGoals} - {game.awayGoals}
           </span>
         ) : (
@@ -123,6 +132,246 @@ function RoundRow({ game, onClick }) {
           {game.venue || ''}
         </span>
       </div>
+      {dbId != null && (
+        <div className="shrink-0" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+          <AdminMatchEditButton matchId={dbId} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function normTeam(name) {
+  return String(name || '')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function sameGame(a, b) {
+  if (a?.homeCode && b?.homeCode && a?.awayCode && b?.awayCode) {
+    return String(a.homeCode) === String(b.homeCode) && String(a.awayCode) === String(b.awayCode);
+  }
+  return normTeam(a?.home) === normTeam(b?.home) && normTeam(a?.away) === normTeam(b?.away);
+}
+
+function toInputDateTime(iso) {
+  if (!iso) return '';
+  const s = String(iso).slice(0, 16);
+  return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(s) ? s : '';
+}
+
+/** Editor inline de un partido neutro (solo admin). */
+function NeutralEditor({ game, neutral, competitionId, jornada, onSaved, onClose }) {
+  const [date, setDate] = useState(() => toInputDateTime(neutral?.date ?? game.date));
+  const [venue, setVenue] = useState(neutral?.venue ?? game.venue ?? '');
+  const [homeGoals, setHomeGoals] = useState(neutral?.homeGoals ?? game.homeGoals ?? '');
+  const [awayGoals, setAwayGoals] = useState(neutral?.awayGoals ?? game.awayGoals ?? '');
+  const [status, setStatus] = useState(neutral?.status ?? (game.homeGoals != null && game.awayGoals != null ? 'FINISHED' : 'SCHEDULED'));
+  const [codacta, setCodacta] = useState(neutral?.codacta ?? game.codacta ?? '');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSave = async () => {
+    setSaving(true);
+    setError('');
+    try {
+      const hg = homeGoals === '' ? null : Number(homeGoals);
+      const ag = awayGoals === '' ? null : Number(awayGoals);
+      await saveNeutralMatch({
+        id: neutral?.id ?? null,
+        competitionId: Number(competitionId),
+        jornada,
+        homeName: game.home,
+        awayName: game.away,
+        homeCode: game.homeCode ?? null,
+        awayCode: game.awayCode ?? null,
+        date: date ? `${date}:00` : null,
+        venue: venue.trim() || null,
+        status: hg != null && ag != null ? 'FINISHED' : status,
+        homeGoals: hg,
+        awayGoals: ag,
+        codacta: codacta.trim() || null,
+      });
+      onSaved();
+      onClose();
+    } catch (e) {
+      setError(e.message || 'No se pudo guardar');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!neutral?.id) { onClose(); return; }
+    if (!window.confirm(`¿Borrar la corrección de ${game.home} - ${game.away}? Se volverá al dato de federación.`)) return;
+    setSaving(true);
+    try {
+      await deleteNeutralMatch(neutral.id);
+      onSaved();
+      onClose();
+    } catch (e) {
+      setError(e.message || 'No se pudo borrar');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const inputClass = 'w-full rounded-lg border border-card-border dark:border-white/10 bg-card-bg dark:bg-black/30 px-2.5 py-2 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-re-dorado';
+  return (
+    <div className="mx-3 mb-3 rounded-2xl border border-re-dorado/30 bg-re-dorado/5 p-3">
+      <p className="mb-2 text-[9px] font-black uppercase tracking-widest text-re-dorado">
+        Corregir: {game.home} - {game.away}{neutral?.id ? ' (hay corrección guardada)' : ''}
+      </p>
+      <div className="grid grid-cols-2 gap-2">
+        <label className="col-span-2 sm:col-span-1">
+          <span className="mb-1 block text-[9px] font-black uppercase tracking-widest text-muted-foreground">Fecha y hora</span>
+          <input type="datetime-local" value={date} onChange={(e) => setDate(e.target.value)} className={inputClass} />
+        </label>
+        <label className="col-span-2 sm:col-span-1">
+          <span className="mb-1 block text-[9px] font-black uppercase tracking-widest text-muted-foreground">Sede</span>
+          <input type="text" value={venue} onChange={(e) => setVenue(e.target.value)} placeholder="Pabellón…" className={inputClass} />
+        </label>
+        <label>
+          <span className="mb-1 block text-[9px] font-black uppercase tracking-widest text-muted-foreground">Goles local</span>
+          <input type="number" min="0" max="30" value={homeGoals} onChange={(e) => setHomeGoals(e.target.value)} className={inputClass} />
+        </label>
+        <label>
+          <span className="mb-1 block text-[9px] font-black uppercase tracking-widest text-muted-foreground">Goles visitante</span>
+          <input type="number" min="0" max="30" value={awayGoals} onChange={(e) => setAwayGoals(e.target.value)} className={inputClass} />
+        </label>
+        <label>
+          <span className="mb-1 block text-[9px] font-black uppercase tracking-widest text-muted-foreground">Estado</span>
+          <select value={status} onChange={(e) => setStatus(e.target.value)} className={inputClass}>
+            <option value="SCHEDULED">Programado</option>
+            <option value="FINISHED">Finalizado</option>
+            <option value="POSTPONED">Aplazado</option>
+          </select>
+        </label>
+        <label>
+          <span className="mb-1 block text-[9px] font-black uppercase tracking-widest text-muted-foreground">CodActa</span>
+          <input type="text" value={codacta} onChange={(e) => setCodacta(e.target.value)} placeholder="Ej. 78450" className={inputClass} />
+        </label>
+      </div>
+      {error && <p className="mt-2 text-[11px] font-bold text-re-rojo">{error}</p>}
+      <div className="mt-2 flex flex-wrap gap-2">
+        <button type="button" onClick={handleSave} disabled={saving} className="rounded-full bg-re-rojo px-4 py-2 text-[10px] font-black uppercase tracking-widest text-white disabled:opacity-50">
+          {saving ? 'Guardando…' : 'Guardar'}
+        </button>
+        <button type="button" onClick={onClose} disabled={saving} className="rounded-full border border-card-border px-4 py-2 text-[10px] font-black uppercase tracking-widest">
+          Cancelar
+        </button>
+        {neutral?.id && (
+          <button type="button" onClick={handleDelete} disabled={saving} className="ml-auto rounded-full border border-re-rojo/50 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-re-rojo disabled:opacity-50">
+            Quitar corrección
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Fila de partido de jornada con herramientas admin (actas + corrección neutra). */
+function JornadaGameRow({ game, ourDbId, onOpenOurs, codacta, neutral, isAdmin, competitionId, jornada, onNeutralSaved, corrected }) {
+  const [editing, setEditing] = useState(false);
+  const [actaBusy, setActaBusy] = useState(null);
+  const [actaError, setActaError] = useState('');
+
+  const openActaHtml = async () => {
+    if (!codacta) return;
+    setActaBusy('html');
+    setActaError('');
+    try {
+      const html = await fetchActaHtml(codacta, game.home, game.away);
+      const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+      window.open(URL.createObjectURL(blob), '_blank', 'noopener');
+    } catch (e) {
+      setActaError(e.message || 'No se pudo abrir el acta');
+    } finally {
+      setActaBusy(null);
+    }
+  };
+
+  const downloadActaPdf = async () => {
+    if (!codacta) return;
+    setActaBusy('pdf');
+    setActaError('');
+    try {
+      const blob = await fetchActaPdf(codacta);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `acta-J${jornada}-${codacta}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+    } catch (e) {
+      setActaError(e.message || 'No se pudo descargar el acta');
+    } finally {
+      setActaBusy(null);
+    }
+  };
+
+  return (
+    <div className={`rounded-2xl ${corrected ? 'border border-re-dorado/40 bg-re-dorado/5' : ''}`}>
+      <RoundRow
+        game={game}
+        dbId={ourDbId}
+        onClick={ourDbId != null && onOpenOurs ? onOpenOurs : undefined}
+      />
+      {isAdmin && (
+        <div className="flex flex-wrap items-center gap-2 px-3 pb-3">
+          {corrected && (
+            <span className="text-[8px] font-black uppercase tracking-widest text-re-dorado">Corregido a mano</span>
+          )}
+          {codacta ? (
+            <>
+              <button
+                type="button"
+                onClick={openActaHtml}
+                disabled={actaBusy != null}
+                className="rounded-full border border-re-dorado/40 px-3 py-1.5 text-[9px] font-black uppercase tracking-widest text-re-dorado hover:bg-re-dorado hover:text-white disabled:opacity-50"
+              >
+                {actaBusy === 'html' ? 'Abriendo…' : 'Ver acta'}
+              </button>
+              <button
+                type="button"
+                onClick={downloadActaPdf}
+                disabled={actaBusy != null}
+                className="rounded-full border border-re-dorado/40 px-3 py-1.5 text-[9px] font-black uppercase tracking-widest text-re-dorado hover:bg-re-dorado hover:text-white disabled:opacity-50"
+              >
+                {actaBusy === 'pdf' ? 'Descargando…' : 'Acta PDF'}
+              </button>
+              <span className="text-[8px] font-bold text-muted-foreground">#{codacta}</span>
+            </>
+          ) : (
+            <span className="text-[8px] font-bold uppercase tracking-widest text-muted-foreground">Sin acta publicada</span>
+          )}
+          {!game.ours && (
+            <button
+              type="button"
+              onClick={() => setEditing((v) => !v)}
+              className="ml-auto rounded-full border border-card-border px-3 py-1.5 text-[9px] font-black uppercase tracking-widest hover:border-re-dorado/50 hover:text-re-dorado"
+            >
+              {editing ? 'Cerrar editor' : '✎ Corregir'}
+            </button>
+          )}
+        </div>
+      )}
+      {actaError && <p className="px-3 pb-2 text-[11px] font-bold text-re-rojo">{actaError}</p>}
+      {isAdmin && editing && !game.ours && (
+        <NeutralEditor
+          game={{ ...game, codacta: neutral?.codacta ?? codacta ?? null }}
+          neutral={neutral}
+          competitionId={competitionId}
+          jornada={jornada}
+          onSaved={onNeutralSaved}
+          onClose={() => setEditing(false)}
+        />
+      )}
     </div>
   );
 }
@@ -131,6 +380,7 @@ const selectClass = 'w-full rounded-lg border border-card-border dark:border-re-
 
 export default function CompetitionPage() {
   const navigate = useNavigate();
+  const { isAdmin } = useApp();
   const [seasons, setSeasons] = useState([]);
   const [selectedSeasonId, setSelectedSeasonId] = useState('');
   const [competitions, setCompetitions] = useState([]);
@@ -143,6 +393,10 @@ export default function CompetitionPage() {
   const [ffmRounds, setFfmRounds] = useState(undefined);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [roundActas, setRoundActas] = useState(null);
+  const [roundActasLoading, setRoundActasLoading] = useState(false);
+  const [roundActasError, setRoundActasError] = useState('');
+  const [neutralAll, setNeutralAll] = useState([]);
 
   const loadStandings = useCallback((competitionId, jornada) => {
     return getStandings(competitionId, jornada)
@@ -174,6 +428,66 @@ export default function CompetitionPage() {
       })
       .finally(() => setLoading(false));
   }, [loadStandings, loadMatches]);
+
+  const loadNeutrals = useCallback((competitionId) => {
+    if (!competitionId) { setNeutralAll([]); return; }
+    getNeutralMatches(competitionId)
+      .then((data) => setNeutralAll(Array.isArray(data) ? data : []))
+      .catch(() => setNeutralAll([]));
+  }, []);
+
+  useEffect(() => {
+    loadNeutrals(selectedId);
+  }, [selectedId, loadNeutrals]);
+
+  // Al cambiar de competición o jornada se descarta el scrapeo en vivo (hay que pedirlo a mano)
+  useEffect(() => {
+    setRoundActas(null);
+    setRoundActasError('');
+  }, [selectedId, selectedJornada]);
+
+  const handleScrapeRound = async () => {
+    if (!selectedId || selectedJornada == null || roundActasLoading) return;
+    setRoundActasLoading(true);
+    setRoundActasError('');
+    try {
+      const data = await getRoundActas(selectedId, selectedJornada);
+      setRoundActas(Array.isArray(data) ? data : []);
+    } catch (e) {
+      setRoundActasError(e.message || 'No se pudieron scrapear las actas');
+      setRoundActas(null);
+    } finally {
+      setRoundActasLoading(false);
+    }
+  };
+
+  /** Correcciones manuales de esta jornada, haya o no scrapeo en vivo. */
+  const jornadaNeutrals = useMemo(
+    () => neutralAll.filter((n) => n.jornada === selectedJornada),
+    [neutralAll, selectedJornada],
+  );
+
+  const findNeutral = useCallback((game) => jornadaNeutrals.find((n) => sameGame(
+    { homeCode: game.homeCode, awayCode: game.awayCode, home: game.home, away: game.away },
+    { homeCode: n.homeCode, awayCode: n.awayCode, home: n.homeName, away: n.awayName },
+  )), [jornadaNeutrals]);
+
+  /** Aplica correcciones manuales sobre un partido FFM (fecha, sede, resultado). */
+  const withNeutral = useCallback((game) => {
+    const n = findNeutral(game);
+    if (!n) return { game, corrected: false };
+    const merged = { ...game };
+    if (n.date) merged.date = n.date;
+    if (n.venue) merged.venue = n.venue;
+    if (n.homeGoals != null && n.awayGoals != null) {
+      merged.homeGoals = n.homeGoals;
+      merged.awayGoals = n.awayGoals;
+      merged.ourGoals = n.homeGoals;
+      merged.rivalGoals = n.awayGoals;
+    }
+    if (n.codacta) merged.codacta = n.codacta;
+    return { game: merged, corrected: true, neutral: n };
+  }, [findNeutral]);
 
   useEffect(() => {
     Promise.all([
@@ -340,10 +654,34 @@ export default function CompetitionPage() {
           }));
         }
       }
+      // Correcciones manuales de partidos neutros (también cuentan para la tabla)
+      if (neutralAll.length > 0) {
+        const byKey = new Map();
+        for (const n of neutralAll) {
+          if (n.status !== 'FINISHED' || n.homeGoals == null || n.awayGoals == null) continue;
+          const key = n.homeCode && n.awayCode
+            ? `${n.jornada}|${n.homeCode}|${n.awayCode}`
+            : `${n.jornada}|${normTeam(n.homeName)}|${normTeam(n.awayName)}`;
+          byKey.set(key, n);
+        }
+        if (byKey.size > 0) {
+          roundsForCalc = roundsForCalc.map(({ round, games }) => ({
+            round,
+            games: games.map(g => {
+              if (g.ours) return g;
+              const keyCode = g.homeCode && g.awayCode ? `${round}|${g.homeCode}|${g.awayCode}` : null;
+              const keyName = `${round}|${normTeam(g.home)}|${normTeam(g.away)}`;
+              const n = (keyCode && byKey.get(keyCode)) || byKey.get(keyName);
+              if (!n) return g;
+              return { ...g, homeGoals: n.homeGoals, awayGoals: n.awayGoals };
+            })
+          }));
+        }
+      }
       return computeStandings(roundsForCalc, roundIndex.data.ourCode, selectedJornada);
     }
     return standings;
-  }, [ffmAvailable, ffmRounds, roundIndex, selectedJornada, standings, allMatches]);
+  }, [ffmAvailable, ffmRounds, roundIndex, selectedJornada, standings, allMatches, neutralAll]);
   const standingsSource = ffmAvailable ? 'FFM (nuestro resultado dinámico, resto auto lunes)' : 'nuestros partidos';
 
   const selected = competitions.find((c) => String(c.id) === String(selectedId));
@@ -603,29 +941,69 @@ export default function CompetitionPage() {
 
           {selectedJornada != null && (() => {
             // Mostrar siempre los resultados del grupo desde FFM (incluye al resto de equipos).
-            // Si hay FFM, fusionar el resultado de nuestro partido con el de la BD para que se vea dinámico.
-            if (roundGames && roundGames.length > 0) {
+            // Fuente preferida: scrapeo en vivo de la jornada (trae CodActa); si no, JSON estático.
+            // Se fusiona nuestro resultado de la BD más las correcciones manuales de neutros.
+            const liveGames = (roundActas && roundActas.length > 0 ? roundActas : null)
+              || (roundGames && roundGames.length > 0 ? roundGames : null);
+            if (liveGames) {
               const ourMatch = allMatches.find((m) => m.jornada === selectedJornada);
               const ourCode = roundIndex?.data?.ourCode;
-              const mergedGames = roundGames.map(g => {
+              const mergedGames = liveGames.map(g => {
                 const isOurGame = ourCode != null ? String(g.homeCode) === String(ourCode) || String(g.awayCode) === String(ourCode) : Boolean(g.ours);
+                let game = { ...g, ours: isOurGame || Boolean(g.ours) };
                 if (isOurGame && ourMatch && ourMatch.status === 'FINISHED' && ourMatch.ourGoals != null && ourMatch.rivalGoals != null) {
                   const isHome = String(g.homeCode) === String(ourCode);
-                  return { ...g, homeGoals: isHome ? ourMatch.ourGoals : ourMatch.rivalGoals, awayGoals: isHome ? ourMatch.rivalGoals : ourMatch.ourGoals };
+                  game = { ...game, ours: true, ourGoals: ourMatch.ourGoals, rivalGoals: ourMatch.rivalGoals, homeGoals: isHome ? ourMatch.ourGoals : ourMatch.rivalGoals, awayGoals: isHome ? ourMatch.rivalGoals : ourMatch.ourGoals };
                 }
-                return g;
+                const { game: withFix, corrected, neutral } = withNeutral(game);
+                return { game: withFix, corrected, neutral, isOurGame };
               });
+              const source = roundActas ? 'en vivo (scrapeo bajo demanda)' : 'FFM (caché estática)';
               return (
                 <section className="overflow-hidden rounded-[1.7rem] border border-card-border dark:border-re-dorado/30 bg-card-bg dark:bg-[#071018] text-foreground dark:text-white shadow-card dark:shadow-[0_24px_60px_rgba(0,0,0,0.28)]">
                   <div className="px-4 sm:px-6 py-4 border-b border-card-border">
-                    <h2 className="text-lg font-black uppercase tracking-tight">Jornada {selectedJornada}</h2>
-                    <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground mt-1">Resultados del grupo · Fuente: FFM {ourMatch ? '· nuestro resultado dinámico' : ''} · resto auto lunes</p>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <h2 className="text-lg font-black uppercase tracking-tight">Jornada {selectedJornada}</h2>
+                      {isAdmin && (
+                        <button
+                          type="button"
+                          onClick={handleScrapeRound}
+                          disabled={roundActasLoading}
+                          className="rounded-full bg-re-rojo px-4 py-2 text-[10px] font-black uppercase tracking-widest text-white disabled:opacity-50"
+                        >
+                          {roundActasLoading ? 'Scrapeando…' : roundActas ? 'Re-scrapear actas' : 'Scrapear actas'}
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground mt-1">Resultados del grupo · Fuente: {source}{ourMatch ? ' · nuestro resultado dinámico' : ''} · resto auto lunes</p>
+                    {isAdmin && (
+                      <p className="text-[9px] font-bold uppercase tracking-widest text-re-dorado/80 mt-1">Scrapeo educado: 3 peticiones con pausas · cada acta se pide de una en una</p>
+                    )}
+                    {roundActasLoading && (
+                      <p className="mt-2 text-[11px] font-bold text-re-dorado">Leyendo la federación con pausas… tarda unos 10 segundos.</p>
+                    )}
+                    {roundActasError && (
+                      <p className="mt-2 rounded-xl bg-re-rojo/10 border border-re-rojo/30 px-3 py-2 text-[11px] font-bold text-re-rojo">{roundActasError}</p>
+                    )}
                   </div>
                   <div className="divide-y divide-card-border">
-                    {mergedGames.map((game, i) => {
-                      const isOurGame = ourCode != null ? String(game.homeCode) === String(ourCode) || String(game.awayCode) === String(ourCode) : Boolean(game.ours);
-                      const clickable = Boolean(isOurGame && ourMatch);
-                      return <RoundRow key={`${game.homeCode}-${game.awayCode}-${i}`} game={game} onClick={clickable ? () => navigate(`/partidos/${ourMatch.id}`) : undefined} />;
+                    {mergedGames.map((entry, i) => {
+                      const clickable = Boolean(entry.isOurGame && ourMatch);
+                      return (
+                        <JornadaGameRow
+                          key={`${entry.game.homeCode}-${entry.game.awayCode}-${i}`}
+                          game={entry.game}
+                          ourDbId={clickable ? ourMatch.id : null}
+                          onOpenOurs={clickable ? () => navigate(`/partidos/${ourMatch.id}`) : undefined}
+                          codacta={entry.neutral?.codacta ?? entry.game.codacta ?? null}
+                          neutral={entry.neutral ?? null}
+                          corrected={entry.corrected}
+                          isAdmin={isAdmin}
+                          competitionId={selectedId}
+                          jornada={selectedJornada}
+                          onNeutralSaved={() => loadNeutrals(selectedId)}
+                        />
+                      );
                     })}
                   </div>
                 </section>

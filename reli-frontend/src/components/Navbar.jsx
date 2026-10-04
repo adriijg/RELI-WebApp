@@ -22,7 +22,10 @@ export default function Navbar({ theme, user, isAdmin, onToggleTheme, onOpenAuth
 
   useEffect(() => {
     menuOpenRef.current = isMenuOpen;
-    if (isMenuOpen) setVisible(true);
+    if (isMenuOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setVisible(true);
+    }
   }, [isMenuOpen]);
 
   useEffect(() => {
@@ -53,6 +56,7 @@ export default function Navbar({ theme, user, isAdmin, onToggleTheme, onOpenAuth
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setVisible(true);
     lastY.current = window.scrollY;
   }, [location.pathname]);

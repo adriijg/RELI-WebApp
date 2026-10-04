@@ -4,6 +4,7 @@ import PageHeader from '../../components/admin/PageHeader';
 import StatCard from '../../components/admin/StatCard';
 import { getEvents, getMatches, getPlayers, getSeasons, getCompetitions, getStats, getUsers, toPage } from '../../services/api';
 import { getRecentAdminMatches } from '../../utils/adminRecentMatches';
+import { getMatchOutcome, scoreTextClass } from '../../utils/matchResult';
 
 const CARDS = [
   { key: 'matches', label: 'Partidos', to: '/admin/partidos', accent: 'red', fetcher: (p) => getMatches({ ...p, size: 1 }) },
@@ -92,7 +93,7 @@ export default function Dashboard() {
                   <span className="block truncate font-black text-[15px] leading-none">{m.rival}</span>
                   <span className="block text-[11px] font-bold text-muted-foreground">{m.date ? new Date(m.date).toLocaleDateString('es-ES',{day:'2-digit',month:'short'}) : 'Sin fecha'} · {m.competitionName || ''}</span>
                 </span>
-                <span className="shrink-0 font-black text-re-rojo text-[15px]">{m.status==='FINISHED' && m.ourGoals!=null ? `${m.ourGoals}-${m.rivalGoals}` : '→'}</span>
+                <span className={`shrink-0 font-black text-[15px] ${m.status==='FINISHED' && m.ourGoals!=null ? scoreTextClass(getMatchOutcome(m.ourGoals, m.rivalGoals)) : 'text-re-rojo'}`}>{m.status==='FINISHED' && m.ourGoals!=null ? `${m.ourGoals}-${m.rivalGoals}` : '→'}</span>
               </Link>
             ))}
           </div>

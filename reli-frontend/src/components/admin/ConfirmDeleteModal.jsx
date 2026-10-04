@@ -20,7 +20,7 @@ export default function ConfirmDeleteModal({ open, title = '¿Eliminar registro?
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       <div className="relative w-full max-w-md bg-background border border-card-border rounded-3xl shadow-2xl p-8 text-center">
         <div className="w-16 h-16 mx-auto mb-5 rounded-full bg-re-rojo/10 border border-re-rojo/30 flex items-center justify-center">
