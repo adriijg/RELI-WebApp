@@ -76,6 +76,7 @@ function formatWhen(date) {
 export default function QuintetPage() {
   const { user, isAdmin, openAuth } = useApp();
   const voterKey = user?.id ?? user?.username ?? '';
+  const canVote = user?.canVote !== false;
   const [players, setPlayers] = useState([]);
   const [match, setMatch] = useState(null);
   const [seasonId, setSeasonId] = useState('');
@@ -265,6 +266,7 @@ export default function QuintetPage() {
       openAuth('login');
       return;
     }
+    if (!canVote) return;
     if (!isVoteOpen) return;
     if (locked) return;
     if (chosenIds.has(player.id)) {
@@ -287,6 +289,7 @@ export default function QuintetPage() {
   };
 
   const clearSlot = (slotId) => {
+    if (!canVote) return;
     if (!isVoteOpen) return;
     if (locked) return;
     setLineup((current) => ({ ...current, [slotId]: null }));
@@ -298,6 +301,7 @@ export default function QuintetPage() {
       openAuth('login');
       return;
     }
+    if (!canVote) return;
     if (!isVoteOpen) return;
     if (locked || filled < 5 || !match) return;
     const playerIds = SLOTS.map((slot) => lineup[slot.id]);
@@ -388,6 +392,11 @@ export default function QuintetPage() {
           {isVoteOpen ? `Votación abierta · cierra jueves 23:59${quintetStatus.closesAt ? ` (${new Date(quintetStatus.closesAt).toLocaleString('es-ES', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' })})` : ''}` : 'Votación cerrada · espera a que el admin la abra'}
         </div>
       )}
+      {voterKey && !canVote && (
+        <div className="rounded-xl border border-re-rojo/30 bg-re-rojo/10 px-3 py-2 text-[11px] font-black uppercase tracking-widest text-re-rojo">
+          Tu cuenta no tiene permiso para votar. Contacta con un administrador.
+        </div>
+      )}
       {isAdmin && match && seasonId && (
         <div className="flex flex-wrap gap-2">
           <button type="button" onClick={async () => { try { const s = await openQuintet(seasonId, match.jornada); setQuintetStatus(s); } catch (e) { alert(e.message); } }} className="rounded-full bg-emerald-600 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-white">Abrir votación</button>
@@ -426,7 +435,7 @@ export default function QuintetPage() {
                           {POSITION_LABELS[player.position] || player.position}
                         </span>
                       </span>
-                      {!locked && isVoteOpen && (
+                      {!locked && isVoteOpen && canVote && (
                         <button
                           type="button"
                           onClick={() => clearSlot(slot.id)}
@@ -443,6 +452,7 @@ export default function QuintetPage() {
                       onClick={() => {
                         if (!isVoteOpen) return;
                         if (!voterKey) { openAuth('login'); return; }
+                        if (!canVote) return;
                         setActiveSlot(slot.id);
                       }}
                       className="flex-1 py-1 text-left text-[11px] font-bold uppercase tracking-widest text-foreground/40"
@@ -459,7 +469,7 @@ export default function QuintetPage() {
         {isVoteOpen && players.length === 0 && (
           <div className="rounded-2xl border border-dashed border-card-border bg-muted/5 px-4 py-3 text-center text-[11px] font-bold text-muted-foreground">Aún no hay convocados para este partido, votación no disponible.</div>
         )}
-        {isVoteOpen && voterKey && !locked && players.length > 0 && (
+        {isVoteOpen && voterKey && canVote && !locked && players.length > 0 && (
           <div className="rounded-[1.4rem] border border-re-dorado/20 bg-card-bg/80 px-3 py-3">
             <p className="text-[9px] font-black uppercase tracking-[0.2em] text-re-dorado">
               Plantilla · cualquier puesto
@@ -513,6 +523,10 @@ export default function QuintetPage() {
             >
               Entrar para votar
             </button>
+          ) : !canVote ? (
+            <span className="rounded-full border border-re-rojo/40 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-re-rojo">
+              Sin permiso de voto
+            </span>
           ) : locked ? (
             <div className="flex flex-wrap gap-2">
               <button
@@ -536,7 +550,7 @@ export default function QuintetPage() {
             <button
               type="button"
               onClick={submit}
-              disabled={filled < 5 || !isVoteOpen}
+              disabled={filled < 5 || !isVoteOpen || !canVote}
               className="rounded-full bg-re-rojo px-4 py-2 text-[10px] font-black uppercase tracking-widest text-white disabled:cursor-not-allowed disabled:opacity-40"
             >
               Enviar voto

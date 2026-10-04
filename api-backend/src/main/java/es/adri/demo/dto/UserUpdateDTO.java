@@ -22,4 +22,7 @@ public class UserUpdateDTO {
 
     @Size(min = 8, max = 100, message = "La password debe tener entre 8 y 100 caracteres")
     private String password;
+
+    // null = no cambiar el permiso de voto
+    private Boolean canVote;
 }

@@ -17,4 +17,5 @@ public class UserDTO {
     private Role role;
     private LocalDateTime createdAt;
     private boolean emailVerified;
+    private boolean canVote;
 }

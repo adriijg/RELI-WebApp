@@ -55,6 +55,13 @@ export default function UsersAdmin() {
       fullWidth: true,
       placeholder: 'Déjalo vacío para no cambiarla (mín. 8 si la cambias)',
     },
+    {
+      name: 'canVote',
+      label: 'Puede votar en el quinteto',
+      type: 'checkbox',
+      fullWidth: true,
+      checkboxLabel: 'Tiene permiso para votar',
+    },
   ];
 
   const columns = [
@@ -86,6 +93,19 @@ export default function UsersAdmin() {
           }`}
         >
           {v === 'ROLE_ADMIN' ? 'Admin' : 'Usuario'}
+        </span>
+      ),
+    },
+    {
+      key: 'canVote',
+      label: 'Voto',
+      render: (v) => (
+        <span
+          className={`inline-block px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${
+            v === false ? 'bg-re-rojo/15 text-re-rojo' : 'bg-emerald-500/15 text-emerald-600'
+          }`}
+        >
+          {v === false ? 'Sin permiso' : 'Puede votar'}
         </span>
       ),
     },
@@ -146,6 +166,7 @@ export default function UsersAdmin() {
           const payload = {
             username: values.username,
             email: values.email,
+            canVote: Boolean(values.canVote),
           };
           if (values.password && values.password.trim() !== '') {
             payload.password = values.password;

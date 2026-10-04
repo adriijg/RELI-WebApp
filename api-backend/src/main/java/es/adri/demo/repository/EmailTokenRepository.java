@@ -10,4 +10,6 @@ public interface EmailTokenRepository extends JpaRepository<EmailToken, Long> {
     Optional<EmailToken> findByTokenHashAndType(String tokenHash, EmailToken.Type type);
 
     void deleteByUserAndType(User user, EmailToken.Type type);
+
+    void deleteByUser(User user);
 }

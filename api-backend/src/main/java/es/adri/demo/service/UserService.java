@@ -12,6 +12,9 @@ import es.adri.demo.exception.EmailAlreadyExistsException;
 import es.adri.demo.exception.ResourceNotFoundException;
 import es.adri.demo.model.Role;
 import es.adri.demo.model.User;
+import es.adri.demo.repository.EmailTokenRepository;
+import es.adri.demo.repository.EventRepository;
+import es.adri.demo.repository.QuintetVoteRepository;
 import es.adri.demo.repository.UserRepository;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -26,6 +29,7 @@ import org.springframework.web.client.RestTemplate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import static org.springframework.http.HttpStatus.CONFLICT;
@@ -41,6 +45,9 @@ public class UserService {
     private final JwtService jwtService;
     private final EmailTokenService emailTokenService;
     private final RestTemplate restTemplate;
+    private final QuintetVoteRepository quintetVoteRepository;
+    private final EmailTokenRepository emailTokenRepository;
+    private final EventRepository eventRepository;
 
     @org.springframework.beans.factory.annotation.Value("${app.email.enabled:false}")
     private boolean emailEnabled;
@@ -49,12 +56,17 @@ public class UserService {
     private String googleClientId;
 
     public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder, JwtService jwtService,
-                       EmailTokenService emailTokenService, RestTemplate restTemplate) {
+                       EmailTokenService emailTokenService, RestTemplate restTemplate,
+                       QuintetVoteRepository quintetVoteRepository, EmailTokenRepository emailTokenRepository,
+                       EventRepository eventRepository) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.emailTokenService = emailTokenService;
         this.restTemplate = restTemplate;
+        this.quintetVoteRepository = quintetVoteRepository;
+        this.emailTokenRepository = emailTokenRepository;
+        this.eventRepository = eventRepository;
     }
 
     public UserDTO saveUser(UserRegistrationDTO userRegistrationDTO) {
@@ -190,12 +202,20 @@ public class UserService {
         if (userUpdateDTO.getPassword() != null && !userUpdateDTO.getPassword().isBlank()) {
             user.setPassword(passwordEncoder.encode(userUpdateDTO.getPassword()));
         }
+        if (userUpdateDTO.getCanVote() != null) {
+            user.setCanVote(userUpdateDTO.getCanVote());
+        }
 
         return toDto(userRepository.save(user));
     }
 
+    @Transactional
     public void deleteUser(Long id) {
         User user = getUserEntityById(id);
+        // Limpiar filas hijas que referencian al usuario (FK sin ON DELETE CASCADE)
+        quintetVoteRepository.deleteAllByUser(user);
+        emailTokenRepository.deleteByUser(user);
+        eventRepository.clearCreatedBy(user);
         userRepository.delete(user);
     }
 
@@ -229,7 +249,8 @@ public class UserService {
                 user.getEmail(),
                 user.getRole(),
                 user.getCreatedAt(),
-                !Boolean.FALSE.equals(user.getEmailVerified())
+                !Boolean.FALSE.equals(user.getEmailVerified()),
+                !Boolean.FALSE.equals(user.getCanVote())
         );
     }
 

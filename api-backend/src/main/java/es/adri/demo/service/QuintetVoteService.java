@@ -143,6 +143,9 @@ public class QuintetVoteService {
         }
 
         User user = currentUser();
+        if (Boolean.FALSE.equals(user.getCanVote())) {
+            throw new ResponseStatusException(FORBIDDEN, "Tu cuenta no tiene permiso para votar");
+        }
         QuintetVote vote = voteRepository
                 .findByUserIdAndSeasonIdAndJornada(user.getId(), request.getSeasonId(), request.getJornada())
                 .orElseGet(QuintetVote::new);
@@ -163,6 +166,9 @@ public class QuintetVoteService {
 
     public void deleteMine(Long seasonId, Integer jornada) {
         User user = currentUser();
+        if (Boolean.FALSE.equals(user.getCanVote())) {
+            throw new ResponseStatusException(FORBIDDEN, "Tu cuenta no tiene permiso para votar");
+        }
         voteRepository.findByUserIdAndSeasonIdAndJornada(user.getId(), seasonId, jornada)
                 .ifPresent(voteRepository::delete);
     }
