@@ -126,8 +126,8 @@ Este proyecto está bajo la Licencia MIT. Ver el archivo `LICENSE` para más det
 
 ## Contacto
 
-- **Equipo RELI**: [Sitio web oficial]((https://reallisiados.duckdns.org/))
-- **Email**: reallisiados.info@gmail.com
+- **Equipo RELI**: [reallisiados.duckdns.org](https://reallisiados.duckdns.org/)
+- **Email**: [reallisiados.info@gmail.com](mailto:reallisiados.info@gmail.com)
 
 ---
 
