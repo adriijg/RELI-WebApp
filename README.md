@@ -126,9 +126,8 @@ Este proyecto está bajo la Licencia MIT. Ver el archivo `LICENSE` para más det
 
 ## Contacto
 
-- **Equipo RELI**: [Sitio web oficial](https://www.equiporeli.com)
-- **Email**: contacto@equiporeli.com
-- **Redes Sociales**: [Facebook](https://facebook.com/equiporeli), [Twitter](https://twitter.com/equiporeli)
+- **Equipo RELI**: [Sitio web oficial]([https://www.equiporeli.com](https://reallisiados.duckdns.org/))
+- **Email**: reallisiados.info@gmail.com
 
 ---
 
