@@ -3,7 +3,7 @@
 
 Uso:
     pip install requests
-    set FFM_USER=0R49865 & set FFM_PASS=Bancos25      (Windows, solo en memoria)
+    set FFM_USER=... & set FFM_PASS=...      (Windows, solo en memoria)
     python scripts/ffmadrid.py --jornadas 1-22 --out jornada.json     # solo descarga + parsea
     python scripts/ffmadrid.py --jornadas 1-22 --push --competition-id 2 --api http://localhost:8080/api --admin-user admin --admin-pass "..."   # sincroniza con el backend
 
