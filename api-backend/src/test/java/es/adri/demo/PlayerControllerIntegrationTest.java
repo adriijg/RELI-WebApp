@@ -1,5 +1,6 @@
 package es.adri.demo;
 
+import es.adri.demo.config.JwtService;
 import es.adri.demo.dto.PlayerRequestDTO;
 import es.adri.demo.model.Player;
 import es.adri.demo.model.Position;
@@ -7,8 +8,6 @@ import es.adri.demo.model.Role;
 import es.adri.demo.model.User;
 import es.adri.demo.repository.PlayerRepository;
 import es.adri.demo.repository.UserRepository;
-import java.nio.charset.StandardCharsets;
-import java.util.Base64;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,6 +38,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "spring.jpa.show-sql=false",
         "spring.jpa.open-in-view=false",
         "app.email.enabled=false",
+        "app.jwt.secret=test-secret-0123456789-0123456789-0123456789-0123456789",
         "spring.security.oauth2.client.registration.google.client-id=test-client-id",
         "spring.security.oauth2.client.registration.google.client-secret=test-client-secret"
 })
@@ -58,6 +58,9 @@ class PlayerControllerIntegrationTest {
 
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private JwtService jwtService;
 
     @BeforeEach
     void setUp() {
@@ -83,7 +86,7 @@ class PlayerControllerIntegrationTest {
         PlayerRequestDTO request = validPlayerRequest();
 
         mockMvc.perform(post("/api/players")
-                        .header("Authorization", basicAuth(user.getUsername(), "Password123"))
+                        .header("Authorization", bearer(user))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isForbidden());
@@ -95,7 +98,7 @@ class PlayerControllerIntegrationTest {
         PlayerRequestDTO request = validPlayerRequest();
 
         mockMvc.perform(post("/api/players")
-                        .header("Authorization", basicAuth(admin.getUsername(), "Password123"))
+                        .header("Authorization", bearer(admin))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
@@ -111,7 +114,7 @@ class PlayerControllerIntegrationTest {
         PlayerRequestDTO request = new PlayerRequestDTO("Juan Actualizado", "JP", "Perez", 9, Position.PIVOT, "https://example.com/updated.jpg");
 
         mockMvc.perform(put("/api/players/{id}", player.getId())
-                        .header("Authorization", basicAuth(admin.getUsername(), "Password123"))
+                        .header("Authorization", bearer(admin))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
@@ -126,7 +129,7 @@ class PlayerControllerIntegrationTest {
         Player player = playerRepository.save(new Player(null, "Juan Perez", "Juan", null, 8, Position.ALA, "https://example.com/a.jpg", true));
 
         mockMvc.perform(delete("/api/players/{id}", player.getId())
-                        .header("Authorization", basicAuth(admin.getUsername(), "Password123")))
+                        .header("Authorization", bearer(admin)))
                 .andExpect(status().isNoContent());
 
         org.junit.jupiter.api.Assertions.assertFalse(playerRepository.findById(player.getId()).orElseThrow().isActive());
@@ -138,7 +141,7 @@ class PlayerControllerIntegrationTest {
         PlayerRequestDTO request = new PlayerRequestDTO("", "Juan", null, 0, Position.ALA, "not-a-url");
 
         mockMvc.perform(post("/api/players")
-                        .header("Authorization", basicAuth(admin.getUsername(), "Password123"))
+                        .header("Authorization", bearer(admin))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
@@ -161,8 +164,7 @@ class PlayerControllerIntegrationTest {
         return userRepository.save(user);
     }
 
-    private String basicAuth(String username, String password) {
-        String token = Base64.getEncoder().encodeToString((username + ":" + password).getBytes(StandardCharsets.UTF_8));
-        return "Basic " + token;
+    private String bearer(User user) {
+        return "Bearer " + jwtService.generateToken(user.getUsername(), user.getRole().name());
     }
 }

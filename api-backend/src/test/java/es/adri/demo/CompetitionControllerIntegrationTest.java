@@ -1,5 +1,6 @@
 package es.adri.demo;
 
+import es.adri.demo.config.JwtService;
 import es.adri.demo.dto.CompetitionRequestDTO;
 import es.adri.demo.model.Competition;
 import es.adri.demo.model.CompetitionType;
@@ -13,9 +14,7 @@ import es.adri.demo.repository.MatchRepository;
 import es.adri.demo.repository.SeasonRepository;
 import es.adri.demo.repository.StatRepository;
 import es.adri.demo.repository.UserRepository;
-import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
-import java.util.Base64;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -46,6 +45,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "spring.jpa.show-sql=false",
         "spring.jpa.open-in-view=false",
         "app.email.enabled=false",
+        "app.jwt.secret=test-secret-0123456789-0123456789-0123456789-0123456789",
         "spring.security.oauth2.client.registration.google.client-id=test-client-id",
         "spring.security.oauth2.client.registration.google.client-secret=test-client-secret"
 })
@@ -75,6 +75,9 @@ class CompetitionControllerIntegrationTest {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    @Autowired
+    private JwtService jwtService;
+
     @BeforeEach
     void setUp() {
         statRepository.deleteAll();
@@ -102,7 +105,7 @@ class CompetitionControllerIntegrationTest {
         CompetitionRequestDTO request = new CompetitionRequestDTO("Liga", CompetitionType.LIGA, season.getId(), null, null, null, null);
 
         mockMvc.perform(post("/api/competitions")
-                        .header("Authorization", basicAuth(admin.getUsername(), "Password123"))
+                        .header("Authorization", bearer(admin))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
@@ -118,7 +121,7 @@ class CompetitionControllerIntegrationTest {
         CompetitionRequestDTO request = new CompetitionRequestDTO("Liga", CompetitionType.LIGA, season.getId(), null, null, null, null);
 
         mockMvc.perform(post("/api/competitions")
-                        .header("Authorization", basicAuth(user.getUsername(), "Password123"))
+                        .header("Authorization", bearer(user))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isForbidden());
@@ -133,7 +136,7 @@ class CompetitionControllerIntegrationTest {
         CompetitionRequestDTO request = new CompetitionRequestDTO("Copa", CompetitionType.COPA, newSeason.getId(), null, null, null, null);
 
         mockMvc.perform(put("/api/competitions/{id}", competition.getId())
-                        .header("Authorization", basicAuth(admin.getUsername(), "Password123"))
+                        .header("Authorization", bearer(admin))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
@@ -148,7 +151,7 @@ class CompetitionControllerIntegrationTest {
         Competition competition = competitionRepository.save(new Competition(null, "Liga", CompetitionType.LIGA, season, null, null, null, null));
 
         mockMvc.perform(delete("/api/competitions/{id}", competition.getId())
-                        .header("Authorization", basicAuth(admin.getUsername(), "Password123")))
+                        .header("Authorization", bearer(admin)))
                 .andExpect(status().isNoContent());
     }
 
@@ -208,8 +211,7 @@ class CompetitionControllerIntegrationTest {
         return userRepository.save(user);
     }
 
-    private String basicAuth(String username, String password) {
-        String token = Base64.getEncoder().encodeToString((username + ":" + password).getBytes(StandardCharsets.UTF_8));
-        return "Basic " + token;
+    private String bearer(User user) {
+        return "Bearer " + jwtService.generateToken(user.getUsername(), user.getRole().name());
     }
 }

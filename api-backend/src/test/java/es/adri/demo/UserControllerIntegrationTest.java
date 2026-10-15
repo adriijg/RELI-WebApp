@@ -1,5 +1,6 @@
 package es.adri.demo;
 
+import es.adri.demo.config.JwtService;
 import es.adri.demo.dto.LoginRequestDTO;
 import es.adri.demo.dto.UserRegistrationDTO;
 import es.adri.demo.model.Role;
@@ -36,6 +37,7 @@ import tools.jackson.databind.ObjectMapper;
         "spring.jpa.show-sql=false",
         "spring.jpa.open-in-view=false",
         "app.email.enabled=false",
+        "app.jwt.secret=test-secret-0123456789-0123456789-0123456789-0123456789",
         "spring.security.oauth2.client.registration.google.client-id=test-client-id",
         "spring.security.oauth2.client.registration.google.client-secret=test-client-secret"
 })
@@ -55,6 +57,9 @@ class UserControllerIntegrationTest {
 
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private JwtService jwtService;
 
     @BeforeEach
     void setUp() {
@@ -130,7 +135,7 @@ class UserControllerIntegrationTest {
     void getMissingUserReturnsNotFound() throws Exception {
         User admin = createUser("admin", "admin@example.com", "Password123", Role.ROLE_ADMIN);
 
-        mockMvc.perform(get("/api/users/9999").header("Authorization", basicAuth(admin.getUsername(), "Password123")))
+        mockMvc.perform(get("/api/users/9999").header("Authorization", bearer(admin)))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.message").value("Usuario no encontrado"));
     }
@@ -156,7 +161,7 @@ class UserControllerIntegrationTest {
     void getAllUsersRequiresAdminRole() throws Exception {
         User user = createUser("user1", "user1@example.com", "Password123", Role.ROLE_USER);
 
-        mockMvc.perform(get("/api/users").header("Authorization", basicAuth(user.getUsername(), "Password123")))
+        mockMvc.perform(get("/api/users").header("Authorization", bearer(user)))
                 .andExpect(status().isForbidden());
     }
 
@@ -166,7 +171,7 @@ class UserControllerIntegrationTest {
         User target = createUser("target", "target@example.com", "Password123", Role.ROLE_USER);
 
         mockMvc.perform(delete("/api/users/{id}", target.getId())
-                        .header("Authorization", basicAuth(admin.getUsername(), "Password123")))
+                        .header("Authorization", bearer(admin)))
                 .andExpect(status().isNoContent());
     }
 
@@ -179,8 +184,7 @@ class UserControllerIntegrationTest {
         return userRepository.save(user);
     }
 
-    private String basicAuth(String username, String password) {
-        String token = java.util.Base64.getEncoder().encodeToString((username + ":" + password).getBytes(java.nio.charset.StandardCharsets.UTF_8));
-        return "Basic " + token;
+    private String bearer(User user) {
+        return "Bearer " + jwtService.generateToken(user.getUsername(), user.getRole().name());
     }
 }

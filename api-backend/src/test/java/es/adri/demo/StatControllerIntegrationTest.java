@@ -1,5 +1,6 @@
 package es.adri.demo;
 
+import es.adri.demo.config.JwtService;
 import es.adri.demo.dto.StatRequestDTO;
 import es.adri.demo.model.Competition;
 import es.adri.demo.model.CompetitionType;
@@ -17,9 +18,7 @@ import es.adri.demo.repository.PlayerRepository;
 import es.adri.demo.repository.SeasonRepository;
 import es.adri.demo.repository.StatRepository;
 import es.adri.demo.repository.UserRepository;
-import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
-import java.util.Base64;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -50,6 +49,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "spring.jpa.show-sql=false",
         "spring.jpa.open-in-view=false",
         "app.email.enabled=false",
+        "app.jwt.secret=test-secret-0123456789-0123456789-0123456789-0123456789",
         "spring.security.oauth2.client.registration.google.client-id=test-client-id",
         "spring.security.oauth2.client.registration.google.client-secret=test-client-secret"
 })
@@ -81,6 +81,9 @@ class StatControllerIntegrationTest {
 
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private JwtService jwtService;
 
     @BeforeEach
     void setUp() {
@@ -124,7 +127,7 @@ class StatControllerIntegrationTest {
         StatRequestDTO request = new StatRequestDTO(player.getId(), match.getId(), 2, 1, 0, 0, true, true);
 
         mockMvc.perform(post("/api/stats")
-                        .header("Authorization", basicAuth(admin.getUsername(), "Password123"))
+                        .header("Authorization", bearer(admin))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
@@ -142,7 +145,7 @@ class StatControllerIntegrationTest {
         StatRequestDTO request = new StatRequestDTO(player.getId(), match.getId(), 2, 1, 0, 0, true, true);
 
         mockMvc.perform(post("/api/stats")
-                        .header("Authorization", basicAuth(user.getUsername(), "Password123"))
+                        .header("Authorization", bearer(user))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isForbidden());
@@ -157,7 +160,7 @@ class StatControllerIntegrationTest {
         StatRequestDTO request = new StatRequestDTO(player.getId(), match.getId(), 3, 2, 1, 0, false, false);
 
         mockMvc.perform(put("/api/stats/{id}", stat.getId())
-                        .header("Authorization", basicAuth(admin.getUsername(), "Password123"))
+                        .header("Authorization", bearer(admin))
                         .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
@@ -175,7 +178,7 @@ class StatControllerIntegrationTest {
         Stat stat = statRepository.save(new Stat(null, player, match, 2, 1, 0, 0, true, true));
 
         mockMvc.perform(delete("/api/stats/{id}", stat.getId())
-                        .header("Authorization", basicAuth(admin.getUsername(), "Password123")))
+                        .header("Authorization", bearer(admin)))
                 .andExpect(status().isNoContent());
     }
 
@@ -186,7 +189,7 @@ class StatControllerIntegrationTest {
         StatRequestDTO request = new StatRequestDTO(9999L, match.getId(), 2, 1, 0, 0, true, true);
 
         mockMvc.perform(post("/api/stats")
-                        .header("Authorization", basicAuth(admin.getUsername(), "Password123"))
+                        .header("Authorization", bearer(admin))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isNotFound())
@@ -212,8 +215,7 @@ class StatControllerIntegrationTest {
         return userRepository.save(user);
     }
 
-    private String basicAuth(String username, String password) {
-        String token = Base64.getEncoder().encodeToString((username + ":" + password).getBytes(StandardCharsets.UTF_8));
-        return "Basic " + token;
+    private String bearer(User user) {
+        return "Bearer " + jwtService.generateToken(user.getUsername(), user.getRole().name());
     }
 }

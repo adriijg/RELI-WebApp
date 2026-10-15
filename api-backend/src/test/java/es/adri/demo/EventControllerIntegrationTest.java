@@ -1,14 +1,13 @@
 package es.adri.demo;
 
+import es.adri.demo.config.JwtService;
 import es.adri.demo.dto.EventCreateDTO;
 import es.adri.demo.model.EventType;
 import es.adri.demo.model.Role;
 import es.adri.demo.model.User;
 import es.adri.demo.repository.EventRepository;
 import es.adri.demo.repository.UserRepository;
-import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
-import java.util.Base64;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,6 +36,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "spring.jpa.show-sql=false",
         "spring.jpa.open-in-view=false",
         "app.email.enabled=false",
+        "app.jwt.secret=test-secret-0123456789-0123456789-0123456789-0123456789",
         "spring.security.oauth2.client.registration.google.client-id=test-client-id",
         "spring.security.oauth2.client.registration.google.client-secret=test-client-secret"
 })
@@ -57,6 +57,9 @@ class EventControllerIntegrationTest {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    @Autowired
+    private JwtService jwtService;
+
     @BeforeEach
     void setUp() {
         eventRepository.deleteAll();
@@ -76,7 +79,7 @@ class EventControllerIntegrationTest {
         );
 
         mockMvc.perform(post("/api/events")
-                        .header("Authorization", basicAuth(admin.getUsername(), "Password123"))
+                        .header("Authorization", bearer(admin))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
@@ -98,7 +101,7 @@ class EventControllerIntegrationTest {
         );
 
         mockMvc.perform(post("/api/events")
-                        .header("Authorization", basicAuth(user.getUsername(), "Password123"))
+                        .header("Authorization", bearer(user))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isForbidden());
@@ -120,8 +123,7 @@ class EventControllerIntegrationTest {
         return userRepository.save(user);
     }
 
-    private String basicAuth(String username, String password) {
-        String token = Base64.getEncoder().encodeToString((username + ":" + password).getBytes(StandardCharsets.UTF_8));
-        return "Basic " + token;
+    private String bearer(User user) {
+        return "Bearer " + jwtService.generateToken(user.getUsername(), user.getRole().name());
     }
 }

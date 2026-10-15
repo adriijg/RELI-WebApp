@@ -1,5 +1,6 @@
 package es.adri.demo;
 
+import es.adri.demo.config.JwtService;
 import es.adri.demo.dto.MatchRequestDTO;
 import es.adri.demo.model.Competition;
 import es.adri.demo.model.CompetitionType;
@@ -14,9 +15,7 @@ import es.adri.demo.repository.PlayerRepository;
 import es.adri.demo.repository.SeasonRepository;
 import es.adri.demo.repository.StatRepository;
 import es.adri.demo.repository.UserRepository;
-import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
-import java.util.Base64;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -47,6 +46,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "spring.jpa.show-sql=false",
         "spring.jpa.open-in-view=false",
         "app.email.enabled=false",
+        "app.jwt.secret=test-secret-0123456789-0123456789-0123456789-0123456789",
         "spring.security.oauth2.client.registration.google.client-id=test-client-id",
         "spring.security.oauth2.client.registration.google.client-secret=test-client-secret"
 })
@@ -78,6 +78,9 @@ class MatchControllerIntegrationTest {
 
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private JwtService jwtService;
 
     @BeforeEach
     void setUp() {
@@ -117,7 +120,7 @@ class MatchControllerIntegrationTest {
         );
 
         mockMvc.perform(post("/api/matches")
-                        .header("Authorization", basicAuth(admin.getUsername(), "Password123"))
+                        .header("Authorization", bearer(admin))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
@@ -142,7 +145,7 @@ class MatchControllerIntegrationTest {
         );
 
         mockMvc.perform(post("/api/matches")
-                        .header("Authorization", basicAuth(user.getUsername(), "Password123"))
+                        .header("Authorization", bearer(user))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isForbidden());
@@ -167,7 +170,7 @@ class MatchControllerIntegrationTest {
         );
 
         mockMvc.perform(put("/api/matches/{id}", match.getId())
-                        .header("Authorization", basicAuth(admin.getUsername(), "Password123"))
+                        .header("Authorization", bearer(admin))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
@@ -183,7 +186,7 @@ class MatchControllerIntegrationTest {
         Match match = matchRepository.save(new Match(null, "Rival FC", true, LocalDateTime.now().plusDays(1), "Madrid", MatchStatus.SCHEDULED, 0, 0, null, competition));
 
         mockMvc.perform(delete("/api/matches/{id}", match.getId())
-                        .header("Authorization", basicAuth(admin.getUsername(), "Password123")))
+                        .header("Authorization", bearer(admin)))
                 .andExpect(status().isNoContent());
     }
 
@@ -203,7 +206,7 @@ class MatchControllerIntegrationTest {
         );
 
         mockMvc.perform(post("/api/matches")
-                        .header("Authorization", basicAuth(admin.getUsername(), "Password123"))
+                        .header("Authorization", bearer(admin))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isNotFound())
@@ -224,8 +227,7 @@ class MatchControllerIntegrationTest {
         return userRepository.save(user);
     }
 
-    private String basicAuth(String username, String password) {
-        String token = Base64.getEncoder().encodeToString((username + ":" + password).getBytes(StandardCharsets.UTF_8));
-        return "Basic " + token;
+    private String bearer(User user) {
+        return "Bearer " + jwtService.generateToken(user.getUsername(), user.getRole().name());
     }
 }

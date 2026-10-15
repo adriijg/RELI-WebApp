@@ -1,5 +1,6 @@
 package es.adri.demo;
 
+import es.adri.demo.config.JwtService;
 import es.adri.demo.dto.SeasonRequestDTO;
 import es.adri.demo.model.Role;
 import es.adri.demo.model.Season;
@@ -9,8 +10,6 @@ import es.adri.demo.repository.MatchRepository;
 import es.adri.demo.repository.SeasonRepository;
 import es.adri.demo.repository.StatRepository;
 import es.adri.demo.repository.UserRepository;
-import java.nio.charset.StandardCharsets;
-import java.util.Base64;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -41,6 +40,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "spring.jpa.show-sql=false",
         "spring.jpa.open-in-view=false",
         "app.email.enabled=false",
+        "app.jwt.secret=test-secret-0123456789-0123456789-0123456789-0123456789",
         "spring.security.oauth2.client.registration.google.client-id=test-client-id",
         "spring.security.oauth2.client.registration.google.client-secret=test-client-secret"
 })
@@ -70,6 +70,9 @@ class SeasonControllerIntegrationTest {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    @Autowired
+    private JwtService jwtService;
+
     @BeforeEach
     void setUp() {
         statRepository.deleteAll();
@@ -94,7 +97,7 @@ class SeasonControllerIntegrationTest {
         SeasonRequestDTO request = new SeasonRequestDTO("2025/2026", true);
 
         mockMvc.perform(post("/api/seasons")
-                        .header("Authorization", basicAuth(user.getUsername(), "Password123"))
+                        .header("Authorization", bearer(user))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isForbidden());
@@ -106,7 +109,7 @@ class SeasonControllerIntegrationTest {
         SeasonRequestDTO request = new SeasonRequestDTO("2025/2026", true);
 
         mockMvc.perform(post("/api/seasons")
-                        .header("Authorization", basicAuth(admin.getUsername(), "Password123"))
+                        .header("Authorization", bearer(admin))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
@@ -121,7 +124,7 @@ class SeasonControllerIntegrationTest {
         SeasonRequestDTO request = new SeasonRequestDTO("2026/2027", false);
 
         mockMvc.perform(put("/api/seasons/{id}", season.getId())
-                        .header("Authorization", basicAuth(admin.getUsername(), "Password123"))
+                        .header("Authorization", bearer(admin))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
@@ -135,7 +138,7 @@ class SeasonControllerIntegrationTest {
         Season season = seasonRepository.save(new Season(null, "2025/2026", true));
 
         mockMvc.perform(delete("/api/seasons/{id}", season.getId())
-                        .header("Authorization", basicAuth(admin.getUsername(), "Password123")))
+                        .header("Authorization", bearer(admin)))
                 .andExpect(status().isNoContent());
     }
 
@@ -148,8 +151,7 @@ class SeasonControllerIntegrationTest {
         return userRepository.save(user);
     }
 
-    private String basicAuth(String username, String password) {
-        String token = Base64.getEncoder().encodeToString((username + ":" + password).getBytes(StandardCharsets.UTF_8));
-        return "Basic " + token;
+    private String bearer(User user) {
+        return "Bearer " + jwtService.generateToken(user.getUsername(), user.getRole().name());
     }
 }
