@@ -1,33 +1,34 @@
-# Compose para el NAS Synology: usa las imagenes ya publicadas en Docker Hub
-# (no necesita el codigo fuente, solo este fichero + el .env real).
+# Compose de PRODUCCION para el NAS Synology.
 #
-# 1. Sube las imagenes desde el PC:
-#      docker tag reli-webapp-backend:latest TU_USUARIO/reli-backend:latest
-#      docker tag reli-webapp-frontend:latest TU_USUARIO/reli-frontend:latest
-#      docker push TU_USUARIO/reli-backend:latest
-#      docker push TU_USUARIO/reli-frontend:latest
-# 2. Cambia abajo TU_USUARIO por tu usuario de Docker Hub.
-# 3. En el NAS, deja este fichero como docker-compose.yml y coloca tu
-#    api-backend/.env real en ./api-backend/.env (misma carpeta).
-# 4. En el NAS: docker compose pull && docker compose up -d
+# Lo usa el workflow .github/workflows/cd.yml: lo copia al NAS como
+# docker-compose.yml y ejecuta "docker compose pull && docker compose up -d".
+# Usa las imagenes publicadas tanto en GHCR como en Docker Hub.
+#
+# En la carpeta de despliegue del NAS solo hacen falta:
+#   - docker-compose.yml  (este fichero; lo copia el CD automaticamente)
+#   - .env                (tus secretos reales, ver api-backend/.env.example)
+#
+# Registry y tag se inyectan por entorno desde el CD (por defecto GHCR latest):
+#   IMAGE_REGISTRY=ghcr.io/adriijg   IMAGE_TAG=latest
+# Si las imagenes de GHCR son privadas, haz login una vez en el NAS:
+#   echo <PAT_con_read:packages> | docker login ghcr.io -u <usuario> --password-stdin
 #
 # Puertos: el frontend escucha en el 8081 del NAS (el 80 lo usa el propio DSM).
-# Expónlo con el Reverse Proxy de DSM (ver README del proyecto o notas) para
-# servirlo en http://reallisiados.duckdns.org sin puerto.
+# Expuesto con el Reverse Proxy de DSM en http://reallisiados.duckdns.org
 
 services:
   backend:
-    image: TU_USUARIO/reli-backend:latest
+    image: ${IMAGE_REGISTRY:-ghcr.io/adriijg}/reli-backend:${IMAGE_TAG:-latest}
     ports:
       - "8080:8080"
     env_file:
-      - ./api-backend/.env
+      - ./.env
     restart: unless-stopped
     networks:
       - app-network
 
   frontend:
-    image: TU_USUARIO/reli-frontend:latest
+    image: ${IMAGE_REGISTRY:-ghcr.io/adriijg}/reli-frontend:${IMAGE_TAG:-latest}
     ports:
       - "8081:80"
     depends_on:
