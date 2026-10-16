@@ -11,19 +11,19 @@ Mapeo de jugadores:
   "LISIADOS"); el rival se ignora.
 
 Que escribe por jugador convocado (titulares+suplentes):
-- MatchCallUp  (POST /api/matches/{id}/callups)
-- MatchGoal    (POST /api/matches/{id}/goals, uno por gol con minuto)
-- Stat         (POST o PUT /api/stats: goles, amarillas, rojas,
-  attended=true, assists=0, mvp=false)
+- Stat (POST o PUT /api/stats): goals, amarillas, rojas, attended=true,
+  assists=0, mvp=false. Es la unica tabla de estadisticas (jugador x partido);
+  los convocados son los Stat con attended=true.
 
-Es idempotente: relee goles/convocatorias/stats del partido y solo crea
-lo que falta o actualiza stats con valores distintos. Usar --dry-run
-para previsualizar sin escribir.
+Es idempotente: relee las stats del partido y solo crea lo que falta o
+actualiza stats con valores distintos. Usar --dry-run para previsualizar.
 
 Uso:
     python scripts/ffmadrid_acta_import.py --acta acta-78450.json --match-id 27 --dry-run
     python scripts/ffmadrid_acta_import.py --acta acta-78450.json --match-id 27 --apply
-    python scripts/ffmadrid_acta_import.py --codacta 78450 --competition-id 3 --apply
+    python scripts/ffmadrid_acta_import.py --codacta 78450 --match-id 27 --apply
+    # sin --codacta: descubre el acta de NUESTRO partido en su jornada
+    python scripts/ffmadrid_acta_import.py --match-id 27 --ffm-competicion 324545 --ffm-grupo 324568 --ffm-temporada 22 --ffm-our-code 320143 --apply
 """
 
 from __future__ import annotations
@@ -58,6 +58,40 @@ def api_login(api: str, user: str, password: str) -> str:
                       json={"identifier": user, "password": password}, timeout=30)
     r.raise_for_status()
     return r.json()["token"]
+
+
+def our_codacta(html: str, our_code: str) -> str | None:
+    """CodActa del partido del RELI dentro del HTML de una jornada."""
+    comps: list[tuple[str, str, int]] = []
+    seen: set[tuple[str, str]] = set()
+    for m in acta_mod.f.RE_COMP.finditer(html):
+        key = (m.group(1), m.group(2))
+        if key in seen:
+            continue
+        seen.add(key)
+        comps.append((key[0], key[1], m.start()))
+    actas: list[tuple[str, int]] = []
+    seen_codes: set[str] = set()
+    for m in acta_mod.RE_CODACTA.finditer(html):
+        code = m.group(1)
+        if code in seen_codes:
+            continue
+        seen_codes.add(code)
+        actas.append((code, m.start()))
+    for index, (home, away, pos) in enumerate(comps):
+        if our_code not in (home, away):
+            continue
+        lo = comps[index - 1][2] if index else 0
+        hi = comps[index + 1][2] if index + 1 < len(comps) else len(html)
+        best: tuple[int, str] | None = None
+        for code, acta_pos in actas:
+            if lo < acta_pos < hi:
+                dist = abs(acta_pos - pos)
+                if best is None or dist < best[0]:
+                    best = (dist, code)
+        if best:
+            return best[1]
+    return None
 
 
 def load_players(api: str, token: str) -> list[dict]:
@@ -154,9 +188,8 @@ def main() -> int:
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
     sys.stderr.reconfigure(encoding='utf-8', errors='replace')
     ap = argparse.ArgumentParser(description="Importa acta FFM a la BD")
-    src = ap.add_mutually_exclusive_group(required=True)
-    src.add_argument("--acta", default="", help="JSON del acta (ffmadrid_acta.py --out)")
-    src.add_argument("--codacta", default="", help="Descarga y parsea el acta en vivo")
+    ap.add_argument("--acta", default="", help="JSON del acta (ffmadrid_acta.py --out)")
+    ap.add_argument("--codacta", default="", help="Descarga y parsea el acta en vivo")
     ap.add_argument("--match-id", type=int, default=0, help="Id del partido en la BD")
     ap.add_argument("--competition-id", type=int, default=0, help="Necesario si no se da --match-id")
     ap.add_argument("--api", default="http://localhost:8080/api")
@@ -167,10 +200,25 @@ def main() -> int:
     ap.add_argument("--ffm-competicion", default="320164")
     ap.add_argument("--ffm-grupo", default="320174")
     ap.add_argument("--ffm-temporada", default="21")
+    ap.add_argument("--ffm-cod-primaria", default="1000128")
+    ap.add_argument("--ffm-agrupacion", default="1")
+    ap.add_argument("--ffm-tipo-juego", default="3")
+    ap.add_argument("--ffm-our-code", default="320143")
     args = ap.parse_args()
     do_write = args.apply and not args.dry_run
     if not args.apply:
         args.dry_run = True
+
+    if not args.admin_pass:
+        print("Falta clave admin (RELI_ADMIN_PASS / ADMIN_PASSWORD).", file=sys.stderr)
+        return 2
+    token = api_login(args.api, args.admin_user, args.admin_pass)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    match = None
+    if args.match_id:
+        match = requests.get(f"{args.api}/matches/{args.match_id}",
+                             headers=headers, timeout=30).json()
 
     if args.acta:
         with open(args.acta, encoding="utf-8") as fh:
@@ -184,7 +232,26 @@ def main() -> int:
         session = requests.Session()
         session.headers["User-Agent"] = "Mozilla/5.0 (RELI-WebApp acta import)"
         acta_mod.f.login(session, ffm_user, ffm_pass)
-        acta = acta_mod.parse_acta(acta_mod.fetch_acta(session, args.codacta), args.codacta)
+        codacta = args.codacta
+        if not codacta:
+            if match is None:
+                print("Indica --codacta, --acta o --match-id.", file=sys.stderr)
+                return 2
+            params = {
+                "cod_primaria": args.ffm_cod_primaria,
+                "CodCompeticion": args.ffm_competicion,
+                "CodGrupo": args.ffm_grupo,
+                "CodTemporada": args.ffm_temporada,
+                "cod_agrupacion": args.ffm_agrupacion,
+                "Sch_Tipo_Juego": args.ffm_tipo_juego,
+            }
+            html = acta_mod.f.get_jornada(session, int(match.get("jornada") or 0), params)
+            codacta = our_codacta(html, args.ffm_our_code)
+            if not codacta:
+                print("No se encontró el acta de nuestro partido en la federación.", file=sys.stderr)
+                return 2
+            print(f"CodActa descubierto: {codacta}")
+        acta = acta_mod.parse_acta(acta_mod.fetch_acta(session, codacta), codacta)
 
     # Procesar ambos equipos (local y visitante)
     sides = []
@@ -202,20 +269,14 @@ def main() -> int:
 
     acta["our_side_name"] = sides[0][1]["nombre"]
 
-    if not args.admin_pass:
-        print("Falta clave admin (RELI_ADMIN_PASS / ADMIN_PASSWORD).", file=sys.stderr)
-        return 2
-    token = api_login(args.api, args.admin_user, args.admin_pass)
-    headers = {"Authorization": f"Bearer {token}"}
-
-    if args.match_id:
-        match = requests.get(f"{args.api}/matches/{args.match_id}",
-                             headers=headers, timeout=30).json()
-    else:
+    if match is None:
         if not args.competition_id:
             print("--competition-id es obligatorio sin --match-id", file=sys.stderr)
             return 2
-        match = find_match(args.api, token, args.competition_id, acta, side_data)
+        our_name = next(
+            (sd["nombre"] for _, sd, _ in sides if "LISIADOS" in norm(sd.get("nombre", ""))),
+            sides[0][1]["nombre"])
+        match = find_match(args.api, token, args.competition_id, acta, {"nombre": our_name})
         if match is None:
             print("No hay partido en la BD para esa jornada/rival.", file=sys.stderr)
             return 2
@@ -266,10 +327,6 @@ def main() -> int:
                         entry["red"] += 1
                     break
 
-        detail = requests.get(f"{args.api}/matches/{match_id}/detail",
-                              headers=headers, timeout=30).json()
-        existing_goals = {(g["playerId"], g.get("minute")) for g in detail.get("goals", [])}
-        existing_callups = {c["playerId"] for c in detail.get("callups", [])}
         stats_resp = requests.get(f"{args.api}/stats",
                                    params={"matchId": match_id, "size": 200},
                                    headers=headers, timeout=30).json()
@@ -298,16 +355,6 @@ def main() -> int:
             if player is None:
                 continue
             pid = player["id"]
-            if pid not in existing_callups:
-                requests.post(f"{args.api}/matches/{match_id}/callups",
-                              json={"playerId": pid}, headers=headers, timeout=30).raise_for_status()
-                total_created["callups"] += 1
-            for minute in agg["goals"]:
-                if (pid, minute) not in existing_goals:
-                    requests.post(f"{args.api}/matches/{match_id}/goals",
-                                  json={"playerId": pid, "minute": minute},
-                                  headers=headers, timeout=30).raise_for_status()
-                    total_created["goals"] += 1
             payload = {"playerId": pid, "matchId": match_id,
                        "goals": len(agg["goals"]), "assists": 0,
                        "yellowCards": agg["yellow"], "redCards": agg["red"],
@@ -322,20 +369,13 @@ def main() -> int:
                 requests.put(f"{args.api}/stats/{existing['id']}", json=payload,
                              headers=headers, timeout=30).raise_for_status()
                 total_created["stats_updated"] += 1
+            total_created["callups"] += 1
+            total_created["goals"] += len(agg["goals"])
         total_imported += 1
         print(f"{side_data['nombre']}: importado correctamente")
 
     print(f"\nAplicado: {total_created}")
     print(f"Equipos importados: {total_imported}/{len(sides)}")
-
-    # Output roster data for scrapeSeason
-    if args.competition_id:
-        for side_name, side_data, flag in sides:
-            mapping, _ = map_players(side_data, players)
-            for dorsal, agg in sorted(per_player.items()):
-                player = mapping.get(dorsal)
-                if player is None: continue
-                print(f"ROSTER:{side_data['nombre']}:{player['name']}:{player.get('nickname','' )}:{dorsal}:{agg.get('goals',[]).__len__()}")
 
     return 0
 

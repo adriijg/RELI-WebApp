@@ -128,7 +128,85 @@ export default function DataTable({
         </div>
       ) : (
         <>
-          <div className="overflow-x-auto">
+          {/* Vista móvil: tarjetas en lugar de tabla con scroll horizontal */}
+          <div className="sm:hidden">
+            {filtered.length === 0 ? (
+              <div className="px-6 py-16 text-center text-muted-foreground font-bold text-sm">
+                {effectiveQuery ? 'Sin resultados para la búsqueda.' : emptyMessage}
+              </div>
+            ) : (
+              (groupedRows || [['__all__', filtered]]).map(([group, groupRows]) => (
+                <Fragment key={group}>
+                  {groupBy && (
+                    <div className="px-4 py-2 bg-muted/10 text-[10px] font-black uppercase tracking-[0.2em] text-re-rojo">
+                      {groupLabel ? groupLabel(group === '__none__' ? null : group) : group}
+                    </div>
+                  )}
+                  <div className="divide-y divide-card-border">
+                    {groupRows.map((row, idx) => {
+                      const [primaryCol, ...restCols] = columns;
+                      const isSelected = selectedIds.has(String(row.id));
+                      return (
+                        <div
+                          key={row.id ?? `${group}-${idx}`}
+                          onClick={() => (bulkMode ? toggleRow(row) : onRowClick?.(row))}
+                          className={`p-4 ${bulkMode || onRowClick ? 'cursor-pointer active:bg-re-rojo/5' : ''}`}
+                        >
+                          <div className="flex items-start gap-3">
+                            {onBulkDelete && bulkMode && (
+                              <input type="checkbox" checked={isSelected} onChange={() => toggleRow(row)} onClick={(event) => event.stopPropagation()} aria-label={`Seleccionar ${row.id}`} className="mt-1 shrink-0" />
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <div className="min-w-0">
+                                {primaryCol?.render
+                                  ? primaryCol.render(row[primaryCol.key], row)
+                                  : <span className="font-black text-[15px] leading-tight">{formatCell(row[primaryCol?.key])}</span>}
+                              </div>
+                              {restCols.length > 0 && (
+                                <dl className="mt-2.5 space-y-1.5">
+                                  {restCols.map((col) => (
+                                    <div key={col.key} className="flex items-center justify-between gap-3">
+                                      <dt className="text-[9px] font-black uppercase tracking-widest text-muted-foreground shrink-0">{col.label}</dt>
+                                      <dd className="text-xs font-bold text-right min-w-0 truncate">
+                                        {col.render ? col.render(row[col.key], row) : formatCell(row[col.key])}
+                                      </dd>
+                                    </div>
+                                  ))}
+                                </dl>
+                              )}
+                            </div>
+                          </div>
+                          {(onEdit || onDelete) && (
+                            <div className="flex gap-2 mt-3" onClick={(event) => event.stopPropagation()}>
+                              {onEdit && (
+                                <button
+                                  onClick={() => onEdit(row)}
+                                  className="flex-1 inline-flex items-center justify-center px-3 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest bg-re-dorado/15 text-re-dorado border border-re-dorado/30 active:bg-re-dorado/25 transition-all"
+                                >
+                                  Editar
+                                </button>
+                              )}
+                              {onDelete && (
+                                <button
+                                  onClick={() => onDelete(row)}
+                                  className="flex-1 inline-flex items-center justify-center px-3 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest bg-re-rojo/10 text-re-rojo border border-re-rojo/30 active:bg-re-rojo/20 transition-all"
+                                >
+                                  Borrar
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </Fragment>
+              ))
+            )}
+          </div>
+
+          {/* Vista escritorio: tabla */}
+          <div className="hidden sm:block overflow-x-auto">
             <table className="w-full text-left">
           <thead>
             <tr className="bg-muted/20">
@@ -188,7 +266,7 @@ export default function DataTable({
                             {onEdit && (
                               <button
                                 onClick={() => onEdit(row)}
-                                className="hidden sm:inline-flex px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest bg-re-dorado/15 text-re-dorado border border-re-dorado/30 hover:bg-re-dorado/25 transition-all"
+                                className="inline-flex px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest bg-re-dorado/15 text-re-dorado border border-re-dorado/30 hover:bg-re-dorado/25 transition-all"
                               >
                                 Editar
                               </button>

@@ -108,10 +108,6 @@ export const getNextMatch = () => apiFetch('/matches/next', { auth: false });
 export const getMatch = (id) => apiFetch(`/matches/${id}`);
 export const getMatchDetail = (id) => apiFetch(`/matches/${id}/detail`);
 export const getMatchesByCompetition = (competitionId) => apiFetch(`/matches/competition/${competitionId}`);
-export const addMatchGoal = (matchId, body) => apiFetch(`/matches/${matchId}/goals`, { method: 'POST', body });
-export const deleteMatchGoal = (matchId, goalId) => apiFetch(`/matches/${matchId}/goals/${goalId}`, { method: 'DELETE' });
-export const addMatchCallup = (matchId, body) => apiFetch(`/matches/${matchId}/callups`, { method: 'POST', body });
-export const deleteMatchCallup = (matchId, callupId) => apiFetch(`/matches/${matchId}/callups/${callupId}`, { method: 'DELETE' });
 export const createMatch = (body) => apiFetch('/matches', { method: 'POST', body });
 export const updateMatch = (id, body) => apiFetch(`/matches/${id}`, { method: 'PUT', body });
 export const deleteMatch = (id) => apiFetch(`/matches/${id}`, { method: 'DELETE' });
@@ -136,9 +132,6 @@ export const getPlayerSeasons = (params) => apiFetch('/player-seasons', { params
 export const getRosterBySeason = (seasonId) => apiFetch('/player-seasons', { params: { seasonId } });
 export const assignPlayerToSeason = (body) => apiFetch('/player-seasons', { method: 'POST', body });
 export const unassignPlayerFromSeason = (seasonId, playerId) => apiFetch(`/player-seasons/${seasonId}/${playerId}`, { method: 'DELETE' });
-export const scrapeRoster = (seasonId) => apiFetch('/admin/scrape/roster', { params: { seasonId } });
-export const importScrapedRoster = (seasonId, players) => apiFetch('/admin/scrape/roster/import', { method: 'POST', params: { seasonId }, body: players });
-export const scrapeStats = (seasonId) => apiFetch('/admin/scrape/stats', { method: 'POST', params: { seasonId } });
 export const scrapeMatchActa = (matchId) => apiFetch(`/admin/scrape/match/${matchId}/acta`, { method: 'POST' });
 
 /* ---------- Temporadas ---------- */
@@ -171,6 +164,10 @@ export const fetchEmailPreviewHtml = async (type, competitionId) => {
   apiFetch('/admin/sync/ffm/preview', { method: 'POST', params: { competitionId } });
 export const applyFfmSync = (competitionId) =>
   apiFetch('/admin/sync/ffm/apply', { method: 'POST', params: { competitionId } });
+export const syncJornadaResults = (competitionId, jornada) =>
+  apiFetch('/admin/sync/ffm/results/jornada', { method: 'POST', params: { competitionId, jornada } });
+export const syncMatchResult = (matchId) =>
+  apiFetch(`/admin/sync/ffm/results/match/${matchId}`, { method: 'POST' });
 export const getStandings = (competitionId, jornada) => {
   const params = {};
   if (jornada != null) params.jornada = jornada;
@@ -186,9 +183,7 @@ export const getNeutralMatches = (competitionId, jornada) => {
 export const saveNeutralMatch = (body) => apiFetch('/neutral-matches', { method: 'POST', body });
 export const deleteNeutralMatch = (id) => apiFetch(`/neutral-matches/${id}`, { method: 'DELETE' });
 
-/* ---------- Actas FFM por jornada (admin, bajo demanda) ---------- */
-export const getRoundActas = (competitionId, jornada) =>
-  apiFetch('/admin/ffm-actas/jornada', { params: { competitionId, jornada } });
+/* ---------- Actas FFM (admin) ---------- */
 export const fetchActaHtml = (codacta, expectedHome, expectedAway) =>
   apiFetch(`/admin/ffm-actas/${codacta}`, { params: { expectedHome, expectedAway } });
 export const fetchActaPdf = async (codacta) => {

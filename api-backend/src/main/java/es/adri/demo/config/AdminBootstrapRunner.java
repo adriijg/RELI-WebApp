@@ -43,6 +43,7 @@ public class AdminBootstrapRunner implements ApplicationRunner {
         adminUser.setUsername(properties.getUsername());
         adminUser.setEmail(properties.getEmail());
         adminUser.setRole(Role.ROLE_ADMIN);
+        adminUser.setCanVote(true);
 
         if (adminUser.getPassword() == null || !passwordEncoder.matches(properties.getPassword(), adminUser.getPassword())) {
             adminUser.setPassword(passwordEncoder.encode(properties.getPassword()));

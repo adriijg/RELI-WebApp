@@ -78,6 +78,7 @@ public class UserService {
         user.setPassword(passwordEncoder.encode(userRegistrationDTO.getPassword()));
         user.setRole(Role.ROLE_USER);
         user.setEmailVerified(!emailEnabled);
+        user.setCanVote(false);
 
         User savedUser = userRepository.save(user);
         if (emailEnabled) {
@@ -159,6 +160,7 @@ public class UserService {
                     user.setGoogleId(googleId);
                     user.setRole(Role.ROLE_USER);
                     user.setEmailVerified(true);
+                    user.setCanVote(false);
                     user = userRepository.save(user);
                     wasNewUser = true;
                 }

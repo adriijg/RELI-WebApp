@@ -149,13 +149,8 @@ export default function QuintetPage() {
       if (chosen?.id) {
         try {
           const d = await getMatchDetail(chosen.id);
-          const callups = d?.callups || [];
-          const ids = new Set(callups.map(c => String(c.playerId ?? c.id)));
-          if (callups.length > 0) {
-            squad = squad.filter(p => ids.has(String(p.id)));
-          } else {
-            squad = [];
-          }
+          const ids = new Set((d?.stats || []).filter(s => s.attended).map(s => String(s.playerId)));
+          squad = ids.size > 0 ? squad.filter(p => ids.has(String(p.id))) : [];
 } catch {
           // Ignorar errores al obtener detalle del partido
         }

@@ -4,22 +4,15 @@ import es.adri.demo.dto.MatchDTO;
 import es.adri.demo.dto.MatchRequestDTO;
 import es.adri.demo.dto.PagedResponseDTO;
 import es.adri.demo.dto.MatchDetailDTO;
-import es.adri.demo.dto.MatchGoalDTO;
-import es.adri.demo.dto.MatchGoalRequestDTO;
-import es.adri.demo.dto.MatchCallUpDTO;
-import es.adri.demo.dto.MatchCallUpRequestDTO;
 import es.adri.demo.dto.RivalInfoDTO;
+import es.adri.demo.dto.StatDTO;
 import es.adri.demo.exception.ResourceNotFoundException;
 import es.adri.demo.model.Competition;
 import es.adri.demo.model.Match;
-import es.adri.demo.model.MatchGoal;
-import es.adri.demo.model.MatchCallUp;
-import es.adri.demo.model.Player;
+import es.adri.demo.model.Stat;
 import es.adri.demo.repository.CompetitionRepository;
 import es.adri.demo.repository.MatchRepository;
-import es.adri.demo.repository.MatchGoalRepository;
-import es.adri.demo.repository.MatchCallUpRepository;
-import es.adri.demo.repository.PlayerRepository;
+import es.adri.demo.repository.StatRepository;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.springframework.cache.annotation.CacheEvict;
@@ -36,22 +29,16 @@ public class MatchService {
 
     private final MatchRepository matchRepository;
     private final CompetitionRepository competitionRepository;
-    private final MatchGoalRepository matchGoalRepository;
-    private final MatchCallUpRepository matchCallUpRepository;
-    private final PlayerRepository playerRepository;
+    private final StatRepository statRepository;
 
     public MatchService(
             MatchRepository matchRepository,
             CompetitionRepository competitionRepository,
-            MatchGoalRepository matchGoalRepository,
-            MatchCallUpRepository matchCallUpRepository,
-            PlayerRepository playerRepository
+            StatRepository statRepository
     ) {
         this.matchRepository = matchRepository;
         this.competitionRepository = competitionRepository;
-        this.matchGoalRepository = matchGoalRepository;
-        this.matchCallUpRepository = matchCallUpRepository;
-        this.playerRepository = playerRepository;
+        this.statRepository = statRepository;
     }
 
     @Cacheable(value = "homeMatches", key = "#pageable.pageNumber + '-' + #pageable.pageSize + '-' + #pageable.sort.toString()")
@@ -84,16 +71,11 @@ public class MatchService {
 
     public MatchDetailDTO findMatchDetail(Long id) {
         Match match = getMatchById(id);
-        List<MatchGoalDTO> goals = matchGoalRepository.findByMatchIdOrderByIdAsc(id)
-                .stream()
-                .map(this::toGoalDto)
-                .collect(Collectors.toList());
-        List<MatchCallUpDTO> callups = matchCallUpRepository.findByMatchIdOrderByIdAsc(id)
-                .stream()
-                .map(this::toCallUpDto)
+        List<StatDTO> stats = statRepository.findByMatchId(id).stream()
+                .map(this::toStatDto)
                 .collect(Collectors.toList());
         RivalInfoDTO rivalInfo = buildRivalInfo(match);
-        return new MatchDetailDTO(toDto(match), goals, callups, rivalInfo);
+        return new MatchDetailDTO(toDto(match), stats, rivalInfo);
     }
 
     private RivalInfoDTO buildRivalInfo(Match match) {
@@ -130,53 +112,6 @@ public class MatchService {
 
     @CacheEvict(value = {"homeMatches", "nextMatch"}, allEntries = true)
     @Transactional
-    public MatchGoalDTO addGoal(Long matchId, MatchGoalRequestDTO request) {
-        Match match = getMatchById(matchId);
-        Player player = getPlayerById(request.getPlayerId());
-        MatchGoal goal = new MatchGoal();
-        goal.setMatch(match);
-        goal.setPlayer(player);
-        goal.setMinute(request.getMinute());
-        return toGoalDto(matchGoalRepository.save(goal));
-    }
-
-    @CacheEvict(value = {"homeMatches", "nextMatch"}, allEntries = true)
-    @Transactional
-    public void removeGoal(Long matchId, Long goalId) {
-        MatchGoal goal = matchGoalRepository.findById(goalId)
-                .filter(g -> g.getMatch().getId().equals(matchId))
-                .orElseThrow(() -> new ResourceNotFoundException("Gol no encontrado"));
-        matchGoalRepository.delete(goal);
-    }
-
-    @CacheEvict(value = {"homeMatches", "nextMatch"}, allEntries = true)
-    @Transactional
-    public MatchCallUpDTO addCallUp(Long matchId, MatchCallUpRequestDTO request) {
-        Match match = getMatchById(matchId);
-        Long playerId = request.getPlayerId();
-        if (matchCallUpRepository.existsByMatchIdAndPlayerId(matchId, playerId)) {
-            return matchCallUpRepository.findByMatchIdAndPlayerId(matchId, playerId)
-                    .map(this::toCallUpDto)
-                    .orElseThrow(() -> new ResourceNotFoundException("Convocado no encontrado"));
-        }
-        Player player = getPlayerById(playerId);
-        MatchCallUp callUp = new MatchCallUp();
-        callUp.setMatch(match);
-        callUp.setPlayer(player);
-        return toCallUpDto(matchCallUpRepository.save(callUp));
-    }
-
-    @CacheEvict(value = {"homeMatches", "nextMatch"}, allEntries = true)
-    @Transactional
-    public void removeCallUp(Long matchId, Long callUpId) {
-        MatchCallUp callUp = matchCallUpRepository.findById(callUpId)
-                .filter(c -> c.getMatch().getId().equals(matchId))
-                .orElseThrow(() -> new ResourceNotFoundException("Convocado no encontrado"));
-        matchCallUpRepository.delete(callUp);
-    }
-
-    @CacheEvict(value = {"homeMatches", "nextMatch"}, allEntries = true)
-    @Transactional
     public MatchDTO createMatch(MatchRequestDTO matchRequestDTO) {
         Match match = new Match();
         mapRequestToEntity(matchRequestDTO, match);
@@ -194,36 +129,9 @@ public class MatchService {
     @CacheEvict(value = {"homeMatches", "nextMatch"}, allEntries = true)
     @Transactional
     public void deleteMatch(Long id) {
-        // Borra todo lo asociado al partido: goles, convocados y estadísticas
-        matchRepository.deleteGoalsByMatchId(id);
-        matchRepository.deleteCallUpsByMatchId(id);
+        // Borra las estadísticas asociadas y el partido
         matchRepository.deleteStatsByMatchId(id);
         matchRepository.delete(getMatchById(id));
-    }
-
-    private Player getPlayerById(Long playerId) {
-        return playerRepository.findById(playerId)
-                .orElseThrow(() -> new ResourceNotFoundException("Jugador no encontrado"));
-    }
-
-    private MatchGoalDTO toGoalDto(MatchGoal goal) {
-        return new MatchGoalDTO(
-                goal.getId(),
-                goal.getPlayer().getId(),
-                goal.getPlayer().getName(),
-                goal.getPlayer().getJerseyNumber(),
-                goal.getMinute()
-        );
-    }
-
-    private MatchCallUpDTO toCallUpDto(MatchCallUp callUp) {
-        return new MatchCallUpDTO(
-                callUp.getId(),
-                callUp.getPlayer().getId(),
-                callUp.getPlayer().getName(),
-                callUp.getPlayer().getJerseyNumber(),
-                callUp.getPlayer().getPosition()
-        );
     }
 
     private Match getMatchById(Long id) {
@@ -234,6 +142,22 @@ public class MatchService {
     private Competition getCompetitionById(Long competitionId) {
         return competitionRepository.findById(competitionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Competicion no encontrada"));
+    }
+
+    private StatDTO toStatDto(Stat stat) {
+        return new StatDTO(
+                stat.getId(),
+                stat.getPlayer().getId(),
+                stat.getPlayer().getName(),
+                stat.getMatch().getId(),
+                stat.getMatch().getRival(),
+                stat.getGoals(),
+                stat.getAssists(),
+                stat.getYellowCards(),
+                stat.getRedCards(),
+                stat.isMvp(),
+                stat.isAttended()
+        );
     }
 
     private void mapRequestToEntity(MatchRequestDTO matchRequestDTO, Match match) {

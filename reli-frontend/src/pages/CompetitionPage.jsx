@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, MotionConfig } from 'framer-motion';
-import { getCompetitions, getSeasons, getStandings, getMatchesByCompetition, toPage, getNeutralMatches, saveNeutralMatch, deleteNeutralMatch, getRoundActas, fetchActaHtml, fetchActaPdf } from '../services/api';
+import { getCompetitions, getSeasons, getStandings, getMatchesByCompetition, toPage, getNeutralMatches, saveNeutralMatch, deleteNeutralMatch, syncJornadaResults, syncMatchResult, scrapeMatchActa, fetchActaHtml, fetchActaPdf } from '../services/api';
 import { useApp } from '../context/AppContext';
 import { STATUS_LABELS } from '../constants/matchStatus';
 import AdminMatchEditButton from '../components/admin/AdminMatchEditButton';
@@ -274,10 +274,42 @@ function NeutralEditor({ game, neutral, competitionId, jornada, onSaved, onClose
 }
 
 /** Fila de partido de jornada con herramientas admin (actas + corrección neutra). */
-function JornadaGameRow({ game, ourDbId, onOpenOurs, codacta, neutral, isAdmin, competitionId, jornada, onNeutralSaved, corrected }) {
+function JornadaGameRow({ game, ourDbId, onOpenOurs, codacta, neutral, isAdmin, competitionId, jornada, onNeutralSaved, onSynced }) {
   const [editing, setEditing] = useState(false);
   const [actaBusy, setActaBusy] = useState(null);
   const [actaError, setActaError] = useState('');
+  const [ourBusy, setOurBusy] = useState(null);
+  const [ourMsg, setOurMsg] = useState('');
+
+  const syncOurResult = async () => {
+    if (ourDbId == null) return;
+    setOurBusy('result');
+    setOurMsg('');
+    try {
+      const res = await syncMatchResult(ourDbId);
+      setOurMsg(res?.message || 'Resultado sincronizado');
+      if (onSynced) onSynced();
+    } catch (e) {
+      setOurMsg(e.message || 'No se pudo sincronizar el resultado');
+    } finally {
+      setOurBusy(null);
+    }
+  };
+
+  const importOurActa = async () => {
+    if (ourDbId == null) return;
+    setOurBusy('acta');
+    setOurMsg('');
+    try {
+      const res = await scrapeMatchActa(ourDbId);
+      setOurMsg(res?.message || 'Acta importada');
+      if (onSynced) onSynced();
+    } catch (e) {
+      setOurMsg(e.message || 'No se pudo importar el acta');
+    } finally {
+      setOurBusy(null);
+    }
+  };
 
   const openActaHtml = async () => {
     if (!codacta) return;
@@ -316,7 +348,7 @@ function JornadaGameRow({ game, ourDbId, onOpenOurs, codacta, neutral, isAdmin, 
   };
 
   return (
-    <div className={`rounded-2xl ${corrected ? 'border border-re-dorado/40 bg-re-dorado/5' : ''}`}>
+    <div className="rounded-2xl">
       <RoundRow
         game={game}
         dbId={ourDbId}
@@ -324,10 +356,27 @@ function JornadaGameRow({ game, ourDbId, onOpenOurs, codacta, neutral, isAdmin, 
       />
       {isAdmin && (
         <div className="flex flex-wrap items-center gap-2 px-3 pb-3">
-          {corrected && (
-            <span className="text-[8px] font-black uppercase tracking-widest text-re-dorado">Corregido a mano</span>
+          {game.ours && ourDbId != null && (
+            <>
+              <button
+                type="button"
+                onClick={syncOurResult}
+                disabled={ourBusy != null}
+                className="rounded-full bg-re-rojo px-3 py-1.5 text-[9px] font-black uppercase tracking-widest text-white hover:opacity-90 disabled:opacity-50"
+              >
+                {ourBusy === 'result' ? 'Sincronizando…' : '⟳ Resultado'}
+              </button>
+              <button
+                type="button"
+                onClick={importOurActa}
+                disabled={ourBusy != null}
+                className="rounded-full bg-re-rojo px-3 py-1.5 text-[9px] font-black uppercase tracking-widest text-white hover:opacity-90 disabled:opacity-50"
+              >
+                {ourBusy === 'acta' ? 'Importando…' : '↓ Acta'}
+              </button>
+            </>
           )}
-          {codacta ? (
+          {codacta && (
             <>
               <button
                 type="button"
@@ -347,8 +396,6 @@ function JornadaGameRow({ game, ourDbId, onOpenOurs, codacta, neutral, isAdmin, 
               </button>
               <span className="text-[8px] font-bold text-muted-foreground">#{codacta}</span>
             </>
-          ) : (
-            <span className="text-[8px] font-bold uppercase tracking-widest text-muted-foreground">Sin acta publicada</span>
           )}
           {!game.ours && (
             <button
@@ -362,6 +409,7 @@ function JornadaGameRow({ game, ourDbId, onOpenOurs, codacta, neutral, isAdmin, 
         </div>
       )}
       {actaError && <p className="px-3 pb-2 text-[11px] font-bold text-re-rojo">{actaError}</p>}
+      {ourMsg && <p className="px-3 pb-2 text-[11px] font-bold text-re-dorado">{ourMsg}</p>}
       {isAdmin && editing && !game.ours && (
         <NeutralEditor
           game={{ ...game, codacta: neutral?.codacta ?? codacta ?? null }}
@@ -393,9 +441,9 @@ export default function CompetitionPage() {
   const [ffmRounds, setFfmRounds] = useState(undefined);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [roundActas, setRoundActas] = useState(null);
-  const [roundActasLoading, setRoundActasLoading] = useState(false);
-  const [roundActasError, setRoundActasError] = useState('');
+  const [syncBusy, setSyncBusy] = useState(false);
+  const [syncMsg, setSyncMsg] = useState('');
+  const [syncError, setSyncError] = useState('');
   const [neutralAll, setNeutralAll] = useState([]);
 
   const loadStandings = useCallback((competitionId, jornada) => {
@@ -440,24 +488,40 @@ export default function CompetitionPage() {
     loadNeutrals(selectedId);
   }, [selectedId, loadNeutrals]);
 
-  // Al cambiar de competición o jornada se descarta el scrapeo en vivo (hay que pedirlo a mano)
+  // Al cambiar de competición o jornada se descarta el mensaje de la última sincronización
   useEffect(() => {
-    setRoundActas(null);
-    setRoundActasError('');
+    setSyncMsg('');
+    setSyncError('');
   }, [selectedId, selectedJornada]);
 
-  const handleScrapeRound = async () => {
-    if (!selectedId || selectedJornada == null || roundActasLoading) return;
-    setRoundActasLoading(true);
-    setRoundActasError('');
+  const handleSyncJornada = async () => {
+    if (!selectedId || selectedJornada == null || syncBusy) return;
+    setSyncBusy(true);
+    setSyncError('');
+    setSyncMsg('');
+    const messages = [];
     try {
-      const data = await getRoundActas(selectedId, selectedJornada);
-      setRoundActas(Array.isArray(data) ? data : []);
+      const res = await syncJornadaResults(selectedId, selectedJornada);
+      messages.push(res?.message || 'Jornada sincronizada');
+      setSyncMsg(messages.join(' · '));
+
+      const ourMatch = allMatches.find((m) => m.jornada === selectedJornada);
+      if (ourMatch?.id) {
+        try {
+          const acta = await scrapeMatchActa(ourMatch.id);
+          messages.push(acta?.message || 'Acta de Real Lisiados importada');
+        } catch (actaErr) {
+          messages.push('Acta de Real Lisiados: ' + (actaErr.message || 'no disponible todavía'));
+        }
+        setSyncMsg(messages.join(' · '));
+      }
+
+      loadNeutrals(selectedId);
+      loadData(selectedId, selectedJornada);
     } catch (e) {
-      setRoundActasError(e.message || 'No se pudieron scrapear las actas');
-      setRoundActas(null);
+      setSyncError(e.message || 'No se pudieron sincronizar los resultados');
     } finally {
-      setRoundActasLoading(false);
+      setSyncBusy(false);
     }
   };
 
@@ -682,7 +746,7 @@ export default function CompetitionPage() {
     }
     return standings;
   }, [ffmAvailable, ffmRounds, roundIndex, selectedJornada, standings, allMatches, neutralAll]);
-  const standingsSource = ffmAvailable ? 'FFM (nuestro resultado dinámico, resto auto lunes)' : 'nuestros partidos';
+  const standingsSource = ffmAvailable ? 'FFM (sincronizado desde la federación)' : 'nuestros partidos';
 
   const selected = competitions.find((c) => String(c.id) === String(selectedId));
   const filteredCompetitions = selectedSeasonId
@@ -941,24 +1005,32 @@ export default function CompetitionPage() {
 
           {selectedJornada != null && (() => {
             // Mostrar siempre los resultados del grupo desde FFM (incluye al resto de equipos).
-            // Fuente preferida: scrapeo en vivo de la jornada (trae CodActa); si no, JSON estático.
-            // Se fusiona nuestro resultado de la BD más las correcciones manuales de neutros.
-            const liveGames = (roundActas && roundActas.length > 0 ? roundActas : null)
-              || (roundGames && roundGames.length > 0 ? roundGames : null);
+            // Nuestro resultado y las correcciones/sincronizaciones de neutros se fusionan encima.
+            const liveGames = roundGames && roundGames.length > 0 ? roundGames : null;
             if (liveGames) {
               const ourMatch = allMatches.find((m) => m.jornada === selectedJornada);
               const ourCode = roundIndex?.data?.ourCode;
               const mergedGames = liveGames.map(g => {
                 const isOurGame = ourCode != null ? String(g.homeCode) === String(ourCode) || String(g.awayCode) === String(ourCode) : Boolean(g.ours);
                 let game = { ...g, ours: isOurGame || Boolean(g.ours) };
-                if (isOurGame && ourMatch && ourMatch.status === 'FINISHED' && ourMatch.ourGoals != null && ourMatch.rivalGoals != null) {
-                  const isHome = String(g.homeCode) === String(ourCode);
-                  game = { ...game, ours: true, ourGoals: ourMatch.ourGoals, rivalGoals: ourMatch.rivalGoals, homeGoals: isHome ? ourMatch.ourGoals : ourMatch.rivalGoals, awayGoals: isHome ? ourMatch.rivalGoals : ourMatch.ourGoals };
+                if (isOurGame && ourMatch) {
+                  // Fuente única de verdad para nuestro partido: la BD (lo que edita el admin).
+                  // Sobrescribimos fecha/hora de la jornada FFM con los datos guardados.
+                  if (ourMatch.date) game = { ...game, date: ourMatch.date };
+                  if (ourMatch.status === 'FINISHED' && ourMatch.ourGoals != null && ourMatch.rivalGoals != null) {
+                    const isHome = String(g.homeCode) === String(ourCode);
+                    game = { ...game, ours: true, ourGoals: ourMatch.ourGoals, rivalGoals: ourMatch.rivalGoals, homeGoals: isHome ? ourMatch.ourGoals : ourMatch.rivalGoals, awayGoals: isHome ? ourMatch.rivalGoals : ourMatch.ourGoals };
+                  }
                 }
                 const { game: withFix, corrected, neutral } = withNeutral(game);
                 return { game: withFix, corrected, neutral, isOurGame };
               });
-              const source = roundActas ? 'en vivo (scrapeo bajo demanda)' : 'FFM (caché estática)';
+              // Ordenar por fecha/hora (los partidos sin fecha conocida van al final).
+              const gameTime = (d) => {
+                const t = d ? new Date(d).getTime() : NaN;
+                return Number.isNaN(t) ? Number.POSITIVE_INFINITY : t;
+              };
+              mergedGames.sort((a, b) => gameTime(a.game.date) - gameTime(b.game.date));
               return (
                 <section className="overflow-hidden rounded-[1.7rem] border border-card-border dark:border-re-dorado/30 bg-card-bg dark:bg-[#071018] text-foreground dark:text-white shadow-card dark:shadow-[0_24px_60px_rgba(0,0,0,0.28)]">
                   <div className="px-4 sm:px-6 py-4 border-b border-card-border">
@@ -967,23 +1039,26 @@ export default function CompetitionPage() {
                       {isAdmin && (
                         <button
                           type="button"
-                          onClick={handleScrapeRound}
-                          disabled={roundActasLoading}
+                          onClick={handleSyncJornada}
+                          disabled={syncBusy}
                           className="rounded-full bg-re-rojo px-4 py-2 text-[10px] font-black uppercase tracking-widest text-white disabled:opacity-50"
                         >
-                          {roundActasLoading ? 'Scrapeando…' : roundActas ? 'Re-scrapear actas' : 'Scrapear actas'}
+                          {syncBusy ? 'Sincronizando…' : '⟳ Sincronizar jornada'}
                         </button>
                       )}
                     </div>
-                    <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground mt-1">Resultados del grupo · Fuente: {source}{ourMatch ? ' · nuestro resultado dinámico' : ''} · resto auto lunes</p>
+                    <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground mt-1">Resultados del grupo · Fuente: FFM (caché estática){ourMatch ? ' · nuestro resultado dinámico' : ''}</p>
                     {isAdmin && (
-                      <p className="text-[9px] font-bold uppercase tracking-widest text-re-dorado/80 mt-1">Scrapeo educado: 3 peticiones con pausas · cada acta se pide de una en una</p>
+                      <p className="text-[9px] font-bold uppercase tracking-widest text-re-dorado/80 mt-1">Trae resultados, pabellón y hora de toda la jornada + el acta de Real Lisiados (goles, convocados y tarjetas)</p>
                     )}
-                    {roundActasLoading && (
-                      <p className="mt-2 text-[11px] font-bold text-re-dorado">Leyendo la federación con pausas… tarda unos 10 segundos.</p>
+                    {syncBusy && (
+                      <p className="mt-2 text-[11px] font-bold text-re-dorado">Leyendo la federación… tarda unos segundos.</p>
                     )}
-                    {roundActasError && (
-                      <p className="mt-2 rounded-xl bg-re-rojo/10 border border-re-rojo/30 px-3 py-2 text-[11px] font-bold text-re-rojo">{roundActasError}</p>
+                    {syncMsg && (
+                      <p className="mt-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 px-3 py-2 text-[11px] font-bold text-emerald-600 dark:text-emerald-400">{syncMsg}</p>
+                    )}
+                    {syncError && (
+                      <p className="mt-2 rounded-xl bg-re-rojo/10 border border-re-rojo/30 px-3 py-2 text-[11px] font-bold text-re-rojo">{syncError}</p>
                     )}
                   </div>
                   <div className="divide-y divide-card-border">
@@ -1002,6 +1077,7 @@ export default function CompetitionPage() {
                           competitionId={selectedId}
                           jornada={selectedJornada}
                           onNeutralSaved={() => loadNeutrals(selectedId)}
+                          onSynced={() => { loadNeutrals(selectedId); loadData(selectedId, selectedJornada); }}
                         />
                       );
                     })}
