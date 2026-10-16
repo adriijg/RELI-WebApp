@@ -88,3 +88,22 @@ Cuando termine, el NAS habra hecho `pull` + `up -d` con la imagen nueva.
   en `.github/workflows/cd.yml`.
 - Seguridad: al ser un runner self-hosted con acceso al socket de Docker, evita
   ejecutarlo con `pull_request` de repos publicos. El CD solo corre en `push` a `main`.
+
+## Estado real del NAS (notas operativas)
+
+- **DSM 6.1.7 (2018), kernel Linux 3.10, Docker 20.10.3**. NO actualizar el DSM.
+- Por el kernel 3.10 (sin `getrandom`), el job de deploy **no usa `actions/checkout`**:
+  descarga `docker-compose.nas.yml` por HTTPS (`raw.githubusercontent.com`).
+- **CA**: el almacen del NAS era de 2018 y no traia `ISRG Root X1` (Let's Encrypt),
+  necesario para Docker Hub/GHCR. Se anadio a `/etc/ssl/certs/ca-certificates.crt`
+  (copia de seguridad en `ca-certificates.crt.bak`) y se reinicio el servicio Docker
+  (`synopkg restart Docker`). Sin esto el daemon no puede tirar de los registries.
+- **Puertos**: el 8080 del host lo ocupa `admana-web`; el backend no publica puerto
+  (el frontend lo alcanza por la red interna en `http://backend:8080`). El frontend
+  sigue en **8081** (lo apunta el proxy inverso de DSM).
+- **Contenedores**: proyecto compose `reli-app` → `reli-app-backend-1`,
+  `reli-app-frontend-1`. El runner es `reli-github-runner`. Las imagenes viejas
+  `reli-webapp-backend:latest` / `reli-webapp-frontend:fixed` ya no se usan.
+- El runner arranca con un **token de registro de un solo uso** y reutiliza su
+  configuracion (volumen `reli-runner-config`); no guarda secretos de larga duracion.
+
