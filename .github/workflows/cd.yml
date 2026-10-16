@@ -98,8 +98,9 @@ jobs:
     runs-on: [self-hosted, nas]
     environment: production
     steps:
-      - uses: actions/checkout@v4
-
+      # Nota: sin actions/checkout a proposito. El kernel del NAS (DSM 6.1,
+      # Linux 3.10) no soporta getrandom(), y el git del checkout falla. El
+      # compose se descarga por HTTPS mas abajo.
       - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
@@ -144,10 +145,11 @@ jobs:
           DEPLOY_PATH: ${{ vars.DEPLOY_PATH || '/volume1/docker/reli-app' }}
           IMAGE_REGISTRY: ${{ vars.DEPLOY_IMAGE_REGISTRY || format('ghcr.io/{0}', github.repository_owner) }}
           IMAGE_TAG: latest
+          COMPOSE_URL: https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/docker-compose.nas.yml
         run: |
           set -e
           mkdir -p "$DEPLOY_PATH"
-          cp -f docker-compose.nas.yml "$DEPLOY_PATH/docker-compose.yml"
+          curl -fsSL "$COMPOSE_URL" -o "$DEPLOY_PATH/docker-compose.yml"
           cd "$DEPLOY_PATH"
           docker compose pull
           docker compose up -d --remove-orphans
