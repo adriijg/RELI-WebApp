@@ -107,3 +107,18 @@ Cuando termine, el NAS habra hecho `pull` + `up -d` con la imagen nueva.
 - El runner arranca con un **token de registro de un solo uso** y reutiliza su
   configuracion (volumen `reli-runner-config`); no guarda secretos de larga duracion.
 
+## Seguridad del repositorio (endurecimiento aplicado)
+
+- **Secret scanning** + **push protection** activados, con **validez de secretos** y
+  **Dependabot security updates** (0 alertas a dia de hoy).
+- **Permisos por defecto de workflows**: solo lectura (`read`). Cada workflow amplia
+  lo que necesita (el CD declara `packages: write`).
+- **Actions permitidas**: solo de GitHub y de creadores verificados
+  (`github_owned_allowed` + `verified_allowed`).
+- **PRs de forks**: requieren aprobacion de todos los contribuyentes externos
+  (`all_external_contributors`). El CD nunca corre en `pull_request`.
+- No hay secretos en el repo (solo `.env.example` con placeholders). Los secretos de
+  runtime viven solo en `/volume1/docker/reli-app/.env` del NAS.
+- Pendiente opcional: `sha_pinning_required` (fijar cada action a un commit SHA).
+
+
