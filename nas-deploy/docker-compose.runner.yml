@@ -1,0 +1,53 @@
+# Runner self-hosted de GitHub Actions para desplegar RELI-WebApp en el NAS.
+#
+# Se levanta EN el NAS. Al vivir dentro de tu red local, alcanza el Docker del
+# NAS directamente, por lo que el despliegue NO necesita SSH ni abrir puertos.
+#
+# El registro usa un token de UN SOLO USO (caduca en ~1h) y el runner reutiliza
+# su configuracion en el volumen reli-runner-config, asi que NO se guarda ningun
+# secreto de larga duracion en el NAS.
+#
+# Uso (en el NAS, dentro de la carpeta que contenga este fichero + tu .env):
+#   1) Genera el token (desde tu PC, con gh autenticado):
+#        gh api -X POST repos/adriijg/RELI-WebApp/actions/runners/registration-token --jq .token
+#      y ponlo en un fichero ".env" junto a este compose:
+#        RUNNER_TOKEN=<token>
+#   2) docker compose -f docker-compose.runner.yml up -d
+#
+# Requisitos en el NAS:
+#   - Container Manager / Docker funcionando.
+#   - La carpeta del proyecto: /volume1/docker/reli-app (con su .env real).
+
+services:
+  github-runner:
+    image: myoung34/github-runner:latest
+    container_name: reli-github-runner
+    restart: unless-stopped
+    environment:
+      REPO_URL: https://github.com/adriijg/RELI-WebApp
+      RUNNER_SCOPE: repo
+      RUNNER_NAME: reli-nas
+      LABELS: nas
+      RUNNER_TOKEN: ${RUNNER_TOKEN}
+      RUNNER_WORKDIR: /tmp/runner/work
+      # Reutiliza el registro entre reinicios (evita re-registrar).
+      CONFIGURED_ACTIONS_RUNNER_FILES_DIR: /tmp/runner-config
+      DISABLE_AUTOMATIC_DEREGISTRATION: "true"
+      DISABLE_AUTO_UPDATE: "true"
+      RUN_AS_ROOT: "true"
+    volumes:
+      # El runner controla el Docker del NAS a traves del socket del host.
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Carpeta de despliegue del proyecto (compose + .env real viven aqui).
+      - /volume1/docker/reli-app:/volume1/docker/reli-app
+      # Workspace persistente del runner.
+      - reli-runner-work:/tmp/runner
+      # Configuracion del runner (permite reutilizar el registro).
+      - reli-runner-config:/tmp/runner-config
+      # Persiste el plugin "docker compose" entre reinicios del contenedor.
+      - reli-runner-plugins:/usr/local/lib/docker/cli-plugins
+
+volumes:
+  reli-runner-work:
+  reli-runner-config:
+  reli-runner-plugins:

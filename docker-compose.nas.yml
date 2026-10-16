@@ -19,8 +19,10 @@
 services:
   backend:
     image: ${IMAGE_REGISTRY:-ghcr.io/adriijg}/reli-backend:${IMAGE_TAG:-latest}
-    ports:
-      - "8080:8080"
+    # Sin puerto en el host: el frontend llama al backend por la red interna
+    # (http://backend:8080). El 8080 del host lo ocupa otra app (admana-web).
+    expose:
+      - "8080"
     env_file:
       - ./.env
     restart: unless-stopped

@@ -3,6 +3,7 @@
 api-backend/.env
 reli-frontend/.env
 nas-deploy/.env
+nas-deploy/runner.env
 
 # Logs
 *.log

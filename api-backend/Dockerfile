@@ -5,7 +5,7 @@ COPY api-backend/mvnw .
 COPY api-backend/.mvn ./.mvn
 COPY api-backend/pom.xml .
 COPY api-backend/src ./src
-RUN chmod +x mvnw && ./mvnw package -DskipTests -q
+RUN chmod +x mvnw && ./mvnw clean package -DskipTests
 
 FROM eclipse-temurin:21-jdk-alpine
 WORKDIR /app
