@@ -152,5 +152,5 @@ jobs:
           curl -fsSL "$COMPOSE_URL" -o "$DEPLOY_PATH/docker-compose.yml"
           cd "$DEPLOY_PATH"
           docker compose pull
-          docker compose up -d --remove-orphans
+          docker compose up -d --remove-orphans --wait --wait-timeout 240
           docker image prune -f
