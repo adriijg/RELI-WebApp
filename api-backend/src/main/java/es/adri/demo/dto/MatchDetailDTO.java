@@ -11,7 +11,6 @@ import lombok.NoArgsConstructor;
 public class MatchDetailDTO {
 
     private MatchDTO match;
-    private List<MatchGoalDTO> goals;
-    private List<MatchCallUpDTO> callups;
+    private List<StatDTO> stats;
     private RivalInfoDTO rivalInfo;
 }

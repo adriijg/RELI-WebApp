@@ -27,22 +27,15 @@ function formatDateTime(date) {
   });
 }
 
-function groupGoals(goals) {
-  const map = new Map();
-  for (const goal of goals) {
-    const existing = map.get(goal.playerId);
-    if (existing) {
-      existing.minutes.push(goal.minute);
-    } else {
-      map.set(goal.playerId, {
-        playerId: goal.playerId,
-        playerName: goal.playerName,
-        jerseyNumber: goal.jerseyNumber,
-        minutes: [goal.minute],
-      });
-    }
-  }
-  return Array.from(map.values());
+function groupScorers(stats) {
+  return stats
+    .filter((s) => (s.goals || 0) > 0)
+    .map((s) => ({
+      playerId: s.playerId,
+      playerName: s.playerName,
+      jerseyNumber: s.jerseyNumber,
+      goals: s.goals,
+    }));
 }
 
 function getMatchList(data) {
@@ -252,24 +245,20 @@ export default function MatchDetail() {
           position: p.position,
           photoUrl: p.photoUrl,
         }));
-        // solo convocados de ese partido
-        const callups = detail?.callups || [];
-        const callupIds = new Set(callups.map((c) => String(c.playerId ?? c.id)));
-        if (callups.length > 0) {
-          mapped = mapped.filter((p) => callupIds.has(String(p.id)));
+        // solo convocados de ese partido (stats con attended=true)
+        const convocadoIds = new Set(
+          (detail?.stats || []).filter((s) => s.attended).map((s) => String(s.playerId)),
+        );
+        if (convocadoIds.size > 0) {
+          mapped = mapped.filter((p) => convocadoIds.has(String(p.id)));
         } else {
           mapped = [];
         }
         if (mapped.length > 0) setQuintetPlayers(mapped);
         else {
           const fallback = await getAllPlayers().catch(() => []);
-          let fb = Array.isArray(fallback) ? fallback : [];
-          if (callups.length > 0) {
-            fb = fb.filter((p) => callupIds.has(String(p.id)));
-          } else {
-            fb = [];
-          }
-          setQuintetPlayers(fb);
+          const fb = Array.isArray(fallback) ? fallback : [];
+          setQuintetPlayers(convocadoIds.size > 0 ? fb.filter((p) => convocadoIds.has(String(p.id))) : []);
         }
       } finally {
         if (!cancelled) setQuintetLoading(false);
@@ -401,7 +390,7 @@ export default function MatchDetail() {
     );
   }
 
-  const { match, goals, callups, rivalInfo, stats = [] } = detail;
+  const { match, rivalInfo, stats = [] } = detail;
   const isHome = match.home !== false;
   const left = isHome
     ? { name: 'REAL LISIADOS', isUs: true }
@@ -413,21 +402,19 @@ export default function MatchDetail() {
   const rightGoals = isHome ? match.rivalGoals : match.ourGoals;
   const historicalJersey = (playerId, jerseyNumber) =>
     jerseyForCompetition(playerId, match.competitionId, jerseyNumber);
-  const scorers = groupGoals(goals).map((scorer) => ({
+  const jerseyOf = (playerId, fallback) => allPlayersMap.get(playerId)?.jerseyNumber ?? fallback;
+  const goalTotal = stats.reduce((sum, s) => sum + (s?.goals ?? 0), 0);
+  const scorers = groupScorers(stats).map((scorer) => ({
     ...scorer,
-    jerseyNumber: historicalJersey(scorer.playerId, scorer.jerseyNumber),
+    jerseyNumber: historicalJersey(scorer.playerId, jerseyOf(scorer.playerId, scorer.jerseyNumber)),
   }));
   const jerseyByPlayer = new Map();
-  for (const g of goals) {
-    if (g?.playerId != null && g?.jerseyNumber != null && !jerseyByPlayer.has(g.playerId)) {
-      jerseyByPlayer.set(g.playerId, historicalJersey(g.playerId, g.jerseyNumber));
+  for (const s of stats) {
+    if (s?.playerId != null && !jerseyByPlayer.has(s.playerId)) {
+      jerseyByPlayer.set(s.playerId, historicalJersey(s.playerId, jerseyOf(s.playerId)));
     }
   }
-  for (const c of callups) {
-    if (c?.playerId != null && c?.jerseyNumber != null && !jerseyByPlayer.has(c.playerId)) {
-      jerseyByPlayer.set(c.playerId, historicalJersey(c.playerId, c.jerseyNumber));
-    }
-  }
+  const convocados = stats.filter((s) => s?.attended);
   const carded = stats.filter((s) => (s?.yellowCards ?? 0) > 0 || (s?.redCards ?? 0) > 0);
   const formattedDate = formatDateTime(match.date);
   const finished = match.status === 'FINISHED' && match.ourGoals != null && match.rivalGoals != null;
@@ -518,9 +505,9 @@ export default function MatchDetail() {
             </p>
             {finished && (
               <p className="mt-3 text-[11px] font-bold uppercase tracking-widest text-foreground/70">
-                {callups.length} convocados
+                {convocados.length} convocados
                 {carded.length > 0 ? ` · ${carded.length} ${carded.length === 1 ? 'tarjeta' : 'tarjetas'}` : ''}
-                {goals.length > 0 ? ` · ${goals.length} ${goals.length === 1 ? 'gol' : 'goles'}` : ' · sin goles nuestros'}
+                {goalTotal > 0 ? ` · ${goalTotal} ${goalTotal === 1 ? 'gol' : 'goles'}` : ' · sin goles nuestros'}
               </p>
             )}
           </div>
@@ -532,7 +519,7 @@ export default function MatchDetail() {
         <div className="flex items-center justify-between mb-4 sm:mb-6">
           <h3 className="text-lg sm:text-xl lg:text-2xl font-black italic tracking-tighter uppercase">Goleadores</h3>
           <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-            {goals.length} {goals.length === 1 ? 'gol' : 'goles'}
+            {goalTotal} {goalTotal === 1 ? 'gol' : 'goles'}
           </span>
         </div>
 
@@ -554,7 +541,7 @@ export default function MatchDetail() {
                 </span>
                 <span className="font-black text-xs sm:text-sm flex-1 min-w-0 truncate text-foreground dark:text-white">{displayName(scorer.playerId, scorer.playerName)}</span>
                 <span className="text-re-rojo font-black text-[10px] sm:text-xs tracking-widest uppercase shrink-0">
-                  ⚽ {scorer.minutes.filter((m) => m != null).map((m) => `${m}'`).join(', ') || '—'}
+                  ⚽ {scorer.goals > 1 ? `x${scorer.goals}` : '1'}
                 </span>
               </li>
             ))}
@@ -611,32 +598,35 @@ export default function MatchDetail() {
         <div className="flex items-center justify-between mb-4 sm:mb-6">
           <h3 className="text-lg sm:text-xl lg:text-2xl font-black italic tracking-tighter uppercase">Convocados</h3>
           <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-            {callups.length} {callups.length === 1 ? 'jugador' : 'jugadores'}
+            {convocados.length} {convocados.length === 1 ? 'jugador' : 'jugadores'}
           </span>
         </div>
 
-        {callups.length === 0 ? (
+        {convocados.length === 0 ? (
           <p className="text-center text-muted-foreground font-bold text-xs sm:text-sm py-6 sm:py-8 bg-muted/5 rounded-2xl border border-dashed border-card-border">
             Aún no hay convocados para este partido.
           </p>
         ) : (
           <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
-            {callups.map((player) => (
-              <li
-                key={player.id}
-                className="flex items-center gap-2 sm:gap-3 bg-muted/5 dark:bg-white/5 border border-card-border dark:border-white/10 rounded-2xl px-3 sm:px-4 py-2.5 sm:py-3"
-              >
-                <span className="shrink-0 w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-re-azul-oscuro text-white font-black text-xs sm:text-sm flex items-center justify-center">
-                  {historicalJersey(player.playerId ?? player.id, player.jerseyNumber)}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="font-black text-xs sm:text-sm truncate">{displayName(player.playerId ?? player.id, player.playerName)}</p>
-                  <p className="text-[8px] sm:text-[9px] font-black uppercase tracking-widest text-muted-foreground">
-                    {POSITION_LABELS[player.position] || player.position}
-                  </p>
-                </div>
-              </li>
-            ))}
+            {convocados.map((s) => {
+              const p = allPlayersMap.get(s.playerId);
+              return (
+                <li
+                  key={s.playerId}
+                  className="flex items-center gap-2 sm:gap-3 bg-muted/5 dark:bg-white/5 border border-card-border dark:border-white/10 rounded-2xl px-3 sm:px-4 py-2.5 sm:py-3"
+                >
+                  <span className="shrink-0 w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-re-azul-oscuro text-white font-black text-xs sm:text-sm flex items-center justify-center">
+                    {jerseyByPlayer.get(s.playerId) ?? '—'}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-black text-xs sm:text-sm truncate">{displayName(s.playerId, s.playerName)}</p>
+                    <p className="text-[8px] sm:text-[9px] font-black uppercase tracking-widest text-muted-foreground">
+                      {POSITION_LABELS[p?.position] || p?.position || ''}
+                    </p>
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>

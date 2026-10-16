@@ -4,10 +4,6 @@ import es.adri.demo.dto.PagedResponseDTO;
 import es.adri.demo.dto.MatchDTO;
 import es.adri.demo.dto.MatchRequestDTO;
 import es.adri.demo.dto.MatchDetailDTO;
-import es.adri.demo.dto.MatchGoalDTO;
-import es.adri.demo.dto.MatchGoalRequestDTO;
-import es.adri.demo.dto.MatchCallUpDTO;
-import es.adri.demo.dto.MatchCallUpRequestDTO;
 import es.adri.demo.service.MatchService;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -74,32 +70,6 @@ public class MatchController {
     @GetMapping("/{id}/detail")
     public ResponseEntity<MatchDetailDTO> getMatchDetail(@PathVariable Long id) {
         return ResponseEntity.ok(matchService.findMatchDetail(id));
-    }
-
-    @PostMapping("/{id}/goals")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<MatchGoalDTO> addGoal(@PathVariable Long id, @Valid @RequestBody MatchGoalRequestDTO request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(matchService.addGoal(id, request));
-    }
-
-    @DeleteMapping("/{id}/goals/{goalId}")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Void> removeGoal(@PathVariable Long id, @PathVariable Long goalId) {
-        matchService.removeGoal(id, goalId);
-        return ResponseEntity.noContent().build();
-    }
-
-    @PostMapping("/{id}/callups")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<MatchCallUpDTO> addCallUp(@PathVariable Long id, @Valid @RequestBody MatchCallUpRequestDTO request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(matchService.addCallUp(id, request));
-    }
-
-    @DeleteMapping("/{id}/callups/{callupId}")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Void> removeCallUp(@PathVariable Long id, @PathVariable Long callupId) {
-        matchService.removeCallUp(id, callupId);
-        return ResponseEntity.noContent().build();
     }
 
     @PostMapping

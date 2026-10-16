@@ -38,9 +38,10 @@ public class User extends BaseEntity {
     // Existing rows remain usable; new registrations explicitly start unverified.
     private Boolean emailVerified = true;
 
-    // Permiso de voto (quinteto). El admin puede revocarlo desde el panel.
-    // null se trata como true para las filas existentes antes de la migración.
-    private Boolean canVote = true;
+    // Permiso de voto (quinteto). Los nuevos usuarios empiezan sin permiso;
+    // el admin lo habilita desde el panel. Las filas existentes conservan su valor
+    // (null se sigue tratando como true para registros previos a la migración).
+    private Boolean canVote = false;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -52,7 +53,7 @@ public class User extends BaseEntity {
             role = Role.ROLE_USER;
         }
         if (canVote == null) {
-            canVote = true;
+            canVote = false;
         }
     }
 }

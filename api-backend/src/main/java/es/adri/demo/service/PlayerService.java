@@ -7,8 +7,6 @@ import es.adri.demo.dto.PlayerSeasonStatsDTO;
 import es.adri.demo.exception.ResourceNotFoundException;
 import es.adri.demo.model.Player;
 import es.adri.demo.model.PlayerSeason;
-import es.adri.demo.repository.MatchCallUpRepository;
-import es.adri.demo.repository.MatchGoalRepository;
 import es.adri.demo.repository.PlayerRepository;
 import es.adri.demo.repository.PlayerSeasonRepository;
 import es.adri.demo.repository.StatRepository;
@@ -26,19 +24,13 @@ import org.springframework.transaction.annotation.Transactional;
 public class PlayerService {
 
     private final PlayerRepository playerRepository;
-    private final MatchGoalRepository matchGoalRepository;
-    private final MatchCallUpRepository matchCallUpRepository;
     private final StatRepository statRepository;
     private final PlayerSeasonRepository playerSeasonRepository;
 
     public PlayerService(PlayerRepository playerRepository,
-                         MatchGoalRepository matchGoalRepository,
-                         MatchCallUpRepository matchCallUpRepository,
                          StatRepository statRepository,
                          PlayerSeasonRepository playerSeasonRepository) {
         this.playerRepository = playerRepository;
-        this.matchGoalRepository = matchGoalRepository;
-        this.matchCallUpRepository = matchCallUpRepository;
         this.statRepository = statRepository;
         this.playerSeasonRepository = playerSeasonRepository;
     }
@@ -75,10 +67,10 @@ public class PlayerService {
 
         Map<Long, Long> cleanSheetsMap = new HashMap<>();
         List<Object[]> cleanSheetRows = seasonId == null
-                ? matchCallUpRepository.countCleanSheetsByCurrentSeason()
-                : matchCallUpRepository.countCleanSheetsBySeason(seasonId);
+                ? statRepository.countCleanSheetsByCurrentSeason()
+                : statRepository.countCleanSheetsBySeason(seasonId);
         for (Object[] row : cleanSheetRows) {
-            cleanSheetsMap.put((Long) row[0], (Long) row[1]);
+            cleanSheetsMap.put((Long) row[0], ((Number) row[1]).longValue());
         }
 
         Map<Long, long[]> cardsMap = new HashMap<>();

@@ -5,7 +5,7 @@ import DataTable from '../../components/admin/DataTable';
 import EntityFormModal from '../../components/admin/EntityFormModal';
 import ConfirmDeleteModal from '../../components/admin/ConfirmDeleteModal';
 import { useCrud } from '../../hooks/useCrud';
-import { createMatch, deleteMatch, getCompetitions, getMatches, getSeasons, toPage, updateMatch, getMatchDetail, addMatchGoal, deleteMatchGoal, getAllPlayers, getPlayerSeasonStats, getStats, createStat, updateStat, addMatchCallup, deleteMatchCallup } from '../../services/api';
+import { createMatch, deleteMatch, getCompetitions, getMatches, getSeasons, toPage, updateMatch, getMatchDetail, getAllPlayers, getPlayerSeasonStats, getStats, createStat, updateStat } from '../../services/api';
 import { STATUS_LABELS } from '../../constants/matchStatus';
 import { POSITION_LABELS } from '../../constants/positions';
 import { rememberAdminMatch } from '../../utils/adminRecentMatches';
@@ -71,87 +71,64 @@ function useRosterPlayers(matchId) {
 function GoleadoresSection({ matchId }) {
   const { players, detail, setDetail, loading } = useRosterPlayers(matchId);
   const [selectedPlayer, setSelectedPlayer] = useState('');
-  const [minute, setMinute] = useState('');
+  const [goals, setGoals] = useState(1);
   const [saving, setSaving] = useState(false);
-  const syncStatForPlayer = async (playerId, delta) => {
-    try {
-      const res = await getStats({ matchId, size: 200 });
-      const list = res?.content || res || [];
-      const existing = Array.isArray(list) ? list.find(s => String(s.playerId) === String(playerId)) : null;
-      if (existing) {
-        const newGoals = Math.max(0, (existing.goals || 0) + delta);
-        await updateStat(existing.id, { playerId: Number(playerId), matchId, goals: newGoals, assists: existing.assists || 0, yellowCards: existing.yellowCards || 0, redCards: existing.redCards || 0, mvp: !!existing.mvp, attended: true });
-      } else if (delta > 0) {
-        await createStat({ playerId: Number(playerId), matchId, goals: delta, assists: 0, yellowCards: 0, redCards: 0, mvp: false, attended: true });
-      }
-    } catch {
-      // Ignorar errores al sincronizar estadísticas
-    }
+  const stats = detail?.stats || [];
+  const scorers = stats.filter((s) => (s.goals || 0) > 0);
+
+  const upsertStat = async (playerId, patch) => {
+    const existing = stats.find((s) => String(s.playerId) === String(playerId));
+    const payload = {
+      playerId: Number(playerId),
+      matchId,
+      goals: patch.goals ?? existing?.goals ?? 0,
+      assists: patch.assists ?? existing?.assists ?? 0,
+      yellowCards: patch.yellowCards ?? existing?.yellowCards ?? 0,
+      redCards: patch.redCards ?? existing?.redCards ?? 0,
+      mvp: patch.mvp ?? existing?.mvp ?? false,
+      attended: patch.attended ?? existing?.attended ?? true,
+    };
+    const saved = existing ? await updateStat(existing.id, payload) : await createStat(payload);
+    setDetail((prev) => {
+      if (!prev) return prev;
+      const others = (prev.stats || []).filter((s) => String(s.playerId) !== String(playerId));
+      return { ...prev, stats: [...others, saved] };
+    });
   };
+
   const handleAdd = async (e) => {
     e.preventDefault();
-    if (!selectedPlayer || !minute) return;
-    const m = parseInt(minute, 10);
-    if (isNaN(m) || m < 1 || m > 120) { alert('Minuto debe estar entre 1 y 120'); return; }
-    const player = players.find(p => String(p.id) === String(selectedPlayer));
-    if (!player) return;
-    const tempId = `temp-${Date.now()}`;
-    const optimistic = { id: tempId, playerId: Number(selectedPlayer), playerName: player.nickname || player.name, jerseyNumber: player.jerseyNumber, minute: m };
-    setDetail(prev => prev ? { ...prev, goals: [...(prev.goals || []), optimistic], match: { ...prev.match, ourGoals: (prev.goals?.length || 0) + 1, status: 'FINISHED' } } : prev);
-    setMinute('');
+    if (!selectedPlayer) return;
+    const n = Number(goals);
+    if (!n || n < 1) { alert('Introduce al menos 1 gol'); return; }
     setSaving(true);
     try {
-      const created = await addMatchGoal(matchId, { playerId: Number(selectedPlayer), minute: m });
-      setDetail(prev => prev ? { ...prev, goals: prev.goals.map(g => g.id === tempId ? created : g) } : prev);
-      syncStatForPlayer(selectedPlayer, 1);
-      getMatchDetail(matchId).then(d => {
-        const count = (d?.goals || []).length;
-        if (d?.match && (d.match.ourGoals !== count || d.match.status !== 'FINISHED')) {
-          updateMatch(matchId, { ...d.match, competitionId: d.match.competitionId, ourGoals: count, status: 'FINISHED' }).catch(()=>{});
-        }
-      });
+      const existing = stats.find((s) => String(s.playerId) === String(selectedPlayer));
+      await upsertStat(selectedPlayer, { goals: (existing?.goals || 0) + n });
+      setSelectedPlayer('');
+      setGoals(1);
     } catch (err) {
-      setDetail(prev => prev ? { ...prev, goals: (prev.goals || []).filter(g => g.id !== tempId), match: { ...prev.match, ourGoals: Math.max(0, (prev.goals?.length || 1) - 1) } } : prev);
-      alert(err.message || 'Error al añadir gol');
+      alert(err.message || 'Error al guardar');
     } finally { setSaving(false); }
   };
-  const handleDelete = async (goalId) => {
-    const goal = detail?.goals?.find(g => g.id === goalId);
-    const playerId = goal?.playerId;
-    const snapshot = detail;
-    // optimistic: quita al instante sin fantasma
-    setDetail(prev => prev ? { ...prev, goals: (prev.goals || []).filter(g => g.id !== goalId), match: { ...prev.match, ourGoals: Math.max(0, (prev.goals?.length || 1) - 1) } } : prev);
-    try {
-      await deleteMatchGoal(matchId, goalId);
-      if (playerId) await syncStatForPlayer(playerId, -1).catch(()=>{});
-      // sincroniza en background sin bloquear UI
-      getMatchDetail(matchId).then(d => {
-        if (!d) return;
-        const count = (d?.goals || []).length;
-        if (d?.match && d.match.ourGoals !== count) {
-          updateMatch(matchId, { ...d.match, competitionId: d.match.competitionId, ourGoals: count }).catch(()=>{});
-        }
-        // no setDetail aquí para no re-pintar con delay; el optimistic ya está
-      }).catch(()=>{});
-    } catch (err) {
-      setDetail(snapshot);
-      alert(err.message || 'Error al borrar');
-    }
+
+  const handleRemove = async (playerId) => {
+    try { await upsertStat(playerId, { goals: 0 }); } catch (err) { alert(err.message || 'Error'); }
   };
+
   if (!matchId) return <p className="text-[11px] text-muted-foreground">Guarda el partido primero para añadir goleadores.</p>;
   if (loading) return <p className="text-sm text-muted-foreground">Cargando goleadores…</p>;
-  const goals = detail?.goals || [];
   return (
     <div className="space-y-4">
       <div className="rounded-2xl border border-card-border bg-muted/5 p-4">
         <h4 className="text-[11px] font-black uppercase tracking-widest text-re-dorado mb-3">Nuestros goleadores</h4>
-        {goals.length === 0 ? <p className="text-[11px] font-bold text-muted-foreground py-2">Aún no hay goleadores.</p> : (
+        {scorers.length === 0 ? <p className="text-[11px] font-bold text-muted-foreground py-2">Aún no hay goleadores.</p> : (
           <ul className="space-y-2">
-            {goals.map(g => (
-              <li key={g.id} className="flex items-center gap-3 bg-card-bg border border-card-border rounded-xl px-3 py-2">
-                <span className="w-8 h-8 rounded-lg bg-re-rojo text-white font-black text-xs flex items-center justify-center">#{g.jerseyNumber}</span>
-                <span className="flex-1 min-w-0"><span className="font-black text-sm">{g.playerName}</span><span className="ml-2 text-[11px] text-muted-foreground">{g.minute}'</span></span>
-                <button onClick={() => handleDelete(g.id)} className="text-re-rojo text-[10px] font-black uppercase">Quitar</button>
+            {scorers.map((s) => (
+              <li key={s.playerId} className="flex items-center gap-3 bg-card-bg border border-card-border rounded-xl px-3 py-2">
+                <span className="w-9 h-9 rounded-lg bg-re-rojo text-white font-black text-sm flex items-center justify-center shrink-0">{s.goals}</span>
+                <span className="flex-1 min-w-0 font-black text-sm truncate">{s.playerName}</span>
+                <button onClick={() => handleRemove(s.playerId)} className="text-re-rojo text-[10px] font-black uppercase">Quitar</button>
               </li>
             ))}
           </ul>
@@ -164,10 +141,10 @@ function GoleadoresSection({ matchId }) {
             {players.map(p => <option key={p.id} value={p.id}>#{p.jerseyNumber} {p.nickname || p.name} — {POSITION_LABELS[p.position]||p.position}</option>)}
           </select>
         </label>
-        <label className="w-28"><span className="text-[10px] font-black uppercase tracking-widest">Minuto</span>
-          <input type="number" min="1" max="120" value={minute} onChange={e=>setMinute(e.target.value)} placeholder="23" className="w-full mt-1 rounded-xl border border-card-border bg-background px-3 py-2.5 text-sm font-bold" />
+        <label className="w-28"><span className="text-[10px] font-black uppercase tracking-widest">Goles</span>
+          <input type="number" min="1" max="20" value={goals} onChange={e=>setGoals(e.target.value)} className="w-full mt-1 rounded-xl border border-card-border bg-background px-3 py-2.5 text-sm font-bold" />
         </label>
-        <button type="submit" disabled={saving || !selectedPlayer || !minute} className="bg-re-rojo text-white font-black px-6 py-2.5 rounded-xl text-xs uppercase tracking-widest disabled:opacity-50">Añadir gol</button>
+        <button type="submit" disabled={saving || !selectedPlayer} className="bg-re-rojo text-white font-black px-6 py-2.5 rounded-xl text-xs uppercase tracking-widest disabled:opacity-50">Añadir gol</button>
       </form>
     </div>
   );
@@ -176,48 +153,42 @@ function GoleadoresSection({ matchId }) {
 function ConvocadosSection({ matchId }) {
   const { players, detail, setDetail, loading } = useRosterPlayers(matchId);
   const [savingId, setSavingId] = useState(null);
-  const callups = detail?.callups || [];
-  const callupIds = new Set(callups.map(c => String(c.playerId)));
+  const stats = detail?.stats || [];
+  const convocados = stats.filter((s) => s.attended);
+  const convocadoIds = new Set(convocados.map((s) => String(s.playerId)));
   const toggle = async (player) => {
-    const isIn = callupIds.has(String(player.id));
-    if (isIn) {
-      const callUp = callups.find(c => String(c.playerId) === String(player.id));
-      if (!callUp) return;
-      if (String(callUp.id).startsWith('temp-')) return;
-      const snapshot = detail;
-      setDetail(prev => prev ? { ...prev, callups: (prev.callups||[]).filter(c => String(c.playerId) !== String(player.id)) } : prev);
-      setSavingId(String(player.id));
-      try { await deleteMatchCallup(matchId, callUp.id); } catch (err) { setDetail(snapshot); alert(err.message||'Error'); } finally { setSavingId(null); }
-    } else {
-      const optimistic = { id: `temp-${Date.now()}`, playerId: Number(player.id), playerName: player.nickname || player.name, jerseyNumber: player.jerseyNumber, position: player.position };
-      setDetail(prev => prev ? { ...prev, callups: [...(prev.callups||[]), optimistic] } : prev);
-      setSavingId(String(player.id));
-      try {
-        const created = await addMatchCallup(matchId, { playerId: Number(player.id) });
-        setDetail(prev => prev ? { ...prev, callups: prev.callups.map(c => String(c.id).startsWith('temp-') && String(c.playerId)===String(player.id) ? created : c) } : prev);
-        try {
-          const res = await getStats({ matchId, size: 200 });
-          const list = res?.content || res || [];
-          const existing = Array.isArray(list) ? list.find(s => String(s.playerId) === String(player.id)) : null;
-          if (!existing) await createStat({ playerId: Number(player.id), matchId, goals: 0, assists: 0, yellowCards: 0, redCards: 0, mvp: false, attended: true });
-          else if (!existing.attended) await updateStat(existing.id, { playerId: Number(player.id), matchId, goals: existing.goals||0, assists: existing.assists||0, yellowCards: existing.yellowCards||0, redCards: existing.redCards||0, mvp: !!existing.mvp, attended: true });
-} catch {
-      // Ignorar errores al sincronizar estadísticas
-    }
-      } catch (err) {
-        setDetail(prev => prev ? { ...prev, callups: (prev.callups||[]).filter(c => String(c.playerId) !== String(player.id)) } : prev);
-        alert(err.message || 'Error');
-      } finally { setSavingId(null); }
-    }
+    const existing = stats.find((s) => String(s.playerId) === String(player.id));
+    const isIn = convocadoIds.has(String(player.id));
+    const payload = {
+      playerId: Number(player.id),
+      matchId,
+      goals: existing?.goals || 0,
+      assists: existing?.assists || 0,
+      yellowCards: existing?.yellowCards || 0,
+      redCards: existing?.redCards || 0,
+      mvp: existing?.mvp || false,
+      attended: !isIn,
+    };
+    setSavingId(String(player.id));
+    try {
+      const saved = existing ? await updateStat(existing.id, payload) : await createStat(payload);
+      setDetail((prev) => {
+        if (!prev) return prev;
+        const others = (prev.stats || []).filter((s) => String(s.playerId) !== String(player.id));
+        return { ...prev, stats: [...others, saved] };
+      });
+    } catch (err) {
+      alert(err.message || 'Error');
+    } finally { setSavingId(null); }
   };
   if (!matchId) return <p className="text-[11px] text-muted-foreground">Guarda el partido primero.</p>;
   if (loading) return <p className="text-sm text-muted-foreground">Cargando convocados…</p>;
   return (
     <div className="space-y-3">
-      <p className="text-[10px] font-bold text-muted-foreground">Toca al jugador para convocar / desconvocar. Sin checkbox.</p>
+      <p className="text-[10px] font-bold text-muted-foreground">Toca al jugador para convocar / desconvocar.</p>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
         {players.map(p => {
-          const isIn = callupIds.has(String(p.id));
+          const isIn = convocadoIds.has(String(p.id));
           const saving = savingId === String(p.id);
           return (
             <button key={p.id} type="button" onClick={()=>toggle(p)} disabled={saving} className={`flex items-center gap-2 rounded-2xl border px-3 py-2.5 text-left transition-all ${isIn ? 'bg-re-rojo border-re-rojo text-white shadow-md' : 'bg-card-bg border-card-border text-foreground hover:border-re-rojo/30'} ${saving ? 'opacity-60' : ''}`}>
@@ -231,7 +202,7 @@ function ConvocadosSection({ matchId }) {
           );
         })}
       </div>
-      <p className="text-center text-[11px] font-bold text-muted-foreground">{callups.length} convocados</p>
+      <p className="text-center text-[11px] font-bold text-muted-foreground">{convocados.length} convocados</p>
     </div>
   );
 }

@@ -4,6 +4,7 @@ import es.adri.demo.dto.FfmSyncActionDTO;
 import es.adri.demo.dto.FfmSyncResultDTO;
 import es.adri.demo.dto.MatchRequestDTO;
 import es.adri.demo.dto.MatchDTO;
+import es.adri.demo.dto.NeutralMatchDTO;
 import es.adri.demo.model.Competition;
 import es.adri.demo.model.FfmSyncRun;
 import es.adri.demo.model.Match;
@@ -37,6 +38,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -65,6 +67,9 @@ public class FfmSyncService {
     private static final Pattern RE_TAG = Pattern.compile("<[^>]+>");
     private static final Pattern RE_DATE = Pattern.compile("\\d{2}-\\d{2}-\\d{4}");
     private static final Pattern RE_TIME = Pattern.compile("\\d{2}:\\d{2}");
+    private static final Pattern RE_CODACTA = Pattern.compile(
+            "NFG_CmpPartido\\?cod_primaria=\\d+&CodActa=(\\d+)&cod_acta=\\d+",
+            Pattern.CASE_INSENSITIVE);
 
     private static final Set<String> UPPER_TOKENS = Set.of(
             "FS", "F.S", "CD", "AD", "UD", "CF", "FF", "CE", "AT", "SD", "FC", "AC");
@@ -74,6 +79,7 @@ public class FfmSyncService {
     private final CompetitionRepository competitionRepository;
     private final MatchRepository matchRepository;
     private final MatchService matchService;
+    private final NeutralMatchService neutralMatchService;
     private final FfmSyncRunRepository runRepository;
     private final UserRepository userRepository;
     private final EmailService emailService;
@@ -103,6 +109,7 @@ public class FfmSyncService {
     public FfmSyncService(CompetitionRepository competitionRepository,
                           MatchRepository matchRepository,
                           MatchService matchService,
+                          NeutralMatchService neutralMatchService,
                           FfmSyncRunRepository runRepository,
                           UserRepository userRepository,
                            EmailService emailService,
@@ -110,6 +117,7 @@ public class FfmSyncService {
         this.competitionRepository = competitionRepository;
         this.matchRepository = matchRepository;
         this.matchService = matchService;
+        this.neutralMatchService = neutralMatchService;
         this.runRepository = runRepository;
         this.userRepository = userRepository;
         this.emailService = emailService;
@@ -120,7 +128,13 @@ public class FfmSyncService {
     public record FfmMatch(int jornada, LocalDateTime date, String venue,
                            String homeCode, String homeName,
                            String awayCode, String awayName,
-                           Integer homeGoals, Integer awayGoals, boolean wePlay, Boolean weAreHome) {
+                           Integer homeGoals, Integer awayGoals, boolean wePlay, Boolean weAreHome,
+                           String codacta) {
+    }
+
+    /** Resultado de sincronizar una jornada o un partido desde la federacion. */
+    public record FfmJornadaResultDTO(Long competitionId, String competitionName, Integer jornada,
+                                      int games, boolean ourUpdated, int neutralSaved, String message) {
     }
 
     // ---------- API publica ----------
@@ -311,6 +325,103 @@ public class FfmSyncService {
         return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
     }
 
+    /**
+     * Sincroniza los resultados de UNA jornada: nuestro partido (Match) y el resto
+     * de partidos de la jornada (NeutralMatch, para la clasificacion).
+     * Una sola sesion y una sola peticion a la federacion.
+     */
+    @Transactional
+    public FfmJornadaResultDTO syncJornadaResults(Long competitionId, Integer jornada) {
+        Competition competition = getCompetition(competitionId);
+        if (jornada == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Falta la jornada");
+        }
+        FfmConfig config = configOf(competition);
+        List<FfmMatch> parsed = fetchJornadaMatches(config, jornada);
+        return applyJornadaResults(competition, parsed, true);
+    }
+
+    /**
+     * Sincroniza el resultado de UN partido nuestro (busca su jornada en la
+     * federacion). No toca los partidos de otros equipos.
+     */
+    @Transactional
+    public FfmJornadaResultDTO syncMatchResult(Long matchId) {
+        Match match = matchRepository.findById(matchId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Partido no encontrado"));
+        Competition competition = match.getCompetition();
+        if (competition == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El partido no tiene competicion");
+        }
+        if (match.getJornada() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El partido no tiene jornada");
+        }
+        FfmConfig config = configOf(competition);
+        List<FfmMatch> parsed = fetchJornadaMatches(config, match.getJornada());
+        FfmMatch ours = parsed.stream().filter(FfmMatch::wePlay).findFirst().orElse(null);
+        if (ours == null) {
+            return new FfmJornadaResultDTO(competition.getId(), competition.getName(), match.getJornada(),
+                    0, false, 0, "La federacion no publica resultado de esta jornada todavia");
+        }
+        MatchRequestDTO req = toRequest(competition, ours, match);
+        matchService.updateMatch(match.getId(), req);
+        return new FfmJornadaResultDTO(competition.getId(), competition.getName(), match.getJornada(),
+                1, true, 0, "Resultado: " + req.getOurGoals() + "-" + req.getRivalGoals());
+    }
+
+    private FfmJornadaResultDTO applyJornadaResults(Competition competition, List<FfmMatch> parsed, boolean includeNeutral) {
+        List<Match> existing = matchRepository.findByCompetitionId(competition.getId());
+        int jornada = parsed.isEmpty() ? 0 : parsed.get(0).jornada();
+        Map<String, NeutralMatchDTO> existingNeutral = includeNeutral
+                ? neutralMatchService.list(competition.getId(), jornada).stream()
+                        .collect(Collectors.toMap(
+                                n -> neutralKey(n.getHomeCode(), n.getAwayCode()), n -> n, (a, b) -> a))
+                : Map.of();
+        int games = 0;
+        boolean ourUpdated = false;
+        int neutralSaved = 0;
+        for (FfmMatch p : parsed) {
+            games++;
+            if (p.wePlay()) {
+                Match target = findExisting(existing, competition.getId(), p);
+                if (target != null) {
+                    matchService.updateMatch(target.getId(), toRequest(competition, p, target));
+                    ourUpdated = true;
+                }
+            } else if (includeNeutral) {
+                upsertNeutralFromFfm(competition, p, existingNeutral.get(neutralKey(p.homeCode(), p.awayCode())));
+                neutralSaved++;
+            }
+        }
+        String msg = "Jornada " + jornada + ": " + games + " partidos leidos, " + neutralSaved + " guardados";
+        return new FfmJornadaResultDTO(competition.getId(), competition.getName(),
+                parsed.isEmpty() ? null : parsed.get(0).jornada(), games, ourUpdated, neutralSaved, msg);
+    }
+
+    private void upsertNeutralFromFfm(Competition competition, FfmMatch p, NeutralMatchDTO existing) {
+        boolean finished = p.homeGoals() != null && p.awayGoals() != null;
+        NeutralMatchDTO dto = new NeutralMatchDTO();
+        dto.setId(existing != null ? existing.getId() : null);
+        dto.setCompetitionId(competition.getId());
+        dto.setJornada(p.jornada());
+        dto.setHomeName(smartTitle(p.homeName()));
+        dto.setAwayName(smartTitle(p.awayName()));
+        dto.setHomeCode(p.homeCode());
+        dto.setAwayCode(p.awayCode());
+        dto.setDate(p.date() != null ? p.date().toString() : (existing != null ? existing.getDate() : null));
+        dto.setVenue(p.venue() != null ? p.venue() : (existing != null ? existing.getVenue() : null));
+        dto.setStatus(finished ? MatchStatus.FINISHED
+                : (existing != null ? existing.getStatus() : MatchStatus.SCHEDULED));
+        dto.setHomeGoals(finished ? p.homeGoals() : (existing != null ? existing.getHomeGoals() : null));
+        dto.setAwayGoals(finished ? p.awayGoals() : (existing != null ? existing.getAwayGoals() : null));
+        dto.setCodacta(p.codacta() != null ? p.codacta() : (existing != null ? existing.getCodacta() : null));
+        neutralMatchService.upsert(dto);
+    }
+
+    private static String neutralKey(String homeCode, String awayCode) {
+        return (homeCode == null ? "" : homeCode) + "-" + (awayCode == null ? "" : awayCode);
+    }
+
     /** Sincroniza todas las competiciones configuradas (usado por el programador). */
     @Transactional
     public void syncAllScheduled() {
@@ -318,20 +429,39 @@ public class FfmSyncService {
             if (competition.getFfmCompeticion() == null || competition.getFfmCompeticion().isBlank()) {
                 continue;
             }
+            FfmSyncRun run = new FfmSyncRun();
+            run.setCompetitionId(competition.getId());
+            run.setCompetitionName(competition.getName());
+            run.setTriggeredBy(FfmSyncRun.Trigger.SCHEDULED);
+            run.setStartedAt(LocalDateTime.now());
             try {
-                apply(competition.getId(), FfmSyncRun.Trigger.SCHEDULED);
-            } catch (Exception e) {
-                FfmSyncRun run = new FfmSyncRun();
-                run.setCompetitionId(competition.getId());
-                run.setCompetitionName(competition.getName());
-                run.setTriggeredBy(FfmSyncRun.Trigger.SCHEDULED);
-                run.setStartedAt(LocalDateTime.now());
+                Integer jornada = currentJornadaToSync(competition.getId());
+                if (jornada != null) {
+                    FfmJornadaResultDTO result = syncJornadaResults(competition.getId(), jornada);
+                    run.setRoundsChecked(1);
+                    run.setUpdated((result.ourUpdated() ? 1 : 0) + result.neutralSaved());
+                    run.setUnchanged(Math.max(0, result.games() - result.neutralSaved()));
+                }
+                run.setStatus(FfmSyncRun.Status.OK);
                 run.setFinishedAt(LocalDateTime.now());
+                runRepository.save(run);
+            } catch (Exception e) {
                 run.setStatus(FfmSyncRun.Status.FAILED);
+                run.setFinishedAt(LocalDateTime.now());
                 run.setError(truncate(e.toString(), 2000));
                 runRepository.save(run);
             }
         }
+    }
+
+    /** Jornada mas reciente ya jugada (la unica que puede tener resultado nuevo). */
+    private Integer currentJornadaToSync(Long competitionId) {
+        LocalDateTime now = LocalDateTime.now();
+        return matchRepository.findByCompetitionId(competitionId).stream()
+                .filter(m -> m.getDate() != null && !m.getDate().isAfter(now) && m.getJornada() != null)
+                .max(Comparator.comparing(Match::getDate))
+                .map(Match::getJornada)
+                .orElse(null);
     }
 
     @Transactional(readOnly = true)
@@ -369,35 +499,40 @@ public class FfmSyncService {
         }
     }
 
-    private List<FfmMatch> fetchOurMatches(FfmConfig config) {
+    private HttpClient openSession() throws Exception {
         checkCredentials();
+        HttpClient client = HttpClient.newBuilder()
+                .cookieHandler(new CookieManager(null, CookiePolicy.ACCEPT_ALL))
+                .followRedirects(HttpClient.Redirect.NEVER)
+                .connectTimeout(Duration.ofSeconds(30))
+                .build();
+        String loginBody = "NUser=" + urlEncode(ffmUser)
+                + "&NPass=" + urlEncode(ffmPassword)
+                + "&LoginAjax=1";
+        HttpResponse<String> login = client.send(
+                HttpRequest.newBuilder(URI.create(baseUrl + "/nfg/NLogin"))
+                        .header("Content-Type", "application/x-www-form-urlencoded")
+                        .POST(HttpRequest.BodyPublishers.ofString(loginBody))
+                        .timeout(Duration.ofSeconds(30))
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+        String location = login.headers().firstValue("Location").orElse("");
+        if (login.statusCode() != 302 || !location.contains("NLogin")) {
+            throw new IllegalStateException("Login inesperado: HTTP " + login.statusCode());
+        }
+        HttpResponse<String> session = client.send(
+                HttpRequest.newBuilder(URI.create(baseUrl + location))
+                        .GET().timeout(Duration.ofSeconds(30)).build(),
+                HttpResponse.BodyHandlers.ofString());
+        if (!session.body().contains("estado=\"1\"") && !session.body().contains("estado='1'")) {
+            throw new IllegalStateException("Login rechazado por la federacion");
+        }
+        return client;
+    }
+
+    private List<FfmMatch> fetchOurMatches(FfmConfig config) {
         try {
-            HttpClient client = HttpClient.newBuilder()
-                    .cookieHandler(new CookieManager(null, CookiePolicy.ACCEPT_ALL))
-                    .followRedirects(HttpClient.Redirect.NEVER)
-                    .connectTimeout(Duration.ofSeconds(30))
-                    .build();
-            String loginBody = "NUser=" + urlEncode(ffmUser)
-                    + "&NPass=" + urlEncode(ffmPassword)
-                    + "&LoginAjax=1";
-            HttpResponse<String> login = client.send(
-                    HttpRequest.newBuilder(URI.create(baseUrl + "/nfg/NLogin"))
-                            .header("Content-Type", "application/x-www-form-urlencoded")
-                            .POST(HttpRequest.BodyPublishers.ofString(loginBody))
-                            .timeout(Duration.ofSeconds(30))
-                            .build(),
-                    HttpResponse.BodyHandlers.ofString());
-            String location = login.headers().firstValue("Location").orElse("");
-            if (login.statusCode() != 302 || !location.contains("NLogin")) {
-                throw new IllegalStateException("Login inesperado: HTTP " + login.statusCode());
-            }
-            HttpResponse<String> session = client.send(
-                    HttpRequest.newBuilder(URI.create(baseUrl + location))
-                            .GET().timeout(Duration.ofSeconds(30)).build(),
-                    HttpResponse.BodyHandlers.ofString());
-            if (!session.body().contains("estado=\"1\"") && !session.body().contains("estado='1'")) {
-                throw new IllegalStateException("Login rechazado por la federacion");
-            }
+            HttpClient client = openSession();
             // Descubrir jornadas desde la primera pagina
             String first = fetchJornada(client, config, 1);
             List<Integer> rounds = roundRange(first);
@@ -419,7 +554,25 @@ public class FfmSyncService {
         } catch (ResponseStatusException e) {
             throw e;
         } catch (Exception e) {
-            throw new IllegalStateException("No se pudo leer la federacion: " + e.getMessage(), e);
+            log.error("Fallo leyendo el calendario de la federacion (competicion {}): {}",
+                    config.competicion(), e.toString());
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
+                    "No se pudo leer la federacion: " + e.getMessage());
+        }
+    }
+
+    /** Una sola sesion + una sola peticion: descarga y parsea UNA jornada. */
+    private List<FfmMatch> fetchJornadaMatches(FfmConfig config, int jornada) {
+        try {
+            HttpClient client = openSession();
+            return parseJornada(fetchJornada(client, config, jornada), jornada, config.ourCode());
+        } catch (ResponseStatusException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Fallo leyendo la jornada {} de la federacion (competicion {}): {}",
+                    jornada, config.competicion(), e.toString());
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
+                    "No se pudo leer la jornada " + jornada + " de la federacion: " + e.getMessage());
         }
     }
 
@@ -474,6 +627,7 @@ public class FfmSyncService {
         List<Object[]> dates = findAll(RE_DATES, html);
         List<Object[]> times = findAll(RE_TIMES, html);
         List<Object[]> campos = findAll(RE_CAMPO, html);
+        List<Object[]> actas = findAll(RE_CODACTA, html);
         String fallback = null;
         Matcher roundOpt = RE_ROUND_OPT.matcher(html);
         while (roundOpt.find()) {
@@ -502,6 +656,7 @@ public class FfmSyncService {
             String fecha = nearest(dates, pos, lo, hi);
             String hora = nearest(times, pos, lo, hi);
             String venue = nearest(campos, pos, lo, hi);
+            String codacta = nearest(actas, pos, lo, hi);
             if (fecha == null) {
                 fecha = fallback;
             }
@@ -532,7 +687,7 @@ public class FfmSyncService {
             Boolean weAreHome = wePlay ? ourCode.equals(e1) : null;
             out.add(new FfmMatch(jornada, date, venue == null || venue.isBlank() ? null : venue.trim(),
                     e1, names.getOrDefault(e1, e1), e2, names.getOrDefault(e2, e2),
-                    homeGoals, awayGoals, wePlay, weAreHome));
+                    homeGoals, awayGoals, wePlay, weAreHome, codacta));
         }
         return out;
     }

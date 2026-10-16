@@ -5,6 +5,7 @@ import {
   getCompetitions,
   getFfmSyncRuns,
   previewFfmSync,
+  syncJornadaResults,
   toPage,
 } from '../../services/api';
 
@@ -36,6 +37,9 @@ export default function SyncAdmin() {
   const [runs, setRuns] = useState([]);
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [applying, setApplying] = useState(false);
+  const [jornada, setJornada] = useState('');
+  const [syncingJornada, setSyncingJornada] = useState(false);
+  const [jornadaMsg, setJornadaMsg] = useState('');
   const [error, setError] = useState('');
 
   const loadRuns = useCallback(() => {
@@ -84,6 +88,22 @@ export default function SyncAdmin() {
       setError(err.message || 'No se pudo aplicar');
     } finally {
       setApplying(false);
+    }
+  };
+
+  const handleSyncJornada = async () => {
+    if (!selectedId || !jornada) return;
+    setSyncingJornada(true);
+    setError('');
+    setJornadaMsg('');
+    try {
+      const res = await syncJornadaResults(selectedId, Number(jornada));
+      setJornadaMsg(res?.message || 'Jornada sincronizada');
+      loadRuns();
+    } catch (err) {
+      setError(err.message || 'No se pudo sincronizar la jornada');
+    } finally {
+      setSyncingJornada(false);
     }
   };
 
@@ -140,6 +160,32 @@ export default function SyncAdmin() {
             {applying ? 'Aplicando…' : 'Aplicar cambios'}
           </button>
         </div>
+
+        <div className="mt-4 border-t border-card-border pt-4">
+          <label htmlFor="sync-jornada" className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-2">
+            Sincronizar una jornada concreta
+          </label>
+          <div className="flex flex-wrap items-center gap-3">
+            <input
+              id="sync-jornada"
+              type="number"
+              min="1"
+              value={jornada}
+              onChange={(e) => setJornada(e.target.value)}
+              placeholder="Nº jornada"
+              className="w-32 bg-muted/10 border border-card-border rounded-xl px-4 py-3 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-re-rojo"
+            />
+            <button
+              onClick={handleSyncJornada}
+              disabled={!selectedId || !configured || !jornada || syncingJornada}
+              className="bg-re-rojo text-white font-black px-6 py-3.5 rounded-xl text-xs tracking-widest uppercase shadow-lg shadow-re-rojo/20 hover:bg-re-rojo/90 transition-all disabled:opacity-40"
+            >
+              {syncingJornada ? 'Sincronizando…' : '⟳ Sincronizar jornada'}
+            </button>
+          </div>
+          {jornadaMsg && <p className="mt-2 text-xs font-bold text-emerald-500">{jornadaMsg}</p>}
+        </div>
+
         <p className="mt-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
           La programada (lunes y jueves 08:00) está activa.
         </p>

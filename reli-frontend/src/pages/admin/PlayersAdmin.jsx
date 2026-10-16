@@ -4,7 +4,7 @@ import DataTable from '../../components/admin/DataTable';
 import EntityFormModal from '../../components/admin/EntityFormModal';
 import ConfirmDeleteModal from '../../components/admin/ConfirmDeleteModal';
 import { useCrud } from '../../hooks/useCrud';
-import { createPlayer, deletePlayer, getPlayers, updatePlayer, getSeasons, getRosterBySeason, assignPlayerToSeason, unassignPlayerFromSeason, toPage, scrapeRoster, importScrapedRoster } from '../../services/api';
+import { createPlayer, deletePlayer, getPlayers, updatePlayer, getSeasons, getRosterBySeason, assignPlayerToSeason, unassignPlayerFromSeason, toPage } from '../../services/api';
 import { POSITION_OPTIONS } from '../../constants/positions';
 
 export default function PlayersAdmin() {
@@ -16,11 +16,6 @@ export default function PlayersAdmin() {
   const [roster, setRoster] = useState([]);
   const [rosterLoading, setRosterLoading] = useState(false);
   const [rosterError, setRosterError] = useState('');
-  const [scrapeOpen, setScrapeOpen] = useState(false);
-  const [scraped, setScraped] = useState([]);
-  const [scrapeLoading, setScrapeLoading] = useState(false);
-  const [scrapeError, setScrapeError] = useState('');
-  const [scrapeSelected, setScrapeSelected] = useState(() => new Set());
 
   const crud = useCrud({
     fetchPage: getPlayers,
@@ -86,49 +81,6 @@ export default function PlayersAdmin() {
       // refrescar stats no necesario aquí
     } catch (err) {
       alert(err.message || 'Error al actualizar roster');
-    }
-  };
-
-  const handleScrape = async () => {
-    if (!selectedSeasonId) return;
-    setScrapeLoading(true);
-    setScrapeError('');
-    setScraped([]);
-    setScrapeSelected(new Set());
-    setScrapeOpen(true);
-    try {
-      const data = await scrapeRoster(selectedSeasonId);
-      const list = Array.isArray(data) ? data : [];
-      setScraped(list);
-      // preseleccionar los que no están ya en roster
-      const ids = new Set();
-      const rosterNorms = new Set(roster.map((r) => (r.name + ' ' + (r.surnames||'')).trim().toUpperCase()));
-      list.forEach((p, i) => {
-        const norm = (p.fullName||'').trim().toUpperCase();
-        if (!rosterNorms.has(norm)) ids.add(String(i));
-      });
-      setScrapeSelected(ids);
-    } catch (err) {
-      setScrapeError(err.message || 'No se pudo scrapear. Revisa que la competición tenga FFM y que FFM_USER/PASS estén configurados.');
-    } finally {
-      setScrapeLoading(false);
-    }
-  };
-
-  const handleImportScraped = async () => {
-    if (!selectedSeasonId) return;
-    const toImport = scraped.filter((_, i) => scrapeSelected.has(String(i)));
-    if (toImport.length === 0) { alert('Selecciona al menos un jugador'); return; }
-    setScrapeLoading(true);
-    try {
-      await importScrapedRoster(selectedSeasonId, toImport);
-      await loadRoster(selectedSeasonId);
-      await crud.load(crud.page);
-      setScrapeOpen(false);
-    } catch (err) {
-      alert(err.message || 'Error al importar');
-    } finally {
-      setScrapeLoading(false);
     }
   };
 
@@ -227,9 +179,6 @@ export default function PlayersAdmin() {
         </select>
         <span className="text-[11px] font-bold text-muted-foreground">{rosterLoading ? 'Cargando...' : `${roster.length} en plantilla`}{selectedSeason ? ` · ${selectedSeason.name}` : ''}</span>
         {rosterError && <span className="text-[11px] font-bold text-re-rojo">{rosterError}</span>}
-        <button type="button" onClick={handleScrape} disabled={!selectedSeasonId || scrapeLoading} className="ml-auto rounded-full border border-re-dorado/40 bg-re-dorado/10 px-4 py-2 text-[11px] font-black uppercase tracking-widest text-re-dorado hover:bg-re-dorado hover:text-white disabled:opacity-50">
-          {scrapeLoading ? 'Scrapeando…' : 'Scrapear plantilla de actas'}
-        </button>
       </div>
 
       <DataTable
@@ -280,48 +229,6 @@ export default function PlayersAdmin() {
           if (selectedSeasonId) loadRoster(selectedSeasonId);
         }}
       />
-
-      {scrapeOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setScrapeOpen(false)} />
-          <div className="relative w-full max-w-2xl max-h-[80vh] overflow-hidden rounded-2xl bg-card-bg border border-card-border shadow-2xl flex flex-col">
-            <div className="px-6 py-4 border-b border-card-border">
-              <h3 className="text-lg font-black uppercase">Scrapear plantilla · {selectedSeason?.name}</h3>
-              <p className="text-[11px] text-muted-foreground">Jugadores detectados en actas FFM de la temporada. Selecciona los que quieres importar.</p>
-            </div>
-            <div className="flex-1 overflow-auto p-4 space-y-2">
-              {scrapeLoading ? (
-                <p className="text-center py-8 text-sm font-bold text-muted-foreground">Scrapeando actas… esto puede tardar hasta 30s</p>
-              ) : scrapeError ? (
-                <p className="rounded-xl bg-re-rojo/10 border border-re-rojo/20 px-4 py-3 text-sm font-bold text-re-rojo">{scrapeError}</p>
-              ) : scraped.length === 0 ? (
-                <p className="text-center py-8 text-sm font-bold text-muted-foreground">No se encontraron jugadores. ¿La competición tiene FFM configurado?</p>
-              ) : (
-                scraped.map((p, i) => {
-                  const checked = scrapeSelected.has(String(i));
-                  return (
-                    <label key={i} className={`flex items-center gap-3 rounded-xl border px-3 py-2 cursor-pointer ${checked ? 'bg-re-rojo/10 border-re-rojo/30' : 'bg-card-bg border-card-border'}`}>
-                      <input type="checkbox" checked={checked} onChange={(e) => {
-                        const next = new Set(scrapeSelected);
-                        if (e.target.checked) next.add(String(i)); else next.delete(String(i));
-                        setScrapeSelected(next);
-                      }} />
-                      <span className="flex-1 min-w-0">
-                        <span className="font-black text-sm">{p.fullName}</span>
-                        <span className="ml-2 text-[11px] text-muted-foreground">#{p.jerseyNumber} · {p.appearances} actas</span>
-                      </span>
-                    </label>
-                  );
-                })
-              )}
-            </div>
-            <div className="px-6 py-4 border-t border-card-border flex justify-between">
-              <button type="button" onClick={() => setScrapeOpen(false)} className="rounded-full border border-card-border px-5 py-2 text-[11px] font-black uppercase tracking-widest">Cerrar</button>
-              <button type="button" onClick={handleImportScraped} disabled={scrapeLoading || scrapeSelected.size===0} className="rounded-full bg-re-rojo text-white px-6 py-2 text-[11px] font-black uppercase tracking-widest disabled:opacity-50">Importar {scrapeSelected.size} jugadores</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

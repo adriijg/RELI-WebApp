@@ -3,7 +3,7 @@ import PageHeader from '../../components/admin/PageHeader';
 import DataTable from '../../components/admin/DataTable';
 import EntityFormModal from '../../components/admin/EntityFormModal';
 import ConfirmDeleteModal from '../../components/admin/ConfirmDeleteModal';
-import { createStat, deleteStat, getMatches, getPlayers, getSeasons, getStats, toPage, updateStat, scrapeStats } from '../../services/api';
+import { createStat, deleteStat, getMatches, getPlayers, getSeasons, getStats, toPage, updateStat } from '../../services/api';
 
 export default function StatsAdmin() {
   const [modalOpen, setModalOpen] = useState(false);
@@ -13,8 +13,6 @@ export default function StatsAdmin() {
   const [matches, setMatches] = useState([]);
   const [seasons, setSeasons] = useState([]);
   const [selectedSeasonId, setSelectedSeasonId] = useState('');
-  const [statsLoading, setStatsLoading] = useState(false);
-  const [statsResult, setStatsResult] = useState(null);
 
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -91,23 +89,6 @@ export default function StatsAdmin() {
   }, []);
   useEffect(() => { loadSeasons(); }, [loadSeasons]);
 
-  const handleScrapeStats = async () => {
-    if (!selectedSeasonId) return;
-    if (!confirm('¿Scrapear stats de todas las actas de la temporada? Puede tardar 1-2 minutos y sobreescribirá callups/goles/stats desde FFM.')) return;
-    setStatsLoading(true);
-    setStatsResult(null);
-    try {
-      const res = await scrapeStats(selectedSeasonId);
-      setStatsResult(res);
-      alert(`Stats: ${res.actasProcessed} actas, ${res.callupsCreated} convocatorias, ${res.goalsCreated} goles, ${res.statsCreated} stats nuevos / ${res.statsUpdated} actualizados`);
-      await loadStats(0);
-    } catch (err) {
-      alert(err.message || 'Error al scrapear stats');
-    } finally {
-      setStatsLoading(false);
-    }
-  };
-
   const fields = [
     {
       name: 'playerId',
@@ -165,7 +146,7 @@ export default function StatsAdmin() {
     <div>
       <PageHeader
         title="Estadísticas"
-        subtitle="Registro de rendimiento por jugador y partido: goles, asistencias y distinciones. Scrapea desde actas FFM."
+        subtitle="Registro de rendimiento por jugador y partido: goles, asistencias y distinciones. Se rellena importando el acta de cada partido."
         action={
           <button
             onClick={() => {
@@ -185,15 +166,7 @@ export default function StatsAdmin() {
           {seasons.map((s) => (<option key={s.id} value={s.id}>{s.name}{s.current ? ' · actual' : ''}</option>))}
         </select>
         <span className="text-[11px] font-bold text-muted-foreground">{selectedSeason ? selectedSeason.name : ''}</span>
-        <button type="button" onClick={handleScrapeStats} disabled={!selectedSeasonId || statsLoading} className="ml-auto rounded-full border border-emerald-500/40 bg-emerald-500/10 px-5 py-2.5 text-[11px] font-black uppercase tracking-widest text-emerald-600 hover:bg-emerald-500 hover:text-white disabled:opacity-50">
-          {statsLoading ? 'Scrapeando… 1-2 min' : 'Scrapear stats de actas'}
-        </button>
       </div>
-      {statsResult && (
-        <div className="mb-4 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 text-[11px] font-bold text-emerald-700">
-          Último scrape: {statsResult.actasProcessed} actas · {statsResult.callupsCreated} convocatorias · {statsResult.goalsCreated} goles · {statsResult.statsCreated} stats nuevos · {statsResult.statsUpdated} actualizados
-        </div>
-      )}
 
       <DataTable
         columns={columns}

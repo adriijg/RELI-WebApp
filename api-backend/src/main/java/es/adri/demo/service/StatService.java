@@ -72,7 +72,10 @@ public class StatService {
 
     @Transactional
     public StatDTO createStat(StatRequestDTO statRequestDTO) {
-        Stat stat = new Stat();
+        // Fuente única: un registro por jugador y partido. Si ya existe, se actualiza.
+        Stat stat = statRepository
+                .findByPlayerIdAndMatchId(statRequestDTO.getPlayerId(), statRequestDTO.getMatchId())
+                .orElseGet(Stat::new);
         mapRequestToEntity(statRequestDTO, stat);
         return toDto(statRepository.save(stat));
     }
