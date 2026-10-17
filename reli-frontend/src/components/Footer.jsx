@@ -2,48 +2,11 @@
 import { Link } from 'react-router-dom';
 import logo from '../assets/reli-badge.png';
 
-export default function Footer() {
-    const socialIcons = [
-        {
-            id: 'x',
-            href: '#',
-            icon: (
-                <svg viewBox="0 0 24 24" className="w-5 h-5 fill-current" aria-hidden="true">
-                    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-                </svg>
-            )
-        },
-        {
-            id: 'instagram',
-            href: '#',
-            icon: (
-                <svg viewBox="0 0 24 24" className="w-5 h-5 fill-none stroke-current" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
-                    <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
-                    <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
-                </svg>
-            )
-        },
-        {
-            id: 'tiktok',
-            href: '#',
-            icon: (
-                <svg viewBox="0 0 24 24" className="w-5 h-5 fill-current" aria-hidden="true">
-                    <path d="M12.525.02c1.31.036 2.512.335 3.6.895l-.01 3.454c-.791-.539-1.727-.872-2.74-.872-.012 0-.024 0-.036.001V7.08c1.026.154 1.833.913 2.146 1.905.15.47.225.96.225 1.465 0 2.8-2.27 5.07-5.07 5.07-2.8 0-5.07-2.27-5.07-5.07 0-2.8 2.27-5.07 5.07-5.07.13 0 .256.004.382.012l.01-3.52c-4.73.184-8.525 4.093-8.525 8.908 0 4.97 4.03 9 9 9s9-4.03 9-9c0-.13-.004-.256-.012-.382l.01-.01C20.525 4.417 24 3.02 24 0h-3.475c0 .01-.004.02-.005.03-.004 2.115-1.716 3.827-3.827 3.827V.02h-4.168z" />
-                </svg>
-            )
-        },
-        {
-            id: 'facebook',
-            href: '#',
-            icon: (
-                <svg viewBox="0 0 24 24" className="w-5 h-5 fill-current" aria-hidden="true">
-                    <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" />
-                </svg>
-            )
-        }
-    ];
+const CONTACT_EMAIL = 'reallisiados.info@gmail.com';
+const FFM_URL =
+    'https://parla.ffmadrid.es/nfg/NPcd/NFG_VisEquipos?cod_primaria=1000102&Codigo_Equipo=320143';
 
+export default function Footer() {
     return (
         <footer className="mt-20 bg-card-bg border-t border-card-border overflow-hidden">
             <div className="max-w-7xl mx-auto px-6 py-16">
@@ -62,18 +25,16 @@ export default function Footer() {
                         <p className="text-muted-foreground text-sm font-medium leading-relaxed">
                             Mucho más que un club de fútbol. Una familia unida por la pasión, el esfuerzo y la superación en cada encuentro.
                         </p>
-                        <div className="flex gap-4">
-                            {socialIcons.map(social => (
-                                <a
-                                    key={social.id}
-                                    href={social.href}
-                                    className="w-10 h-10 rounded-full border border-card-border flex items-center justify-center hover:bg-re-rojo hover:text-white transition-all text-muted-foreground hover:border-re-rojo"
-                                    aria-label={`Seguir en ${social.id}`}
-                                >
-                                    {social.icon}
-                                </a>
-                            ))}
-                        </div>
+                        <a
+                            href={`mailto:${CONTACT_EMAIL}`}
+                            className="inline-flex items-center gap-2 text-sm font-bold text-muted-foreground hover:text-re-rojo transition-colors"
+                        >
+                            <svg viewBox="0 0 24 24" className="w-5 h-5 fill-none stroke-current" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                <rect x="2" y="4" width="20" height="16" rx="2" />
+                                <path d="m22 7-10 6L2 7" />
+                            </svg>
+                            {CONTACT_EMAIL}
+                        </a>
                     </div>
 
                     {/* Columna 2: Navegación Rápida */}
@@ -84,7 +45,7 @@ export default function Footer() {
                             <li><Link to="/jugadores" className="hover:text-re-rojo transition-colors">Palmarés</Link></li>
                             <li><Link to="/" className="hover:text-re-rojo transition-colors">Instalaciones</Link></li>
                             <li><Link to="/" className="hover:text-re-rojo transition-colors">Transparencia</Link></li>
-                            <li><Link to="/" className="hover:text-re-rojo transition-colors">Contacto</Link></li>
+                            <li><a href={`mailto:${CONTACT_EMAIL}`} className="hover:text-re-rojo transition-colors">Contacto</a></li>
                         </ul>
                     </div>
 
@@ -95,8 +56,16 @@ export default function Footer() {
                             <li><Link to="/competicion" className="hover:text-re-rojo transition-colors">Clasificación</Link></li>
                             <li><Link to="/jugadores" className="hover:text-re-rojo transition-colors">Primer Equipo</Link></li>
                             <li><Link to="/competicion" className="hover:text-re-rojo transition-colors">Resultados</Link></li>
-                            <li><Link to="/" className="hover:text-re-rojo transition-colors">Cantera</Link></li>
-                            <li><Link to="/" className="hover:text-re-rojo transition-colors">Femenino</Link></li>
+                            <li>
+                                <a
+                                    href={FFM_URL}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="hover:text-re-rojo transition-colors"
+                                >
+                                    Ficha oficial FFM
+                                </a>
+                            </li>
                         </ul>
                     </div>
 
@@ -124,9 +93,8 @@ export default function Footer() {
                 <div className="pt-8 border-t border-card-border flex flex-col md:flex-row justify-between items-center gap-6 text-[10px] font-black text-muted-foreground tracking-widest uppercase text-center md:text-left">
                     <p>© 2026 REAL LISIADOS F.C. TODOS LOS DERECHOS RESERVADOS.</p>
                     <div className="flex gap-8">
-                        <a href="#" className="hover:text-foreground transition-colors">Política de Privacidad</a>
-                        <a href="#" className="hover:text-foreground transition-colors">Aviso Legal</a>
-                        <a href="#" className="hover:text-foreground transition-colors">Cookies</a>
+                        <a href={`mailto:${CONTACT_EMAIL}`} className="hover:text-foreground transition-colors">Contacto</a>
+                        <a href={FFM_URL} target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">Federación</a>
                     </div>
                 </div>
 
