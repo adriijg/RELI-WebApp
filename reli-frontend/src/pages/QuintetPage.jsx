@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useApp } from '../context/AppContext';
+import Seo from '../components/Seo';
 import { getAllPlayers, getCompetitions, getMatches, getMatchDetail, getPlayerSeasonStats, getQuintetBallots, getQuintetSeasonTally, getQuintetStatus, getQuintetTally, deleteQuintetVote, getMyQuintetVote, getSeasons, openQuintet, closeQuintet, saveQuintetVote, toPage } from '../services/api';
 import { jerseyForSeason } from '../constants/jerseys';
 import { POSITION_LABELS } from '../constants/positions';
@@ -364,6 +365,11 @@ export default function QuintetPage() {
 
   return (
       <main className="mx-auto max-w-xl space-y-3 p-4 sm:p-6">
+      <Seo
+        title="Mejor quinteto de la jornada"
+        description="Vota el mejor quinteto de la jornada del Real Lisiados F.C. y consulta el quinteto de la afición y el acumulado de la temporada."
+        path="/quinteto"
+      />
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-[9px] font-black uppercase tracking-[0.22em] text-re-rojo">Una vez por semana</p>

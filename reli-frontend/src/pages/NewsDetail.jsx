@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import Seo from '../components/Seo';
+import { SITE_NAME, SITE_URL } from '../constants/seo';
 import { getEvent, getEvents, toPage } from '../services/api';
 
 const TYPE_BADGES = {
@@ -74,6 +76,24 @@ export default function NewsDetail() {
 
   return (
     <main className="max-w-4xl mx-auto p-6 space-y-8">
+      <Seo
+        title={news.title}
+        description={news.description ? news.description.slice(0, 155) : undefined}
+        path={`/noticias/${id}`}
+        image={news.imageUrl || undefined}
+        type="article"
+        jsonLd={{
+          '@context': 'https://schema.org',
+          '@type': 'NewsArticle',
+          headline: news.title,
+          description: news.description || undefined,
+          image: news.imageUrl || undefined,
+          datePublished: news.date || undefined,
+          inLanguage: 'es',
+          publisher: { '@type': 'Organization', name: SITE_NAME, logo: `${SITE_URL}/og-image.png` },
+          mainEntityOfPage: `${SITE_URL}/noticias/${id}`,
+        }}
+      />
       {/* Cabecera */}
       <section className="bg-card-bg border border-card-border rounded-[40px] shadow-2xl overflow-hidden">
         <div className="bg-re-rojo px-6 py-4 flex items-center justify-between">

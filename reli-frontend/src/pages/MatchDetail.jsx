@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import logo from '../assets/reli-badge.png';
+import Seo from '../components/Seo';
+import { SITE_NAME, SITE_URL } from '../constants/seo';
 import { getMatchDetail, getMatches, getStats, getCompetitions, getPlayerSeasonStats, getQuintetStatus, getQuintetTally, deleteQuintetVote, getAllPlayers, getMyQuintetVote, openQuintet, closeQuintet, saveQuintetVote } from '../services/api';
 import { useApp } from '../context/AppContext';
 import { rememberAdminMatch } from '../utils/adminRecentMatches';
@@ -428,6 +430,31 @@ export default function MatchDetail() {
 
   return (
     <main className="max-w-4xl mx-auto p-3 sm:p-6 space-y-4 sm:space-y-8">
+      <Seo
+        title={`Real Lisiados vs ${match.rival}`}
+        description={`Partido del Real Lisiados F.C. frente a ${match.rival}${
+          match.competitionName ? ` en ${match.competitionName}` : ''
+        }${match.jornada != null ? ` (jornada ${match.jornada})` : ''}. ${
+          finished ? `Resultado ${leftGoals}-${rightGoals}.` : 'Fecha, sede y previa.'
+        }`}
+        path={`/partidos/${id}`}
+        type="article"
+        jsonLd={{
+          '@context': 'https://schema.org',
+          '@type': 'SportsEvent',
+          name: `Real Lisiados F.C. vs ${match.rival}`,
+          sport: 'Fútbol sala',
+          startDate: match.date || undefined,
+          eventStatus: finished ? 'https://schema.org/EventScheduled' : undefined,
+          location: match.location
+            ? { '@type': 'Place', name: match.location }
+            : undefined,
+          homeTeam: { '@type': 'SportsTeam', name: isHome ? SITE_NAME : match.rival },
+          awayTeam: { '@type': 'SportsTeam', name: isHome ? match.rival : SITE_NAME },
+          organizer: { '@type': 'Organization', name: SITE_NAME, url: SITE_URL },
+          url: `${SITE_URL}/partidos/${id}`,
+        }}
+      />
       {/* Cabecera */}
       <section className="bg-card-bg dark:bg-[#071018] border border-card-border dark:border-re-dorado/30 rounded-3xl sm:rounded-[40px] shadow-card dark:shadow-[0_24px_60px_rgba(0,0,0,0.28)] overflow-hidden">
         <div className="bg-re-rojo px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between">

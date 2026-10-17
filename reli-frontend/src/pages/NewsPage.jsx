@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import Seo from '../components/Seo';
 import { getEvents, toPage } from '../services/api';
 
 const TYPE_BADGES = {
@@ -45,6 +46,11 @@ export default function NewsPage() {
 
   return (
     <main className="max-w-5xl mx-auto p-4 sm:p-6 lg:p-10">
+      <Seo
+        title="Noticias"
+        description="Toda la actualidad del Real Lisiados F.C.: noticias del primer equipo, la cantera, entrenamientos y eventos del club."
+        path="/noticias"
+      />
       {/* Cabecera */}
       <div className="mb-8 sm:mb-10 border-b border-card-border pb-4">
         <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black italic tracking-tighter uppercase leading-none">

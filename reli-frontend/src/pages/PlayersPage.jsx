@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion, MotionConfig } from 'framer-motion';
+import Seo from '../components/Seo';
 import { getPlayerSeasonStats, getSeasons, toPage } from '../services/api';
 import { jerseyForSeason } from '../constants/jerseys';
 import { POSITION_LABELS } from '../constants/positions';
@@ -117,6 +118,11 @@ export default function PlayersPage() {
   return (
     <MotionConfig reducedMotion="user">
       <main className="mx-auto max-w-5xl space-y-3 p-4 sm:p-6">
+        <Seo
+          title="Plantilla y jugadores"
+          description="Plantilla del Real Lisiados F.C. con fichas, dorsales, posiciones, goles, tarjetas y estadísticas por temporada."
+          path="/jugadores"
+        />
         <header className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <p className="text-[9px] font-black uppercase tracking-[0.22em] text-re-rojo">Primer equipo</p>
