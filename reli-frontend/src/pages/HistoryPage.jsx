@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import logo from '../assets/reli-badge.png';
+import Seo from '../components/Seo';
 import { getAllPlayers, getCompetitions, getMatches, getSeasons, toPage } from '../services/api';
 
 export default function HistoryPage() {
@@ -45,6 +46,11 @@ export default function HistoryPage() {
 
   return (
     <main className="max-w-5xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+      <Seo
+        title="Historia del club"
+        description="Historia, valores y trayectoria temporada a temporada del Real Lisiados F.C., club de fútbol sala. Somos mucho más que un club."
+        path="/historia"
+      />
       {/* Hero */}
       <section className="gold-sweep relative overflow-hidden rounded-3xl bg-card-bg dark:bg-[#071018] border border-card-border dark:border-re-dorado/30 shadow-card dark:shadow-[0_24px_60px_rgba(0,0,0,0.35)]">
         <div className="stadium-beam stadium-beam-left hidden dark:block" />

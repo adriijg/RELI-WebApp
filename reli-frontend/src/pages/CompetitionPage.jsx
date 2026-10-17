@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, MotionConfig } from 'framer-motion';
+import Seo from '../components/Seo';
 import { getCompetitions, getSeasons, getStandings, getMatchesByCompetition, toPage, getNeutralMatches, saveNeutralMatch, deleteNeutralMatch, syncJornadaResults, syncMatchResult, scrapeMatchActa, fetchActaHtml, fetchActaPdf } from '../services/api';
 import { useApp } from '../context/AppContext';
 import { STATUS_LABELS } from '../constants/matchStatus';
@@ -791,6 +792,11 @@ export default function CompetitionPage() {
   return (
     <MotionConfig reducedMotion="user">
     <main className="mx-auto max-w-5xl space-y-5 p-4 text-foreground dark:text-white sm:p-6">
+      <Seo
+        title="Clasificación y resultados"
+        description="Clasificación actualizada, jornadas y resultados de liga y copa del Real Lisiados F.C. en fútbol sala."
+        path="/competicion"
+      />
       <section className="gold-sweep relative overflow-hidden rounded-[1.7rem] border border-card-border dark:border-re-dorado/30 bg-card-bg dark:bg-[#071018] shadow-card dark:shadow-[0_24px_60px_rgba(0,0,0,0.35)]">
         <div className="stadium-beam stadium-beam-left hidden dark:block" />
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(226,29,44,0.12),transparent_55%)] dark:bg-[radial-gradient(circle_at_top,rgba(226,29,44,0.45),transparent_55%)]" />

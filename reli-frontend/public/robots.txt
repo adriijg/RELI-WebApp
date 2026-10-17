@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+
+# Panel de administración y rutas privadas: no indexar
+Disallow: /admin
+Disallow: /auth
+
+Sitemap: https://reallisiados.duckdns.org/sitemap.xml
