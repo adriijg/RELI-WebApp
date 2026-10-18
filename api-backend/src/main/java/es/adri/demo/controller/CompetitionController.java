@@ -37,9 +37,13 @@ public class CompetitionController {
             @org.springframework.web.bind.annotation.RequestParam(defaultValue = "0") int page,
             @org.springframework.web.bind.annotation.RequestParam(defaultValue = "10") int size,
             @org.springframework.web.bind.annotation.RequestParam(defaultValue = "name") String sortBy,
-            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "asc") String direction
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "asc") String direction,
+            @org.springframework.web.bind.annotation.RequestParam(required = false) String search
     ) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.fromString(direction), sortBy));
+        if (search != null && !search.isBlank()) {
+            return ResponseEntity.ok(competitionService.findCompetitionsBySearch(search, pageable));
+        }
         return ResponseEntity.ok(competitionService.findAllCompetitions(pageable));
     }
 

@@ -1,19 +1,16 @@
 import { useCallback, useEffect, useState } from 'react';
 import PageHeader from '../../components/admin/PageHeader';
-import {
-  applyFfmSync,
-  getCompetitions,
-  getFfmSyncRuns,
-  previewFfmSync,
-  syncJornadaResults,
-  toPage,
-} from '../../services/api';
+import AdminSelect from '../../components/admin/AdminSelect';
+import Badge from '../../components/admin/Badge';
+import EmptyState from '../../components/admin/EmptyState';
+import { applyFfmSync, getCompetitions, getFfmSyncRuns, previewFfmSync, syncJornadaResults, toPage } from '../../services/api';
+import { formatDateTime } from '../../utils/format';
 
-const ACTION_STYLES = {
-  CREATED: 'bg-emerald-500/15 text-emerald-500',
-  UPDATED: 'bg-blue-500/15 text-blue-500',
-  UNCHANGED: 'bg-muted/10 text-muted-foreground',
-  SKIP: 'bg-orange-500/15 text-orange-500',
+const ACTION_VARIANTS = {
+  CREATED: 'green',
+  UPDATED: 'blue',
+  UNCHANGED: 'slate',
+  SKIP: 'yellow',
 };
 
 const ACTION_LABELS = {
@@ -23,12 +20,10 @@ const ACTION_LABELS = {
   SKIP: 'Omitir',
 };
 
-function formatDateTime(value) {
-  if (!value) return '—';
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return '—';
-  return d.toLocaleString('es-ES', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
-}
+const RUN_STATUS_VARIANTS = {
+  OK: 'green',
+  PARTIAL: 'yellow',
+};
 
 export default function SyncAdmin() {
   const [competitions, setCompetitions] = useState([]);
@@ -49,62 +44,56 @@ export default function SyncAdmin() {
   }, []);
 
   useEffect(() => {
-    getCompetitions({ size: 100 })
+    getCompetitions({ size: 200 })
       .then((data) => {
         const list = toPage(data).content;
         setCompetitions(list);
-        const preferred = list.find((c) => c.ffmCompeticion) || list[0];
+        const preferred = list.find((competition) => competition.ffmCompeticion) || list[0];
         if (preferred) setSelectedId(String(preferred.id));
       })
       .catch(() => setCompetitions([]));
     loadRuns();
   }, [loadRuns]);
 
-  const selected = competitions.find((c) => String(c.id) === String(selectedId));
+  const selected = competitions.find((competition) => String(competition.id) === String(selectedId));
   const configured = Boolean(selected?.ffmCompeticion && selected?.ffmGrupo && selected?.ffmTemporada);
+
+  const runAction = async (action, errorFallback) => {
+    setError('');
+    try {
+      await action();
+    } catch (err) {
+      setError(err.message || errorFallback);
+    }
+  };
 
   const handlePreview = async () => {
     if (!selectedId) return;
     setLoadingPreview(true);
-    setError('');
-    try {
-      setPreview(await previewFfmSync(selectedId));
-    } catch (err) {
-      setError(err.message || 'No se pudo previsualizar');
-      setPreview(null);
-    } finally {
-      setLoadingPreview(false);
-    }
+    await runAction(async () => setPreview(await previewFfmSync(selectedId)), 'No se pudo previsualizar');
+    setLoadingPreview(false);
   };
 
   const handleApply = async () => {
     if (!selectedId) return;
     setApplying(true);
-    setError('');
-    try {
+    await runAction(async () => {
       setPreview(await applyFfmSync(selectedId));
       loadRuns();
-    } catch (err) {
-      setError(err.message || 'No se pudo aplicar');
-    } finally {
-      setApplying(false);
-    }
+    }, 'No se pudo aplicar');
+    setApplying(false);
   };
 
   const handleSyncJornada = async () => {
     if (!selectedId || !jornada) return;
     setSyncingJornada(true);
-    setError('');
     setJornadaMsg('');
-    try {
+    await runAction(async () => {
       const res = await syncJornadaResults(selectedId, Number(jornada));
       setJornadaMsg(res?.message || 'Jornada sincronizada');
       loadRuns();
-    } catch (err) {
-      setError(err.message || 'No se pudo sincronizar la jornada');
-    } finally {
-      setSyncingJornada(false);
-    }
+    }, 'No se pudo sincronizar la jornada');
+    setSyncingJornada(false);
   };
 
   return (
@@ -121,26 +110,24 @@ export default function SyncAdmin() {
       )}
 
       <section className="bg-card-bg border border-card-border rounded-3xl shadow-card p-6 lg:p-8 mb-6">
-        <label htmlFor="sync-competition" className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-2">
-          Competición
-        </label>
-        <select
-          id="sync-competition"
+        <AdminSelect
+          label="Competición"
           value={selectedId}
-          onChange={(e) => { setSelectedId(e.target.value); setPreview(null); }}
-          className="w-full sm:max-w-md bg-muted/10 border border-card-border rounded-xl px-4 py-3 text-sm font-bold uppercase tracking-wide focus:outline-none focus:ring-2 focus:ring-re-rojo"
-        >
-          {competitions.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}{c.ffmCompeticion ? '' : ' (sin FFM)'}
-            </option>
-          ))}
-        </select>
+          onChange={(value) => {
+            setSelectedId(value);
+            setPreview(null);
+          }}
+          options={competitions.map((competition) => ({
+            value: String(competition.id),
+            label: `${competition.name}${competition.ffmCompeticion ? '' : ' (sin FFM)'}`,
+          }))}
+          className="sm:max-w-md"
+        />
 
         {!configured && selected && (
           <p className="mt-3 text-xs font-bold text-orange-500">
-            Esta competición no tiene configurados los identificadores FFM (competición, grupo, temporada).
-            Ponlos en Competiciones para poder sincronizar.
+            Esta competición no tiene configurados los identificadores FFM (competición, grupo, temporada). Ponlos en
+            Competiciones para poder sincronizar.
           </p>
         )}
 
@@ -171,9 +158,9 @@ export default function SyncAdmin() {
               type="number"
               min="1"
               value={jornada}
-              onChange={(e) => setJornada(e.target.value)}
+              onChange={(event) => setJornada(event.target.value)}
               placeholder="Nº jornada"
-              className="w-32 bg-muted/10 border border-card-border rounded-xl px-4 py-3 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-re-rojo"
+              className="w-32 bg-muted/30 border border-card-border rounded-xl px-4 py-3 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-re-rojo/40"
             />
             <button
               onClick={handleSyncJornada}
@@ -213,21 +200,22 @@ export default function SyncAdmin() {
                 </tr>
               </thead>
               <tbody>
-                {preview.actions?.map((a, i) => (
-                  <tr key={i} className="border-b border-card-border last:border-0">
-                    <td className="text-center px-2 py-3 font-black">{a.jornada ?? '—'}</td>
+                {preview.actions?.map((action, index) => (
+                  <tr key={index} className="border-b border-card-border last:border-0">
+                    <td className="text-center px-2 py-3 font-black">{action.jornada ?? '—'}</td>
                     <td className="px-3 py-3 font-bold uppercase text-xs">
-                      {a.home ? '' : '@ '}{a.rival}
+                      {action.home ? '' : '@ '}
+                      {action.rival}
                     </td>
                     <td className="px-3 py-3 text-xs text-muted-foreground hidden sm:table-cell">
-                      {[a.date ? a.date.slice(0, 16).replace('T', ' ') : '', a.venue].filter(Boolean).join(' · ') || '—'}
+                      {[action.date ? action.date.slice(0, 16).replace('T', ' ') : '', action.venue].filter(Boolean).join(' · ') || '—'}
                     </td>
                     <td className="text-center px-3 py-3">
-                      <span className={`inline-block px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${ACTION_STYLES[a.action] || ACTION_STYLES.UNCHANGED}`}>
-                        {ACTION_LABELS[a.action] || a.action}
-                      </span>
+                      <Badge variant={ACTION_VARIANTS[action.action] || 'slate'}>
+                        {ACTION_LABELS[action.action] || action.action}
+                      </Badge>
                     </td>
-                    <td className="px-3 py-3 text-xs text-muted-foreground hidden md:table-cell">{a.detail || '—'}</td>
+                    <td className="px-3 py-3 text-xs text-muted-foreground hidden md:table-cell">{action.detail || '—'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -241,9 +229,7 @@ export default function SyncAdmin() {
           <h2 className="text-lg font-black uppercase tracking-tight">Últimas sincronizaciones</h2>
         </div>
         {runs.length === 0 ? (
-          <p className="px-6 py-10 text-center text-muted-foreground font-bold text-sm">
-            Todavía no hay ejecuciones registradas.
-          </p>
+          <EmptyState title="Sin ejecuciones" message="Todavía no hay sincronizaciones registradas." />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm min-w-[680px]">
@@ -264,18 +250,10 @@ export default function SyncAdmin() {
                     <td className="px-3 py-3 text-xs font-bold whitespace-nowrap">{formatDateTime(run.startedAt)}</td>
                     <td className="px-3 py-3 text-xs font-bold uppercase">{run.competitionName || run.competitionId}</td>
                     <td className="text-center px-3 py-3">
-                      <span className="inline-block px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest bg-muted/10 text-muted-foreground">
-                        {run.triggeredBy === 'SCHEDULED' ? 'Auto' : 'Manual'}
-                      </span>
+                      <Badge variant="slate">{run.triggeredBy === 'SCHEDULED' ? 'Auto' : 'Manual'}</Badge>
                     </td>
                     <td className="text-center px-3 py-3">
-                      <span className={`inline-block px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${
-                        run.status === 'OK' ? 'bg-emerald-500/15 text-emerald-500'
-                          : run.status === 'PARTIAL' ? 'bg-orange-500/15 text-orange-500'
-                            : 'bg-re-rojo/15 text-re-rojo'
-                      }`}>
-                        {run.status}
-                      </span>
+                      <Badge variant={RUN_STATUS_VARIANTS[run.status] || 'red'}>{run.status}</Badge>
                     </td>
                     <td className="text-center px-2 py-3 font-black">{run.created}</td>
                     <td className="text-center px-2 py-3 font-black">{run.updated}</td>

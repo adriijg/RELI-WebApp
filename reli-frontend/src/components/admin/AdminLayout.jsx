@@ -38,22 +38,8 @@ function Icon({ name, className = 'w-5 h-5' }) {
 }
 
 export default function AdminLayout() {
-  const { user, theme, toggleTheme, handleLogout, isAdmin } = useApp();
+  const { user, theme, toggleTheme, handleLogout } = useApp();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-
-  if (!isAdmin) {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-6">
-        <div className="card-depth rounded-3xl p-10 max-w-md text-center">
-          <h1 className="text-3xl font-black italic text-re-rojo mb-3">403</h1>
-          <p className="font-bold text-muted-foreground mb-6">No tienes permisos de administrador.</p>
-          <Link to="/" className="inline-block bg-re-rojo text-white font-black px-6 py-3 rounded-xl text-xs tracking-widest uppercase hover:bg-re-rojo/90 transition-all">
-            Volver a la web
-          </Link>
-        </div>
-      </div>
-    );
-  }
 
   const sidebar = (
     <div className="flex flex-col h-full">

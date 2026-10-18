@@ -45,9 +45,13 @@ public class EventController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "date") String sortBy,
-            @RequestParam(defaultValue = "desc") String direction
+            @RequestParam(defaultValue = "desc") String direction,
+            @RequestParam(required = false) String search
     ) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.fromString(direction), sortBy));
+        if (search != null && !search.isBlank()) {
+            return ResponseEntity.ok(eventService.findEventsBySearch(search, pageable));
+        }
         return ResponseEntity.ok(eventService.findAllEvents(pageable));
     }
 

@@ -4,3 +4,8 @@ export const STATUS_LABELS = {
   FINISHED: 'Finalizado',
   POSTPONED: 'Aplazado',
 };
+
+export const STATUS_OPTIONS = Object.entries(STATUS_LABELS).map(([value, label]) => ({
+  value,
+  label,
+}));

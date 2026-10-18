@@ -19,6 +19,11 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
 
     org.springframework.data.domain.Page<Match> findByStatus(es.adri.demo.model.MatchStatus status, org.springframework.data.domain.Pageable pageable);
 
+    @Query("SELECT m FROM Match m WHERE LOWER(m.rival) LIKE LOWER(CONCAT('%', :search, '%')) "
+            + "OR LOWER(m.location) LIKE LOWER(CONCAT('%', :search, '%'))")
+    org.springframework.data.domain.Page<Match> findBySearch(@Param("search") String search,
+            org.springframework.data.domain.Pageable pageable);
+
     @Query("SELECT m FROM Match m WHERE m.rival = :rival AND m.status = es.adri.demo.model.MatchStatus.FINISHED "
             + "AND m.id <> :excludeId ORDER BY m.date DESC")
     List<Match> findFinishedByRival(@Param("rival") String rival, @Param("excludeId") Long excludeId);

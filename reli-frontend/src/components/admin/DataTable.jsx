@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
+import { formatCell } from '../../utils/format';
 
 export default function DataTable({
   columns,
@@ -49,7 +50,10 @@ export default function DataTable({
     return Array.from(groups.entries()).sort(([a], [b]) => {
       if (a === '__none__') return 1;
       if (b === '__none__') return -1;
-      return Number(a) - Number(b);
+      const na = Number(a);
+      const nb = Number(b);
+      if (!Number.isNaN(na) && !Number.isNaN(nb)) return na - nb;
+      return String(a).localeCompare(String(b), 'es');
     });
   }, [filtered, groupBy]);
 
@@ -316,19 +320,4 @@ export default function DataTable({
       )}
     </div>
   );
-}
-
-function formatCell(value) {
-  if (value === null || value === undefined || value === '') return '—';
-  if (typeof value === 'boolean') return value ? 'Sí' : 'No';
-  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(value)) {
-    return new Date(value).toLocaleString('es-ES', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  }
-  return String(value);
 }

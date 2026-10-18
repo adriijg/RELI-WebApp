@@ -52,6 +52,10 @@ public class MatchService {
         return toPagedResponse(matchRepository.findByStatus(status, pageable).map(this::toDto));
     }
 
+    public PagedResponseDTO<MatchDTO> findMatchesBySearch(String search, Pageable pageable) {
+        return toPagedResponse(matchRepository.findBySearch(search, pageable).map(this::toDto));
+    }
+
     @Cacheable(value = "nextMatch")
     public MatchDTO findNextMatch() {
         Page<MatchDTO> page = matchRepository.findAll(PageRequest.of(0, 1, org.springframework.data.domain.Sort.by("date").ascending()))

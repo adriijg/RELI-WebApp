@@ -27,6 +27,12 @@ public class SeasonService {
         return toPagedResponse(page);
     }
 
+    public PagedResponseDTO<SeasonDTO> findSeasonsBySearch(String search, Pageable pageable) {
+        Page<SeasonDTO> page = seasonRepository.findBySearch(search, pageable)
+                .map(this::toDto);
+        return toPagedResponse(page);
+    }
+
     public SeasonDTO findSeasonById(Long id) {
         return toDto(getSeasonById(id));
     }

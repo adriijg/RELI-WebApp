@@ -5,6 +5,7 @@ import es.adri.demo.config.JwtService;
 import es.adri.demo.dto.GoogleAuthRequest;
 import es.adri.demo.dto.LoginRequestDTO;
 import es.adri.demo.dto.UserDTO;
+import es.adri.demo.dto.PagedResponseDTO;
 import es.adri.demo.dto.UserRegistrationDTO;
 import es.adri.demo.dto.UserUpdateDTO;
 import es.adri.demo.model.EmailToken;
@@ -23,6 +24,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.client.RestTemplate;
@@ -96,6 +99,20 @@ public class UserService {
                 .stream()
                 .map(this::toDto)
                 .collect(Collectors.toList());
+    }
+
+    public PagedResponseDTO<UserDTO> findUsersPage(String search, Pageable pageable) {
+        Page<User> page = (search != null && !search.isBlank())
+                ? userRepository.findBySearch(search, pageable)
+                : userRepository.findAll(pageable);
+        return new PagedResponseDTO<>(
+                page.getContent().stream().map(this::toDto).collect(Collectors.toList()),
+                page.getNumber(),
+                page.getSize(),
+                page.getTotalElements(),
+                page.getTotalPages(),
+                page.isLast()
+        );
     }
 
     private static final String GOOGLE_TOKENINFO_URL = "https://oauth2.googleapis.com/tokeninfo";

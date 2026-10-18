@@ -20,13 +20,16 @@ const handleResponse = async (response) => {
             message = data || `Error del servidor (${response.status})`;
         } else {
             message = data?.message || data?.error || `Error del servidor (${response.status})`;
-            if (data?.fieldErrors && typeof data.fieldErrors === 'object') {
-                message = Object.values(data.fieldErrors).join('. ');
+            const fieldErrors = data?.fieldErrors || data?.validationErrors;
+            if (fieldErrors && typeof fieldErrors === 'object') {
+                message = Object.values(fieldErrors).join('. ');
             }
         }
         if (response.status === 401) {
             message = 'Sesión no válida o caducada. Cierra sesión y vuelve a iniciarla.';
             localStorage.removeItem('re-token');
+            localStorage.removeItem('re-user');
+            window.dispatchEvent(new Event('re-session-expired'));
         } else if (response.status === 403) {
             message = data?.message || 'No tienes permisos para esta acción (se requiere rol ADMIN).';
         }
@@ -160,7 +163,9 @@ export const fetchEmailPreviewHtml = async (type, competitionId) => {
   });
   if (!response.ok) throw new Error(`No se pudo cargar la vista previa (${response.status})`);
   return response.text();
-};export const previewFfmSync = (competitionId) =>
+};
+
+export const previewFfmSync = (competitionId) =>
   apiFetch('/admin/sync/ffm/preview', { method: 'POST', params: { competitionId } });
 export const applyFfmSync = (competitionId) =>
   apiFetch('/admin/sync/ffm/apply', { method: 'POST', params: { competitionId } });
@@ -213,6 +218,6 @@ export const updateStat = (id, body) => apiFetch(`/stats/${id}`, { method: 'PUT'
 export const deleteStat = (id) => apiFetch(`/stats/${id}`, { method: 'DELETE' });
 
 /* ---------- Usuarios ---------- */
-export const getUsers = () => apiFetch('/users');
+export const getUsers = (params) => apiFetch('/users', { params });
 export const updateUser = (id, body) => apiFetch(`/users/${id}`, { method: 'PUT', body });
 export const deleteUser = (id) => apiFetch(`/users/${id}`, { method: 'DELETE' });
