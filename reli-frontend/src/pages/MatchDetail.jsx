@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import logo from '../assets/reli-badge.png';
 import Seo from '../components/Seo';
 import { SITE_NAME, SITE_URL } from '../constants/seo';
-import { getMatchDetail, getMatches, getStats, getCompetitions, getPlayerSeasonStats, getQuintetStatus, getQuintetTally, deleteQuintetVote, getAllPlayers, getMyQuintetVote, openQuintet, closeQuintet, saveQuintetVote } from '../services/api';
+import { getMatchDetail, getMatches, getStats, getCompetitions, getPlayerSeasonStats, getQuintetStatus, getQuintetTally, deleteQuintetVote, getAllPlayers, getMyQuintetVote, openQuintet, closeQuintet, saveQuintetVote, getNeutralMatches } from '../services/api';
 import { useApp } from '../context/AppContext';
 import { rememberAdminMatch } from '../utils/adminRecentMatches';
 import AdminMatchEditButton from '../components/admin/AdminMatchEditButton';
@@ -75,77 +75,56 @@ function getResultGoals(match) {
   };
 }
 
-async function getFfmMatches(competitionIds) {
+async function getNeutralMatchesFor(competitionIds) {
   const results = await Promise.allSettled(
-    competitionIds.map(async (competitionId) => {
-      const indexResponse = await fetch(`/ffm/${competitionId}/index.json`);
-      if (!indexResponse.ok) return [];
-      const index = await indexResponse.json();
-      const rounds = await Promise.all(
-        (index.rounds || []).map(async (round) => {
-          const response = await fetch(`/ffm/${competitionId}/jornada-${round}.json`);
-          if (!response.ok) return [];
-          const games = await response.json();
-          return games.map((game) => ({ ...game, competitionId, jornada: round }));
-        }),
-      );
-      return rounds.flat();
-    }),
+    competitionIds.map((competitionId) => getNeutralMatches(competitionId)),
   );
-  return results.flatMap((result) => (result.status === 'fulfilled' ? result.value : []));
+  return results.flatMap((result) =>
+    result.status === 'fulfilled' && Array.isArray(result.value) ? result.value : [],
+  );
 }
 
-function mapTeamMatches(ffmMatches, rivalName) {
+function mapRivalTeamMatches(neutralMatches, sourceMatches, rivalName) {
   const rivalKey = normalizeName(rivalName);
-  const rivalCodes = new Set(
-    ffmMatches.flatMap((game) => {
-      if (normalizeName(game.home) === rivalKey) return [game.homeCode];
-      if (normalizeName(game.away) === rivalKey) return [game.awayCode];
-      return [];
-    }),
-  );
-  const teamCode = [...rivalCodes][0];
-  if (!teamCode) return [];
-
-  return ffmMatches
-    .filter((game) => String(game.homeCode) === String(teamCode) || String(game.awayCode) === String(teamCode))
+  const fromNeutral = neutralMatches
+    .filter((game) => normalizeName(game.homeName) === rivalKey || normalizeName(game.awayName) === rivalKey)
     .map((game) => {
-      const isHome = String(game.homeCode) === String(teamCode);
+      const isHome = normalizeName(game.homeName) === rivalKey;
       return {
-        id: `ffm-${game.competitionId}-${game.jornada}-${game.homeCode}-${game.awayCode}`,
-        rival: isHome ? game.away : game.home,
+        id: `neutral-${game.id}`,
+        rival: isHome ? game.awayName : game.homeName,
         home: isHome,
         date: game.date,
-        status: game.homeGoals != null && game.awayGoals != null ? 'FINISHED' : 'SCHEDULED',
-        ourGoals: game.homeGoals,
-        rivalGoals: game.awayGoals,
-        jornada: game.jornada,
-        competitionId: game.competitionId,
+        status: game.status,
+        ourGoals: isHome ? game.homeGoals : game.awayGoals,
+        rivalGoals: isHome ? game.awayGoals : game.homeGoals,
       };
     });
+  const fromOurMatches = sourceMatches.map((match) => ({
+    id: `db-${match.id}`,
+    rival: SITE_NAME,
+    home: !match.home,
+    date: match.date,
+    status: match.status,
+    ourGoals: match.rivalGoals,
+    rivalGoals: match.ourGoals,
+  }));
+  return [...fromNeutral, ...fromOurMatches];
 }
 
-function buildRivalInfo(detail, allMatches, teamMatches) {
+function buildRivalInfo(detail, allMatches, neutralMatches) {
   const match = detail.match;
   const currentRival = detail.rivalInfo?.rivalName || match.rival;
   const rivalKey = normalizeName(currentRival);
   const sourceMatches = allMatches.filter((candidate) => normalizeName(candidate.rival) === rivalKey);
   const fallbackInfo = detail.rivalInfo || {};
 
-  if (!sourceMatches.length) {
-    return {
-      ...fallbackInfo,
-      rivalName: currentRival,
-      recentMatches: sortNewestFirst((teamMatches.length ? teamMatches : fallbackInfo.recentMatches || []).filter(isPlayed)).slice(0, 5),
-      headToHead: sortNewestFirst((fallbackInfo.headToHead || []).filter(isPlayed)),
-    };
-  }
-
-  const pastMatches = sourceMatches.filter(isPlayed);
+  const teamMatches = mapRivalTeamMatches(neutralMatches, sourceMatches, currentRival);
   const recentMatches = sortNewestFirst(
-    (teamMatches.length ? teamMatches : pastMatches).filter((candidate) => String(candidate.id) !== String(match.id) && isPlayed(candidate)),
+    teamMatches.filter((candidate) => String(candidate.id) !== String(match.id) && isPlayed(candidate)),
   ).slice(0, 5);
-  const headToHead = sortNewestFirst(pastMatches);
+
+  const headToHead = sortNewestFirst(sourceMatches.filter(isPlayed));
   const results = headToHead.map(getResultGoals);
   const ourWins = results.filter(({ ourGoals, rivalGoals }) => ourGoals > rivalGoals).length;
   const rivalWins = results.filter(({ ourGoals, rivalGoals }) => ourGoals < rivalGoals).length;
@@ -202,9 +181,8 @@ export default function MatchDetail() {
           .filter((competitionId) => competitionId != null),
       )];
       if (data.match.competitionId != null) competitionIds.push(data.match.competitionId);
-      const ffmMatches = await getFfmMatches([...new Set(competitionIds)]);
-      const teamMatches = mapTeamMatches(ffmMatches, data.rivalInfo?.rivalName || data.match.rival);
-      setDetail({ ...data, stats: matchStats, rivalInfo: buildRivalInfo(data, allMatches, teamMatches) });
+      const neutralMatches = await getNeutralMatchesFor([...new Set(competitionIds)]);
+      setDetail({ ...data, stats: matchStats, rivalInfo: buildRivalInfo(data, allMatches, neutralMatches) });
     } catch (err) {
       setError(err.message || 'No se pudo cargar el partido');
     } finally {
