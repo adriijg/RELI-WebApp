@@ -75,6 +75,26 @@ function getResultGoals(match) {
   };
 }
 
+async function getFfmMatches(competitionIds) {
+  const results = await Promise.allSettled(
+    competitionIds.map(async (competitionId) => {
+      const indexResponse = await fetch(`/ffm/${competitionId}/index.json`);
+      if (!indexResponse.ok) return [];
+      const index = await indexResponse.json();
+      const rounds = await Promise.all(
+        (index.rounds || []).map(async (round) => {
+          const response = await fetch(`/ffm/${competitionId}/jornada-${round}.json`);
+          if (!response.ok) return [];
+          const games = await response.json();
+          return games.map((game) => ({ ...game, competitionId, jornada: round }));
+        }),
+      );
+      return rounds.flat();
+    }),
+  );
+  return results.flatMap((result) => (result.status === 'fulfilled' ? result.value : []));
+}
+
 async function getNeutralMatchesFor(competitionIds) {
   const results = await Promise.allSettled(
     competitionIds.map((competitionId) => getNeutralMatches(competitionId)),
@@ -84,8 +104,26 @@ async function getNeutralMatchesFor(competitionIds) {
   );
 }
 
-function mapRivalTeamMatches(neutralMatches, sourceMatches, rivalName) {
+// Partidos del rival desde el punto de vista del rival: `home` = el rival juega en casa
+// y `ourGoals`/`rivalGoals` son siempre los goles del propio equipo (el rival) primero.
+function buildRivalTeamMatches(ffmMatches, neutralMatches, sourceMatches, rivalName) {
   const rivalKey = normalizeName(rivalName);
+
+  const fromFfm = ffmMatches
+    .filter((game) => !game.ours && (normalizeName(game.home) === rivalKey || normalizeName(game.away) === rivalKey))
+    .map((game) => {
+      const isHome = normalizeName(game.home) === rivalKey;
+      return {
+        id: `ffm-${game.competitionId}-${game.jornada}-${game.homeCode}-${game.awayCode}`,
+        rival: isHome ? game.away : game.home,
+        home: isHome,
+        date: game.date,
+        status: game.homeGoals != null && game.awayGoals != null ? 'FINISHED' : 'SCHEDULED',
+        ourGoals: isHome ? game.homeGoals : game.awayGoals,
+        rivalGoals: isHome ? game.awayGoals : game.homeGoals,
+      };
+    });
+
   const fromNeutral = neutralMatches
     .filter((game) => normalizeName(game.homeName) === rivalKey || normalizeName(game.awayName) === rivalKey)
     .map((game) => {
@@ -100,6 +138,7 @@ function mapRivalTeamMatches(neutralMatches, sourceMatches, rivalName) {
         rivalGoals: isHome ? game.awayGoals : game.homeGoals,
       };
     });
+
   const fromOurMatches = sourceMatches.map((match) => ({
     id: `db-${match.id}`,
     rival: SITE_NAME,
@@ -109,19 +148,38 @@ function mapRivalTeamMatches(neutralMatches, sourceMatches, rivalName) {
     ourGoals: match.rivalGoals,
     rivalGoals: match.ourGoals,
   }));
-  return [...fromNeutral, ...fromOurMatches];
+
+  return [...fromFfm, ...fromNeutral, ...fromOurMatches];
 }
 
-function buildRivalInfo(detail, allMatches, neutralMatches) {
+function matchDedupeKey(match) {
+  const time = match.date ? new Date(match.date).getTime() : 0;
+  return `${time}|${match.ourGoals ?? ''}-${match.rivalGoals ?? ''}`;
+}
+
+function buildRivalInfo(detail, allMatches, sources) {
   const match = detail.match;
   const currentRival = detail.rivalInfo?.rivalName || match.rival;
   const rivalKey = normalizeName(currentRival);
   const sourceMatches = allMatches.filter((candidate) => normalizeName(candidate.rival) === rivalKey);
   const fallbackInfo = detail.rivalInfo || {};
 
-  const teamMatches = mapRivalTeamMatches(neutralMatches, sourceMatches, currentRival);
+  const matchTime = match.date ? new Date(match.date).getTime() : NaN;
+  const seen = new Set();
   const recentMatches = sortNewestFirst(
-    teamMatches.filter((candidate) => String(candidate.id) !== String(match.id) && isPlayed(candidate)),
+    buildRivalTeamMatches(sources.ffmMatches, sources.neutralMatches, sourceMatches, currentRival)
+      .filter((candidate) => {
+        if (String(candidate.id) === String(match.id)) return false;
+        if (!isPlayed(candidate)) return false;
+        if (!Number.isNaN(matchTime) && candidate.date) {
+          const time = new Date(candidate.date).getTime();
+          if (!Number.isNaN(time) && time > matchTime) return false;
+        }
+        const key = matchDedupeKey(candidate);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      }),
   ).slice(0, 5);
 
   const headToHead = sortNewestFirst(sourceMatches.filter(isPlayed));
@@ -181,8 +239,12 @@ export default function MatchDetail() {
           .filter((competitionId) => competitionId != null),
       )];
       if (data.match.competitionId != null) competitionIds.push(data.match.competitionId);
-      const neutralMatches = await getNeutralMatchesFor([...new Set(competitionIds)]);
-      setDetail({ ...data, stats: matchStats, rivalInfo: buildRivalInfo(data, allMatches, neutralMatches) });
+      const uniqueCompetitionIds = [...new Set(competitionIds)];
+      const [ffmMatches, neutralMatches] = await Promise.all([
+        getFfmMatches(uniqueCompetitionIds),
+        getNeutralMatchesFor(uniqueCompetitionIds),
+      ]);
+      setDetail({ ...data, stats: matchStats, rivalInfo: buildRivalInfo(data, allMatches, { ffmMatches, neutralMatches }) });
     } catch (err) {
       setError(err.message || 'No se pudo cargar el partido');
     } finally {
