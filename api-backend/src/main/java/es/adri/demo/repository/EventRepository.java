@@ -26,6 +26,12 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     @EntityGraph(attributePaths = "createdBy")
     Optional<Event> findById(Long id);
 
+    @EntityGraph(attributePaths = "createdBy")
+    @Query("SELECT e FROM Event e WHERE LOWER(e.title) LIKE LOWER(CONCAT('%', :search, '%')) "
+            + "OR LOWER(e.description) LIKE LOWER(CONCAT('%', :search, '%')) "
+            + "OR LOWER(e.location) LIKE LOWER(CONCAT('%', :search, '%'))")
+    Page<Event> findBySearch(@Param("search") String search, Pageable pageable);
+
     @Modifying
     @Query("update Event e set e.createdBy = null where e.createdBy = :user")
     void clearCreatedBy(@Param("user") User user);

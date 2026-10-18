@@ -41,6 +41,12 @@ public class PlayerService {
         return toPagedResponse(page);
     }
 
+    public PagedResponseDTO<PlayerDTO> findActivePlayersBySearch(String search, Pageable pageable) {
+        Page<PlayerDTO> page = playerRepository.findActiveBySearch(search, pageable)
+                .map(this::toDto);
+        return toPagedResponse(page);
+    }
+
     public List<PlayerDTO> findAllActive() {
         return playerRepository.findAllByActiveTrue().stream()
                 .map(this::toDto)

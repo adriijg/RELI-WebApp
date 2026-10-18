@@ -3,13 +3,16 @@ package es.adri.demo.controller;
 import es.adri.demo.dto.AuthResponseDTO;
 import es.adri.demo.dto.LoginRequestDTO;
 import es.adri.demo.dto.UserDTO;
+import es.adri.demo.dto.PagedResponseDTO;
 import es.adri.demo.dto.UserRegistrationDTO;
 import es.adri.demo.dto.UserUpdateDTO;
 import es.adri.demo.dto.PasswordResetConfirmDTO;
 import es.adri.demo.dto.PasswordResetRequestDTO;
 import jakarta.validation.Valid;
 import es.adri.demo.service.UserService;
-import java.util.List;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -20,6 +23,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -69,8 +73,15 @@ public class UserController {
 
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<List<UserDTO>> getAllUsers() {
-        return ResponseEntity.ok(userService.findAllUsers());
+    public ResponseEntity<PagedResponseDTO<UserDTO>> getAllUsers(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "username") String sortBy,
+            @RequestParam(defaultValue = "asc") String direction,
+            @RequestParam(required = false) String search
+    ) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.fromString(direction), sortBy));
+        return ResponseEntity.ok(userService.findUsersPage(search, pageable));
     }
 
     @GetMapping("/{id}")

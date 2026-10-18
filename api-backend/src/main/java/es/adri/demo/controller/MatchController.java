@@ -50,9 +50,13 @@ public class MatchController {
             @org.springframework.web.bind.annotation.RequestParam(defaultValue = "10") int size,
             @org.springframework.web.bind.annotation.RequestParam(defaultValue = "date") String sortBy,
             @org.springframework.web.bind.annotation.RequestParam(defaultValue = "desc") String direction,
-            @org.springframework.web.bind.annotation.RequestParam(required = false) String status
+            @org.springframework.web.bind.annotation.RequestParam(required = false) String status,
+            @org.springframework.web.bind.annotation.RequestParam(required = false) String search
     ) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.fromString(direction), sortBy));
+        if (search != null && !search.isBlank()) {
+            return ResponseEntity.ok(matchService.findMatchesBySearch(search, pageable));
+        }
         if (status != null && !status.isBlank()) {
             try {
                 es.adri.demo.model.MatchStatus st = es.adri.demo.model.MatchStatus.valueOf(status);

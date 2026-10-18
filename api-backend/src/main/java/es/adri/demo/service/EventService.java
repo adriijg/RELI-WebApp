@@ -49,6 +49,12 @@ public class EventService {
         return toPagedResponse(page);
     }
 
+    public PagedResponseDTO<EventDTO> findEventsBySearch(String search, Pageable pageable) {
+        Page<EventDTO> page = eventRepository.findBySearch(search, pageable)
+                .map(this::toDto);
+        return toPagedResponse(page);
+    }
+
     public EventDTO findEventById(Long id) {
         return toDto(getEventEntityById(id));
     }

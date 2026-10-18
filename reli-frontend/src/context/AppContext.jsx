@@ -30,6 +30,12 @@ export function AppProvider({ children }) {
   }, [user, handleLogout]);
 
   useEffect(() => {
+    const onSessionExpired = () => handleLogout();
+    window.addEventListener('re-session-expired', onSessionExpired);
+    return () => window.removeEventListener('re-session-expired', onSessionExpired);
+  }, [handleLogout]);
+
+  useEffect(() => {
     localStorage.setItem('re-theme', theme);
     const root = document.documentElement;
     if (theme === 'dark') root.classList.add('dark');

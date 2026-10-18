@@ -46,6 +46,12 @@ public class CompetitionService {
         return toPagedResponse(page);
     }
 
+    public PagedResponseDTO<CompetitionDTO> findCompetitionsBySearch(String search, Pageable pageable) {
+        Page<CompetitionDTO> page = competitionRepository.findBySearch(search, pageable)
+                .map(this::toDto);
+        return toPagedResponse(page);
+    }
+
     public CompetitionDTO findCompetitionById(Long id) {
         return toDto(getCompetitionById(id));
     }

@@ -2,7 +2,16 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import PageHeader from '../../components/admin/PageHeader';
 import StatCard from '../../components/admin/StatCard';
-import { getEvents, getMatches, getPlayers, getSeasons, getCompetitions, getStats, getUsers, toPage } from '../../services/api';
+import {
+  getEvents,
+  getMatches,
+  getPlayers,
+  getSeasons,
+  getCompetitions,
+  getStats,
+  getUsers,
+  toPage,
+} from '../../services/api';
 import { getRecentAdminMatches } from '../../utils/adminRecentMatches';
 import { getMatchOutcome, scoreTextClass } from '../../utils/matchResult';
 
@@ -13,12 +22,13 @@ const CARDS = [
   { key: 'seasons', label: 'Temporadas', to: '/admin/temporadas', accent: 'green', fetcher: (p) => getSeasons({ ...p, size: 1 }) },
   { key: 'competitions', label: 'Competiciones', to: '/admin/competiciones', accent: 'purple', fetcher: (p) => getCompetitions({ ...p, size: 1 }) },
   { key: 'stats', label: 'Estadísticas', to: '/admin/estadisticas', accent: 'orange', fetcher: (p) => getStats({ ...p, size: 1 }) },
-  { key: 'users', label: 'Usuarios', to: '/admin/usuarios', accent: 'slate', fetcher: () => getUsers() },
+  { key: 'users', label: 'Usuarios', to: '/admin/usuarios', accent: 'slate', fetcher: (p) => getUsers({ ...p, size: 1 }) },
 ];
 
 export default function Dashboard() {
   const [counts, setCounts] = useState({});
   const [loading, setLoading] = useState(true);
+  const [recentMatches, setRecentMatches] = useState([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -32,7 +42,7 @@ export default function Dashboard() {
           } catch {
             results[card.key] = '—';
           }
-        })
+        }),
       );
       if (!cancelled) {
         setCounts(results);
@@ -44,20 +54,24 @@ export default function Dashboard() {
     };
   }, []);
 
-  const [recentMatches, setRecentMatches] = useState([]);
   useEffect(() => {
-    getMatches({ page: 0, size: 1000, sortBy: 'date', direction: 'desc' })
-      .then(data => {
+    let cancelled = false;
+    getMatches({ page: 0, size: 20, sortBy: 'date', direction: 'desc' })
+      .then((data) => {
+        if (cancelled) return;
         const matches = toPage(data).content;
-        const byId = new Map(matches.map(match => [String(match.id), match]));
+        const byId = new Map(matches.map((match) => [String(match.id), match]));
         const managed = getRecentAdminMatches()
-          .map(saved => byId.get(String(saved.id)) || saved)
+          .map((saved) => byId.get(String(saved.id)) || saved)
           .filter(Boolean);
-        const managedIds = new Set(managed.map(match => String(match.id)));
-        const fallback = matches.filter(match => !managedIds.has(String(match.id)));
+        const managedIds = new Set(managed.map((match) => String(match.id)));
+        const fallback = matches.filter((match) => !managedIds.has(String(match.id)));
         setRecentMatches([...managed, ...fallback].slice(0, 5));
       })
-      .catch(()=>{});
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   return (
@@ -67,37 +81,54 @@ export default function Dashboard() {
         subtitle="Resumen general del club y acceso rápido a la gestión de cada sección."
       />
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 mb-6">
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-2.5 mb-6">
         {CARDS.map((card) => (
           <Link key={card.key} to={card.to} className="block">
-            <div className="min-h-0">
-              <StatCard
-                label={card.label}
-                value={loading ? '…' : counts[card.key]}
-                accent={card.accent}
-                hint="Gestionar →"
-              />
-            </div>
+            <StatCard
+              label={card.label}
+              value={loading ? '…' : counts[card.key]}
+              accent={card.accent}
+              hint="Gestionar →"
+            />
           </Link>
         ))}
       </div>
 
       {recentMatches.length > 0 && (
         <div className="card-depth rounded-3xl p-5 sm:p-6 mb-8">
-          <h3 className="text-[11px] font-black uppercase tracking-widest text-re-dorado mb-3">Partidos recientes — toca para editar</h3>
+          <h3 className="text-[11px] font-black uppercase tracking-widest text-re-dorado mb-3">
+            Partidos recientes — toca para editar
+          </h3>
           <div className="space-y-2">
-            {recentMatches.map(m => (
-              <Link key={m.id} to={`/admin/partidos?edit=${m.id}`} className="flex items-center gap-3 bg-muted/5 border border-card-border rounded-2xl px-4 py-3.5 hover:bg-re-rojo/5 hover:border-re-rojo/20 transition-colors">
-                <span className={`w-8 h-8 rounded-xl flex items-center justify-center text-[11px] font-black text-white shrink-0 ${m.home ? 'bg-emerald-500' : 'bg-blue-500'}`}>{m.home ? 'L' : 'V'}</span>
-                <span className="flex-1 min-w-0">
-                  <span className="block truncate font-black text-[15px] leading-none">{m.rival}</span>
-                  <span className="block text-[11px] font-bold text-muted-foreground">{m.date ? new Date(m.date).toLocaleDateString('es-ES',{day:'2-digit',month:'short'}) : 'Sin fecha'} · {m.competitionName || ''}</span>
-                </span>
-                <span className={`shrink-0 font-black text-[15px] ${m.status==='FINISHED' && m.ourGoals!=null ? scoreTextClass(getMatchOutcome(m.ourGoals, m.rivalGoals)) : 'text-re-rojo'}`}>{m.status==='FINISHED' && m.ourGoals!=null ? `${m.ourGoals}-${m.rivalGoals}` : '→'}</span>
-              </Link>
-            ))}
+            {recentMatches.map((match) => {
+              const hasScore = match.status === 'FINISHED' && match.ourGoals != null && match.rivalGoals != null;
+              return (
+                <Link
+                  key={match.id}
+                  to={`/admin/partidos?edit=${match.id}`}
+                  className="flex items-center gap-3 bg-muted/5 border border-card-border rounded-2xl px-4 py-3.5 hover:bg-re-rojo/5 hover:border-re-rojo/20 transition-colors"
+                >
+                  <span
+                    className={`w-8 h-8 rounded-xl flex items-center justify-center text-[11px] font-black text-white shrink-0 ${
+                      match.home ? 'bg-emerald-500' : 'bg-blue-500'
+                    }`}
+                  >
+                    {match.home ? 'L' : 'V'}
+                  </span>
+                  <span className="flex-1 min-w-0">
+                    <span className="block truncate font-black text-[15px] leading-none">{match.rival}</span>
+                    <span className="block text-[11px] font-bold text-muted-foreground">
+                      {match.date ? new Date(match.date).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' }) : 'Sin fecha'}
+                      {match.competitionName ? ` · ${match.competitionName}` : ''}
+                    </span>
+                  </span>
+                  <span className={`shrink-0 font-black text-[15px] ${hasScore ? scoreTextClass(getMatchOutcome(match.ourGoals, match.rivalGoals)) : 'text-re-rojo'}`}>
+                    {hasScore ? `${match.ourGoals}-${match.rivalGoals}` : '→'}
+                  </span>
+                </Link>
+              );
+            })}
           </div>
-          <p className="mt-3 text-center text-[10px] font-bold text-muted-foreground">Tip: en <b>Partidos</b> toca cualquier fila para editar sin botón.</p>
         </div>
       )}
 

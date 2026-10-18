@@ -1,23 +1,39 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import PageHeader from '../../components/admin/PageHeader';
 import DataTable from '../../components/admin/DataTable';
 import EntityFormModal from '../../components/admin/EntityFormModal';
 import ConfirmDeleteModal from '../../components/admin/ConfirmDeleteModal';
+import Badge from '../../components/admin/Badge';
 import { useCrud } from '../../hooks/useCrud';
-import {
-  createCompetition,
-  deleteCompetition,
-  getCompetitions,
-  getSeasons,
-  toPage,
-  updateCompetition,
-} from '../../services/api';
+import { useSeasons } from '../../hooks/useSeasons';
+import { createCompetition, deleteCompetition, getCompetitions, updateCompetition } from '../../services/api';
+import { COMPETITION_TYPE_LABELS, COMPETITION_TYPE_OPTIONS } from '../../constants/competitionTypes';
+
+const FFM_SECTION = 'Integración con la FFM (sincronización)';
+
+const COLUMNS = [
+  { key: 'name', label: 'Competición' },
+  {
+    key: 'type',
+    label: 'Tipo',
+    render: (value) => <Badge variant="blue">{COMPETITION_TYPE_LABELS[value] || value}</Badge>,
+  },
+  { key: 'seasonName', label: 'Temporada' },
+  {
+    key: 'ffmCompeticion',
+    label: 'FFM',
+    render: (value) => (
+      <Badge variant={value ? 'green' : 'slate'}>{value ? 'Sincroniza' : 'Sin configurar'}</Badge>
+    ),
+  },
+];
 
 export default function CompetitionsAdmin() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
-  const [seasons, setSeasons] = useState([]);
+  const [bulkTarget, setBulkTarget] = useState(null);
+  const { seasons } = useSeasons();
 
   const crud = useCrud({
     fetchPage: getCompetitions,
@@ -26,63 +42,44 @@ export default function CompetitionsAdmin() {
     deleteItem: deleteCompetition,
     sortBy: 'name',
     direction: 'asc',
+    serverSearch: true,
   });
-  const handleBulkDelete = async (selected) => {
-    if (!window.confirm(`¿Borrar ${selected.length} competiciones seleccionadas? Esta acción no se puede deshacer.`)) return;
-    try {
-      await Promise.all(selected.map((row) => deleteCompetition(row.id)));
-      await crud.load(crud.page);
-    } catch (err) {
-      alert(err.message || 'No se pudieron borrar todas las competiciones');
-      await crud.load(crud.page);
-    }
-  };
-
-  useEffect(() => {
-    getSeasons({ size: 100 })
-      .then((data) => setSeasons(toPage(data).content))
-      .catch(() => setSeasons([]));
-  }, []);
 
   const fields = [
     { name: 'name', label: 'Nombre', type: 'text', required: true, placeholder: 'Ej. Liga Nacional' },
-    {
-      name: 'type',
-      label: 'Tipo',
-      type: 'select',
-      required: true,
-      options: [
-        { value: 'LIGA', label: 'Liga' },
-        { value: 'COPA', label: 'Copa' },
-      ],
-    },
+    { name: 'type', label: 'Tipo', type: 'select', required: true, options: COMPETITION_TYPE_OPTIONS },
     {
       name: 'seasonId',
       label: 'Temporada',
       type: 'select',
       required: true,
-      options: seasons.map((s) => ({ value: String(s.id), label: s.name })),
+      options: seasons.map((season) => ({ value: String(season.id), label: season.name })),
     },
-    { name: 'ffmCompeticion', label: 'FFM Competición', type: 'text', placeholder: 'Ej. 324545' },
+    { name: 'ffmCompeticion', label: 'FFM Competición', type: 'text', section: FFM_SECTION, placeholder: 'Ej. 324545' },
     { name: 'ffmGrupo', label: 'FFM Grupo', type: 'text', placeholder: 'Ej. 324568' },
     { name: 'ffmTemporada', label: 'FFM Temporada', type: 'text', placeholder: 'Ej. 22' },
     { name: 'ffmOurCode', label: 'FFM Código equipo', type: 'text', placeholder: 'Ej. 320143' },
   ];
 
-  const columns = [
-    { key: 'name', label: 'Competición' },
-    { key: 'type', label: 'Tipo' },
-    { key: 'seasonName', label: 'Temporada' },
-    {
-      key: 'ffmCompeticion',
-      label: 'FFM',
-      render: (v) => (
-        <span className={`inline-block px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${v ? 'bg-emerald-500/15 text-emerald-500' : 'bg-muted/10 text-muted-foreground'}`}>
-          {v ? 'Sincroniza' : '—'}
-        </span>
-      ),
-    },
-  ];
+  const openCreate = () => {
+    setEditing(null);
+    setModalOpen(true);
+  };
+
+  const openEdit = (row) => {
+    setEditing({ ...row, seasonId: String(row.seasonId ?? '') });
+    setModalOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (bulkTarget) {
+      await crud.bulkRemove(bulkTarget.map((row) => row.id));
+      setBulkTarget(null);
+    } else {
+      await crud.remove(deleteTarget.id);
+      setDeleteTarget(null);
+    }
+  };
 
   return (
     <div>
@@ -91,10 +88,7 @@ export default function CompetitionsAdmin() {
         subtitle="Ligas y torneos donde compite el equipo, ligados a cada temporada."
         action={
           <button
-            onClick={() => {
-              setEditing(null);
-              setModalOpen(true);
-            }}
+            onClick={openCreate}
             className="bg-re-rojo text-white font-black px-6 py-3.5 rounded-xl text-xs tracking-widest uppercase shadow-lg shadow-re-rojo/20 hover:bg-re-rojo/90 hover:-translate-y-0.5 transition-all"
           >
             + Nueva competición
@@ -103,7 +97,7 @@ export default function CompetitionsAdmin() {
       />
 
       <DataTable
-        columns={columns}
+        columns={COLUMNS}
         rows={crud.rows}
         loading={crud.loading}
         error={crud.error}
@@ -111,13 +105,12 @@ export default function CompetitionsAdmin() {
         totalPages={crud.totalPages}
         totalElements={crud.totalElements}
         onPageChange={crud.load}
-        onEdit={(row) => {
-          setEditing({ ...row, seasonId: String(row.seasonId ?? '') });
-          setModalOpen(true);
-        }}
+        serverSearch
+        searchValue={crud.search}
+        onSearchChange={crud.setSearch}
+        onEdit={openEdit}
         onDelete={setDeleteTarget}
-        onBulkDelete={handleBulkDelete}
-        searchKeys={['name', 'type', 'seasonName']}
+        onBulkDelete={setBulkTarget}
         emptyMessage="No hay competiciones creadas."
       />
 
@@ -134,14 +127,18 @@ export default function CompetitionsAdmin() {
       />
 
       <ConfirmDeleteModal
-        open={Boolean(deleteTarget)}
-        title="¿Borrar competición?"
-        message={`Se eliminará "${deleteTarget?.name}" de forma permanente.`}
-        onClose={() => setDeleteTarget(null)}
-        onConfirm={async () => {
-          await crud.remove(deleteTarget.id);
+        open={Boolean(deleteTarget || bulkTarget)}
+        title={bulkTarget ? '¿Borrar competiciones seleccionadas?' : '¿Borrar competición?'}
+        message={
+          bulkTarget
+            ? `Se eliminarán ${bulkTarget.length} competiciones de forma permanente.`
+            : `Se eliminará "${deleteTarget?.name}" de forma permanente.`
+        }
+        onClose={() => {
           setDeleteTarget(null);
+          setBulkTarget(null);
         }}
+        onConfirm={confirmDelete}
       />
     </div>
   );

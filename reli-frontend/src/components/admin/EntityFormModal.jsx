@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { uploadImageToSupabase } from '../../services/supabase';
 
 export default function EntityFormModal({ open, title, fields, initialValue, submitLabel = 'Guardar', onSubmit, onClose, extra, onDelete, deleteLabel = 'Borrar todo' }) {
@@ -35,18 +35,18 @@ export default function EntityFormModal({ open, title, fields, initialValue, sub
 
   if (!open) return null;
 
-  const handleChange = (name, type, checkedOrValue) => {
+  const handleChange = (name, checkedOrValue) => {
     setValues((prev) => ({
       ...prev,
-      [name]: type === 'checkbox' ? checkedOrValue : checkedOrValue,
+      [name]: checkedOrValue,
     }));
     setError('');
   };
 
   const handleImageUpload = async (field, e) => {
     const file = e.target.files?.[0];
-    e.target.value = '';
     if (!file) return;
+    e.target.value = '';
 
     setUploading((prev) => ({ ...prev, [field.name]: true }));
     setError('');
@@ -111,8 +111,18 @@ export default function EntityFormModal({ open, title, fields, initialValue, sub
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {fields.map((field) => (
-              <div key={field.name} className={field.fullWidth ? 'sm:col-span-2' : ''}>
+            {fields.map((field, index) => {
+              const showSection = field.section && field.section !== fields[index - 1]?.section;
+              return (
+                <Fragment key={field.name}>
+                  {showSection && (
+                    <div className="sm:col-span-2 pt-2">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-re-rojo border-b border-card-border pb-1.5">
+                        {field.section}
+                      </p>
+                    </div>
+                  )}
+                  <div className={field.fullWidth ? 'sm:col-span-2' : ''}>
                 <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1.5">
                   {field.label}
                   {field.required && <span className="text-re-rojo"> *</span>}
@@ -122,7 +132,7 @@ export default function EntityFormModal({ open, title, fields, initialValue, sub
                   <div className="relative">
                     <select
                       value={values[field.name] ?? ''}
-                      onChange={(e) => handleChange(field.name, 'select', e.target.value)}
+                      onChange={(e) => handleChange(field.name, e.target.value)}
                       required={field.required}
                       className="w-full appearance-none bg-muted/30 border border-card-border rounded-xl pl-4 pr-11 py-3 text-sm font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-re-rojo/40 transition-all cursor-pointer hover:border-re-rojo/40"
                     >
@@ -148,7 +158,7 @@ export default function EntityFormModal({ open, title, fields, initialValue, sub
                     <input
                       list={`datalist-${field.name}`}
                       value={values[field.name] ?? ''}
-                      onChange={(e) => handleChange(field.name, 'combobox', e.target.value)}
+                      onChange={(e) => handleChange(field.name, e.target.value)}
                       required={field.required}
                       placeholder={field.placeholder}
                       autoComplete="off"
@@ -165,7 +175,7 @@ export default function EntityFormModal({ open, title, fields, initialValue, sub
                 ) : field.type === 'textarea' ? (
                   <textarea
                     value={values[field.name] ?? ''}
-                    onChange={(e) => handleChange(field.name, 'textarea', e.target.value)}
+                    onChange={(e) => handleChange(field.name, e.target.value)}
                     required={field.required}
                     rows={4}
                     placeholder={field.placeholder}
@@ -176,7 +186,7 @@ export default function EntityFormModal({ open, title, fields, initialValue, sub
                     <input
                       type="checkbox"
                       checked={Boolean(values[field.name])}
-                      onChange={(e) => handleChange(field.name, 'checkbox', e.target.checked)}
+                      onChange={(e) => handleChange(field.name, e.target.checked)}
                       className="w-4 h-4 accent-[#E21D2C]"
                     />
                     <span className="text-sm font-bold">{field.checkboxLabel || field.label}</span>
@@ -187,7 +197,7 @@ export default function EntityFormModal({ open, title, fields, initialValue, sub
                       <input
                         type="url"
                         value={values[field.name] ?? ''}
-                        onChange={(e) => handleChange(field.name, 'url', e.target.value)}
+                        onChange={(e) => handleChange(field.name, e.target.value)}
                         required={field.required}
                         placeholder="https://... o sube un archivo"
                         className="flex-1 min-w-0 bg-muted/30 border border-card-border rounded-xl px-4 py-3 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-re-rojo/40 transition-all"
@@ -219,7 +229,7 @@ export default function EntityFormModal({ open, title, fields, initialValue, sub
                   <input
                     type={field.type || 'text'}
                     value={values[field.name] ?? ''}
-                    onChange={(e) => handleChange(field.name, field.type, e.target.value)}
+                    onChange={(e) => handleChange(field.name, e.target.value)}
                     required={field.required}
                     min={field.min}
                     max={field.max}
@@ -228,8 +238,10 @@ export default function EntityFormModal({ open, title, fields, initialValue, sub
                     className="w-full bg-muted/30 border border-card-border rounded-xl px-4 py-3 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-re-rojo/40 transition-all"
                   />
                 )}
-              </div>
-            ))}
+                  </div>
+                </Fragment>
+              );
+            })}
           </div>
 
           {error && (
