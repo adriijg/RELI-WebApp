@@ -104,8 +104,8 @@ async function getNeutralMatchesFor(competitionIds) {
   );
 }
 
-// Partidos del rival desde el punto de vista del rival: `home` = el rival juega en casa
-// y `ourGoals`/`rivalGoals` son siempre los goles del propio equipo (el rival) primero.
+// Partidos del rival en orden local-visitante: `home` = el rival juega en casa,
+// `homeGoals` son los goles del local y `awayGoals` los del visitante.
 function buildRivalTeamMatches(ffmMatches, neutralMatches, sourceMatches, rivalName) {
   const rivalKey = normalizeName(rivalName);
 
@@ -119,8 +119,8 @@ function buildRivalTeamMatches(ffmMatches, neutralMatches, sourceMatches, rivalN
         home: isHome,
         date: game.date,
         status: game.homeGoals != null && game.awayGoals != null ? 'FINISHED' : 'SCHEDULED',
-        ourGoals: isHome ? game.homeGoals : game.awayGoals,
-        rivalGoals: isHome ? game.awayGoals : game.homeGoals,
+        homeGoals: game.homeGoals,
+        awayGoals: game.awayGoals,
       };
     });
 
@@ -134,27 +134,31 @@ function buildRivalTeamMatches(ffmMatches, neutralMatches, sourceMatches, rivalN
         home: isHome,
         date: game.date,
         status: game.status,
-        ourGoals: isHome ? game.homeGoals : game.awayGoals,
-        rivalGoals: isHome ? game.awayGoals : game.homeGoals,
+        homeGoals: game.homeGoals,
+        awayGoals: game.awayGoals,
       };
     });
 
-  const fromOurMatches = sourceMatches.map((match) => ({
-    id: `db-${match.id}`,
-    rival: SITE_NAME,
-    home: !match.home,
-    date: match.date,
-    status: match.status,
-    ourGoals: match.rivalGoals,
-    rivalGoals: match.ourGoals,
-  }));
+  const fromOurMatches = sourceMatches.map((match) => {
+    const weHome = match.home === true;
+    return {
+      id: `db-${match.id}`,
+      matchId: match.id,
+      rival: SITE_NAME,
+      home: !weHome,
+      date: match.date,
+      status: match.status,
+      homeGoals: weHome ? match.ourGoals : match.rivalGoals,
+      awayGoals: weHome ? match.rivalGoals : match.ourGoals,
+    };
+  });
 
   return [...fromFfm, ...fromNeutral, ...fromOurMatches];
 }
 
 function matchDedupeKey(match) {
   const time = match.date ? new Date(match.date).getTime() : 0;
-  return `${time}|${match.ourGoals ?? ''}-${match.rivalGoals ?? ''}`;
+  return `${time}|${match.homeGoals ?? ''}-${match.awayGoals ?? ''}`;
 }
 
 function buildRivalInfo(detail, allMatches, sources) {
@@ -169,7 +173,7 @@ function buildRivalInfo(detail, allMatches, sources) {
   const recentMatches = sortNewestFirst(
     buildRivalTeamMatches(sources.ffmMatches, sources.neutralMatches, sourceMatches, currentRival)
       .filter((candidate) => {
-        if (String(candidate.id) === String(match.id)) return false;
+        if (candidate.matchId != null && String(candidate.matchId) === String(match.id)) return false;
         if (!isPlayed(candidate)) return false;
         if (!Number.isNaN(matchTime) && candidate.date) {
           const time = new Date(candidate.date).getTime();
@@ -855,8 +859,12 @@ export default function MatchDetail() {
             <div className="space-y-2 sm:space-y-3">
               {rivalInfo.recentMatches.map((m) => {
               const mIsHome = m.home !== false;
-              const mOurGoals = mIsHome ? m.ourGoals : m.rivalGoals;
-              const mRivalGoals = mIsHome ? m.rivalGoals : m.ourGoals;
+              const homeGoals = m.homeGoals;
+              const awayGoals = m.awayGoals;
+              // El rival es el equipo de la ficha: si juega en casa gana si marca más "al principio"
+              // (primer número), si juega fuera gana si marca más "al final" (segundo número).
+              const rivalGoals = mIsHome ? homeGoals : awayGoals;
+              const opponentGoals = mIsHome ? awayGoals : homeGoals;
               const mDate = m.date ? new Date(m.date).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }) : '';
               return (
                 <div key={m.id} className="flex items-center gap-2 sm:gap-3 bg-muted/5 dark:bg-white/5 border border-card-border dark:border-white/10 rounded-2xl px-3 sm:px-4 py-2.5 sm:py-3">
@@ -866,9 +874,9 @@ export default function MatchDetail() {
                   </span>
                   <span className="flex-1 min-w-0 text-xs sm:text-sm font-black uppercase truncate">{m.rival}</span>
                   <span className="font-black text-sm sm:text-base shrink-0">
-                    {mOurGoals != null && mRivalGoals != null ? (
-                      <span className={scoreTextClass(getMatchOutcome(mOurGoals, mRivalGoals))}>
-                        {mOurGoals} - {mRivalGoals}
+                    {homeGoals != null && awayGoals != null ? (
+                      <span className={scoreTextClass(getMatchOutcome(rivalGoals, opponentGoals))}>
+                        {homeGoals} - {awayGoals}
                       </span>
                     ) : (
                       <span className="text-muted-foreground">—</span>
