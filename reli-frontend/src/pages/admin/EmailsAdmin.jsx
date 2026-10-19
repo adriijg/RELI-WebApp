@@ -8,6 +8,9 @@ import {
   fetchEmailPreviewHtml,
   sendNextMatchTestEmail,
   sendTestEmail,
+  resendMatchNotice,
+  resendVerificationEmail,
+  getMatchesByCompetition,
   toPage,
 } from '../../services/api';
 
@@ -48,7 +51,10 @@ export default function EmailsAdmin() {
   const [competitions, setCompetitions] = useState([]);
   const [testTo, setTestTo] = useState('');
   const [nextTo, setNextTo] = useState('');
+  const [verifyTo, setVerifyTo] = useState('');
   const [competitionId, setCompetitionId] = useState('');
+  const [matches, setMatches] = useState([]);
+  const [matchId, setMatchId] = useState('');
   const [sending, setSending] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -89,6 +95,40 @@ export default function EmailsAdmin() {
     event.preventDefault();
     send(() => sendNextMatchTestEmail(competitionId, nextTo), 'No se pudo enviar el aviso de prueba');
   };
+
+  const handleResendVerification = (event) => {
+    event.preventDefault();
+    send(() => resendVerificationEmail(verifyTo), 'No se pudo reenviar la verificación');
+  };
+
+  const handleResendMatch = (event) => {
+    event.preventDefault();
+    send(() => resendMatchNotice(matchId), 'No se pudo reenviar el aviso de horario');
+  };
+
+  useEffect(() => {
+    if (!competitionId) {
+      setMatches([]);
+      setMatchId('');
+      return;
+    }
+    let cancelled = false;
+    getMatchesByCompetition(competitionId)
+      .then((data) => {
+        if (cancelled) return;
+        const list = (Array.isArray(data) ? data : []).filter(
+          (match) => match.status === 'SCHEDULED',
+        );
+        setMatches(list);
+        setMatchId(list.length ? String(list[0].id) : '');
+      })
+      .catch(() => {
+        if (!cancelled) setMatches([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [competitionId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -198,6 +238,62 @@ export default function EmailsAdmin() {
               className="bg-re-rojo hover:bg-re-rojo/90 text-white font-black px-6 py-3 rounded-xl text-xs tracking-widest uppercase transition-all disabled:opacity-50"
             >
               {sending ? 'Enviando...' : 'Enviar aviso'}
+            </button>
+          </form>
+        </Section>
+
+        <Section
+          title="Reenviar verificación de cuenta"
+          description="Reenvía el correo de confirmación a un usuario que aún no lo ha verificado (por si el automático falló)."
+        >
+          <form onSubmit={handleResendVerification} className="flex flex-col sm:flex-row gap-3">
+            <input
+              type="email"
+              required
+              value={verifyTo}
+              onChange={(event) => setVerifyTo(event.target.value)}
+              placeholder="usuario@ejemplo.com"
+              className={`flex-1 ${INPUT_CLASS}`}
+            />
+            <button
+              type="submit"
+              disabled={sending}
+              className="bg-re-rojo hover:bg-re-rojo/90 text-white font-black px-6 py-3 rounded-xl text-xs tracking-widest uppercase transition-all disabled:opacity-50"
+            >
+              {sending ? 'Enviando...' : 'Reenviar verificación'}
+            </button>
+          </form>
+        </Section>
+
+        <Section
+          title="Reenviar aviso de horario"
+          description="Reenvía a todos los usuarios verificados el aviso del horario confirmado de un partido (por si el automático falló)."
+        >
+          <form onSubmit={handleResendMatch} className="flex flex-col sm:flex-row gap-3 sm:items-end">
+            <AdminSelect
+              label="Competición"
+              value={competitionId}
+              onChange={setCompetitionId}
+              options={competitions.map((competition) => ({ value: String(competition.id), label: competition.name }))}
+              className="sm:max-w-xs sm:flex-1"
+            />
+            <AdminSelect
+              label="Partido"
+              value={matchId}
+              onChange={setMatchId}
+              placeholder={matches.length ? 'Selecciona…' : 'Sin partidos programados'}
+              options={matches.map((match) => ({
+                value: String(match.id),
+                label: `J${match.jornada ?? '—'} · ${match.rival}${match.date ? ` · ${new Date(match.date).toLocaleDateString('es-ES')}` : ''}`,
+              }))}
+              className="sm:flex-1"
+            />
+            <button
+              type="submit"
+              disabled={sending || !matchId}
+              className="bg-re-rojo hover:bg-re-rojo/90 text-white font-black px-6 py-3 rounded-xl text-xs tracking-widest uppercase transition-all disabled:opacity-50"
+            >
+              {sending ? 'Enviando...' : 'Reenviar aviso'}
             </button>
           </form>
         </Section>

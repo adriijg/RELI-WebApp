@@ -24,23 +24,23 @@ public class EmailTokenService {
     private static final long TOKEN_HOURS = 24;
 
     private final EmailTokenRepository tokenRepository;
-    private final EmailService emailService;
+    private final AsyncEmailService asyncEmailService;
     private final EmailTemplateService templateService;
 
     @Value("${app.email.frontend-url:http://localhost:5173}")
     private String frontendUrl;
 
-    public EmailTokenService(EmailTokenRepository tokenRepository, EmailService emailService,
+    public EmailTokenService(EmailTokenRepository tokenRepository, AsyncEmailService asyncEmailService,
                              EmailTemplateService templateService) {
         this.tokenRepository = tokenRepository;
-        this.emailService = emailService;
+        this.asyncEmailService = asyncEmailService;
         this.templateService = templateService;
     }
 
     @Transactional
     public void sendVerification(User user) {
         String token = createToken(user, EmailToken.Type.VERIFY_EMAIL);
-        emailService.send(user.getEmail(), "Confirma tu email en RELI",
+        asyncEmailService.sendWithRetry(user.getEmail(), "Confirma tu email en RELI",
                 templateService.verification(user.getUsername(), frontendUrl + "?verifyEmail=" + token));
     }
 
@@ -56,7 +56,7 @@ public class EmailTokenService {
     @Transactional
     public void sendPasswordReset(User user) {
         String token = createToken(user, EmailToken.Type.RESET_PASSWORD);
-        emailService.send(user.getEmail(), "Recupera tu contraseña de RELI",
+        asyncEmailService.sendWithRetry(user.getEmail(), "Recupera tu contraseña de RELI",
                 templateService.passwordReset(frontendUrl + "?resetPassword=" + token));
     }
 

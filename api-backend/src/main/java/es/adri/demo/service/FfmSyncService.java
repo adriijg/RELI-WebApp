@@ -3,7 +3,6 @@ package es.adri.demo.service;
 import es.adri.demo.dto.FfmSyncActionDTO;
 import es.adri.demo.dto.FfmSyncResultDTO;
 import es.adri.demo.dto.MatchRequestDTO;
-import es.adri.demo.dto.MatchDTO;
 import es.adri.demo.dto.NeutralMatchDTO;
 import es.adri.demo.model.Competition;
 import es.adri.demo.model.FfmSyncRun;
@@ -12,7 +11,6 @@ import es.adri.demo.model.MatchStatus;
 import es.adri.demo.repository.CompetitionRepository;
 import es.adri.demo.repository.FfmSyncRunRepository;
 import es.adri.demo.repository.MatchRepository;
-import es.adri.demo.repository.UserRepository;
 import java.net.CookieManager;
 import java.net.CookiePolicy;
 import java.net.URI;
@@ -81,12 +79,6 @@ public class FfmSyncService {
     private final MatchService matchService;
     private final NeutralMatchService neutralMatchService;
     private final FfmSyncRunRepository runRepository;
-    private final UserRepository userRepository;
-    private final EmailService emailService;
-    private final EmailTemplateService templateService;
-
-    @Value("${app.email.frontend-url:http://localhost:5173}")
-    private String frontendUrl;
 
     @Value("${app.ffm.base-url:https://parla.ffmadrid.es}")
     private String baseUrl;
@@ -110,18 +102,12 @@ public class FfmSyncService {
                           MatchRepository matchRepository,
                           MatchService matchService,
                           NeutralMatchService neutralMatchService,
-                          FfmSyncRunRepository runRepository,
-                          UserRepository userRepository,
-                           EmailService emailService,
-                           EmailTemplateService templateService) {
+                          FfmSyncRunRepository runRepository) {
         this.competitionRepository = competitionRepository;
         this.matchRepository = matchRepository;
         this.matchService = matchService;
         this.neutralMatchService = neutralMatchService;
         this.runRepository = runRepository;
-        this.userRepository = userRepository;
-        this.emailService = emailService;
-        this.templateService = templateService;
     }
 
     /** Partido parseado de la web de la federacion. */
@@ -149,21 +135,6 @@ public class FfmSyncService {
         return resultOf(competition, ours, actions, null);
     }
 
-    /** HTML de ejemplo para la vista previa del panel admin (sin enviar nada). */
-    @Transactional(readOnly = true)
-    public ScheduleMail buildEmailPreview(Long competitionId) {
-        Competition competition = getCompetition(competitionId);
-        Match next = findNextScheduledMatch(competitionId).orElseGet(() -> {
-            Match example = new Match();
-            example.setRival("CD Ejemplo");
-            example.setDate(LocalDateTime.now().plusDays(6).withHour(17).withMinute(30));
-            example.setLocation("Polideportivo Municipal");
-            example.setJornada(12);
-            return example;
-        });
-        return buildScheduleMail(competition, next, List.of(), List.of());
-    }
-
     @Transactional
     public FfmSyncResultDTO apply(Long competitionId) {
         return apply(competitionId, FfmSyncRun.Trigger.MANUAL);
@@ -185,8 +156,6 @@ public class FfmSyncService {
             List<FfmSyncActionDTO> actions = computeActions(competition, ours, existing);
             int created = 0;
             int updated = 0;
-            List<MatchDTO> createdMatches = new ArrayList<>();
-            List<String> updatedDetails = new ArrayList<>();
             for (int i = 0; i < ours.size(); i++) {
                 FfmMatch parsed = ours.get(i);
                 FfmSyncActionDTO action = actions.get(i);
@@ -195,12 +164,10 @@ public class FfmSyncService {
                 }
                 Match target = findExisting(existing, competition.getId(), parsed);
                 if (target == null) {
-                    createdMatches.add(matchService.createMatch(toRequest(competition, parsed, null)));
+                    matchService.createMatch(toRequest(competition, parsed, null));
                     created++;
                 } else if ("UPDATED".equals(action.getAction())) {
-                    MatchDTO dto = matchService.updateMatch(target.getId(), toRequest(competition, parsed, target));
-                    updatedDetails.add("Jornada " + dto.getJornada() + ": Real Lisiados vs " + dto.getRival()
-                            + (action.getDetail() == null || action.getDetail().isBlank() ? "" : " (" + action.getDetail() + ")"));
+                    matchService.updateMatch(target.getId(), toRequest(competition, parsed, target));
                     updated++;
                 }
             }
@@ -212,7 +179,6 @@ public class FfmSyncService {
             run.setStatus(FfmSyncRun.Status.OK);
             run.setFinishedAt(LocalDateTime.now());
             run = runRepository.save(run);
-            notifyScheduleNews(competition, createdMatches, updatedDetails);
             FfmSyncResultDTO result = resultOf(competition, ours, actions, run.getId());
             result.setCreated(created);
             result.setUpdated(updated);
@@ -228,101 +194,6 @@ public class FfmSyncService {
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
                     "Fallo al sincronizar con la federacion: " + e.getMessage());
         }
-    }
-
-    /** Asunto + cuerpo HTML del aviso de horarios / próximo partido. */
-    public record ScheduleMail(String subject, String html) {
-    }
-
-    /**
-     * Envía a una única dirección el aviso del próximo partido de una competición.
-     * Pensado para probar la configuración de correo desde el panel admin sin
-     * lanzar una sincronización real ni spamear a todos los usuarios.
-     */
-    @Transactional(readOnly = true)
-    public void sendNextMatchPreview(Long competitionId, String recipient) {
-        if (!emailService.isEnabled()) {
-            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
-                    "El envío de correos está desactivado (EMAIL_ENABLED=false)");
-        }
-        Competition competition = getCompetition(competitionId);
-        Match next = findNextScheduledMatch(competitionId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
-                        "No hay próximo partido programado para esta competición"));
-        ScheduleMail mail = buildScheduleMail(competition, next, List.of(), List.of());
-        emailService.send(recipient, "[PRUEBA] " + mail.subject(), mail.html());
-    }
-
-    private java.util.Optional<Match> findNextScheduledMatch(Long competitionId) {
-        return matchRepository.findFirstByCompetitionIdAndStatusAndDateGreaterThanEqualOrderByDateAsc(
-                competitionId, MatchStatus.SCHEDULED, LocalDateTime.now());
-    }
-
-    /**
-     * Avisa por email a todos los usuarios verificados cuando el scraping trae
-     * novedades (partidos nuevos o cambios de horario/sede). El correo destaca
-     * el próximo partido por jugar. Si no hay novedades, no se envía nada
-     * para no spamear en las sincronizaciones programadas sin cambios.
-     */
-    private void notifyScheduleNews(Competition competition, List<MatchDTO> createdMatches, List<String> updatedDetails) {
-        if (createdMatches.isEmpty() && updatedDetails.isEmpty()) return;
-        Match next = findNextScheduledMatch(competition.getId()).orElse(null);
-        ScheduleMail mail = buildScheduleMail(competition, next, createdMatches, updatedDetails);
-        for (es.adri.demo.model.User user : userRepository.findByEmailVerifiedTrue()) {
-            try {
-                emailService.send(user.getEmail(), mail.subject(), mail.html());
-            } catch (Exception e) {
-                log.warn("No se pudo enviar el aviso de horarios a {}", user.getEmail(), e);
-            }
-        }
-    }
-
-    private ScheduleMail buildScheduleMail(Competition competition, Match next,
-                                           List<MatchDTO> createdMatches, List<String> updatedDetails) {
-        String subject;
-        StringBuilder inner = new StringBuilder();
-        if (next != null) {
-            subject = "Próximo partido: Real Lisiados vs " + next.getRival();
-            String dateStr = next.getDate() == null ? "Fecha por confirmar"
-                    : next.getDate().format(DATE_TIME_FORMAT);
-            inner.append("<p>Hola, este es el pr&oacute;ximo compromiso del equipo. Te esperamos en la grada.</p>")
-                    .append(templateService.infoCard(
-                            templateService.matchRow("Partido", "Real Lisiados vs " + escapeHtml(next.getRival()))
-                                    + templateService.matchRow("Fecha", escapeHtml(dateStr))
-                                    + (next.getLocation() == null ? "" : templateService.matchRow("Sede", escapeHtml(next.getLocation())))
-                                    + (next.getJornada() == null ? "" : templateService.matchRow("Jornada", "Jornada " + next.getJornada()))
-                                    + templateService.matchRow("Competición", escapeHtml(competition.getName()))));
-        } else {
-            subject = "Nuevos horarios de " + competition.getName();
-            inner.append("<p>Hay novedades en <strong>").append(escapeHtml(competition.getName())).append("</strong>.</p>");
-        }
-        if (!createdMatches.isEmpty()) {
-            inner.append("<p style=\"font-size:11px;font-weight:900;letter-spacing:2px;color:#E21D2C;text-transform:uppercase;\">Partidos a&ntilde;adidos</p><ul style=\"padding-left:18px;margin:8px 0;\">");
-            for (MatchDTO match : createdMatches) {
-                inner.append("<li>Jornada ").append(match.getJornada())
-                        .append(": Real Lisiados vs ").append(escapeHtml(match.getRival()))
-                        .append(match.getDate() == null ? "" : " · " + escapeHtml(String.valueOf(match.getDate())))
-                        .append(match.getLocation() == null ? "" : " · " + escapeHtml(match.getLocation()))
-                        .append("</li>");
-            }
-            inner.append("</ul>");
-        }
-        if (!updatedDetails.isEmpty()) {
-            inner.append("<p style=\"font-size:11px;font-weight:900;letter-spacing:2px;color:#E21D2C;text-transform:uppercase;\">Cambios de horario, sede o resultado</p><ul style=\"padding-left:18px;margin:8px 0;\">");
-            for (String detail : updatedDetails) {
-                inner.append("<li>").append(escapeHtml(detail)).append("</li>");
-            }
-            inner.append("</ul>");
-        }
-        String html = templateService.scheduleWrapper(subject, inner.toString(),
-                "Ver calendario", frontendUrl + "/calendario",
-                "Recibes este aviso por tener la cuenta verificada.");
-        return new ScheduleMail(subject, html);
-    }
-
-    private static String escapeHtml(String s) {
-        if (s == null) return "";
-        return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
     }
 
     /**
@@ -422,35 +293,60 @@ public class FfmSyncService {
         return (homeCode == null ? "" : homeCode) + "-" + (awayCode == null ? "" : awayCode);
     }
 
-    /** Sincroniza todas las competiciones configuradas (usado por el programador). */
-    @Transactional
+    /**
+     * Sincroniza todas las competiciones configuradas (usado por el programador).
+     * <p>
+     * Por cada competicion hace dos cosas:
+     * <ol>
+     *   <li>Trae el resultado de la jornada mas reciente ya jugada (el domingo).</li>
+     *   <li>Intenta traer los horarios de las proximas jornadas (el proximo domingo).
+     *       Si la federacion aun no ha publicado la fecha/hora, esos partidos se
+     *       quedan como {@code SKIP} y se recogeran en la siguiente ejecucion (jueves).</li>
+     * </ol>
+     */
     public void syncAllScheduled() {
         for (Competition competition : competitionRepository.findAll()) {
             if (competition.getFfmCompeticion() == null || competition.getFfmCompeticion().isBlank()) {
                 continue;
             }
-            FfmSyncRun run = new FfmSyncRun();
-            run.setCompetitionId(competition.getId());
-            run.setCompetitionName(competition.getName());
-            run.setTriggeredBy(FfmSyncRun.Trigger.SCHEDULED);
-            run.setStartedAt(LocalDateTime.now());
-            try {
-                Integer jornada = currentJornadaToSync(competition.getId());
-                if (jornada != null) {
-                    FfmJornadaResultDTO result = syncJornadaResults(competition.getId(), jornada);
-                    run.setRoundsChecked(1);
-                    run.setUpdated((result.ourUpdated() ? 1 : 0) + result.neutralSaved());
-                    run.setUnchanged(Math.max(0, result.games() - result.neutralSaved()));
-                }
-                run.setStatus(FfmSyncRun.Status.OK);
-                run.setFinishedAt(LocalDateTime.now());
-                runRepository.save(run);
-            } catch (Exception e) {
-                run.setStatus(FfmSyncRun.Status.FAILED);
-                run.setFinishedAt(LocalDateTime.now());
-                run.setError(truncate(e.toString(), 2000));
-                runRepository.save(run);
+            syncScheduledResults(competition);
+            syncScheduledCalendar(competition);
+        }
+    }
+
+    /** Resultado de la ultima jornada jugada, registrado como una ejecucion. */
+    private void syncScheduledResults(Competition competition) {
+        FfmSyncRun run = new FfmSyncRun();
+        run.setCompetitionId(competition.getId());
+        run.setCompetitionName(competition.getName());
+        run.setTriggeredBy(FfmSyncRun.Trigger.SCHEDULED);
+        run.setStartedAt(LocalDateTime.now());
+        try {
+            Integer jornada = currentJornadaToSync(competition.getId());
+            if (jornada != null) {
+                FfmJornadaResultDTO result = syncJornadaResults(competition.getId(), jornada);
+                run.setRoundsChecked(1);
+                run.setUpdated((result.ourUpdated() ? 1 : 0) + result.neutralSaved());
+                run.setUnchanged(Math.max(0, result.games() - result.neutralSaved()));
             }
+            run.setStatus(FfmSyncRun.Status.OK);
+            run.setFinishedAt(LocalDateTime.now());
+            runRepository.save(run);
+        } catch (Exception e) {
+            run.setStatus(FfmSyncRun.Status.FAILED);
+            run.setFinishedAt(LocalDateTime.now());
+            run.setError(truncate(e.toString(), 2000));
+            runRepository.save(run);
+            log.error("Sincronizacion programada FFM: fallo al traer resultados de {}", competition.getName(), e);
+        }
+    }
+
+    /** Calendario/horarios de las proximas jornadas. Si aun no hay fecha, no se crea nada. */
+    private void syncScheduledCalendar(Competition competition) {
+        try {
+            apply(competition.getId(), FfmSyncRun.Trigger.SCHEDULED);
+        } catch (Exception e) {
+            log.error("Sincronizacion programada FFM: fallo al traer horarios de {}", competition.getName(), e);
         }
     }
 

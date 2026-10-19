@@ -2,9 +2,10 @@ package es.adri.demo.controller;
 
 import es.adri.demo.dto.EmailStatusDTO;
 import es.adri.demo.dto.EmailTestRequestDTO;
-import es.adri.demo.service.FfmSyncService;
+import es.adri.demo.service.MatchNotificationService;
 import es.adri.demo.service.EmailService;
 import es.adri.demo.service.EmailTemplateService;
+import es.adri.demo.service.UserService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -12,6 +13,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -30,8 +32,9 @@ import org.springframework.web.server.ResponseStatusException;
 public class AdminEmailController {
 
     private final EmailService emailService;
-    private final FfmSyncService ffmSyncService;
+    private final MatchNotificationService matchNotificationService;
     private final EmailTemplateService templateService;
+    private final UserService userService;
 
     @Value("${app.email.enabled:false}")
     private boolean emailEnabled;
@@ -48,11 +51,12 @@ public class AdminEmailController {
     @Value("${app.email.frontend-url:}")
     private String frontendUrl;
 
-    public AdminEmailController(EmailService emailService, FfmSyncService ffmSyncService,
-                                EmailTemplateService templateService) {
+    public AdminEmailController(EmailService emailService, MatchNotificationService matchNotificationService,
+                                EmailTemplateService templateService, UserService userService) {
         this.emailService = emailService;
-        this.ffmSyncService = ffmSyncService;
+        this.matchNotificationService = matchNotificationService;
         this.templateService = templateService;
+        this.userService = userService;
     }
 
     @GetMapping("/status")
@@ -78,8 +82,32 @@ public class AdminEmailController {
     public ResponseEntity<String> sendNextMatchTest(
             @RequestParam Long competitionId,
             @Valid @RequestBody EmailTestRequestDTO request) {
-        ffmSyncService.sendNextMatchPreview(competitionId, request.getTo());
+        matchNotificationService.sendNextMatchPreview(competitionId, request.getTo());
         return ResponseEntity.ok("Aviso de prueba del próximo partido enviado a " + request.getTo());
+    }
+
+    /**
+     * Reenvio manual del aviso de horario de un partido a todos los usuarios
+     * verificados. Util si el correo automatico fallo o no llego.
+     */
+    @PostMapping("/match/{matchId}/notify")
+    public ResponseEntity<String> resendMatchNotice(@PathVariable Long matchId) {
+        checkEnabled();
+        int recipients = matchNotificationService.resend(matchId);
+        return ResponseEntity.ok("Aviso de horario reenviado a " + recipients + " usuarios");
+    }
+
+    /**
+     * Reenvio manual del correo de verificacion a un email concreto.
+     */
+    @PostMapping("/verification/resend")
+    public ResponseEntity<String> resendVerification(@Valid @RequestBody EmailTestRequestDTO request) {
+        checkEnabled();
+        boolean sent = userService.resendVerification(request.getTo());
+        if (!sent) {
+            return ResponseEntity.ok("No hay ningun usuario pendiente de verificar con " + request.getTo());
+        }
+        return ResponseEntity.ok("Correo de verificacion reenviado a " + request.getTo());
     }
 
     /**
@@ -94,7 +122,7 @@ public class AdminEmailController {
             case "verify" -> templateService.verification("Aficionado", frontendUrl + "?verifyEmail=PREVIEW");
             case "reset" -> templateService.passwordReset(frontendUrl + "?resetPassword=PREVIEW");
             case "match" -> {
-                if (competitionId != null) yield ffmSyncService.buildEmailPreview(competitionId).html();
+                if (competitionId != null) yield matchNotificationService.buildEmailPreview(competitionId).html();
                 yield templateService.scheduleWrapper("Próximo partido: Real Lisiados vs CD Ejemplo",
                         "<p>Hola, este es el pr&oacute;ximo compromiso del equipo. Te esperamos en la grada.</p>"
                                 + templateService.infoCard(

@@ -277,11 +277,12 @@ public class UserService {
         emailTokenService.verify(token);
     }
 
-    public void resendVerification(String email) {
-        if (!emailEnabled) return;
-        userRepository.findByEmail(email)
-                .filter(user -> Boolean.FALSE.equals(user.getEmailVerified()))
-                .ifPresent(user -> emailTokenService.sendVerification(user));
+    public boolean resendVerification(String email) {
+        if (!emailEnabled) return false;
+        Optional<User> pending = userRepository.findByEmail(email)
+                .filter(user -> Boolean.FALSE.equals(user.getEmailVerified()));
+        pending.ifPresent(user -> emailTokenService.sendVerification(user));
+        return pending.isPresent();
     }
 
     public void requestPasswordReset(String email) {

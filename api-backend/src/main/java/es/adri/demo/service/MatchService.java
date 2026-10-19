@@ -30,15 +30,18 @@ public class MatchService {
     private final MatchRepository matchRepository;
     private final CompetitionRepository competitionRepository;
     private final StatRepository statRepository;
+    private final MatchNotificationService matchNotificationService;
 
     public MatchService(
             MatchRepository matchRepository,
             CompetitionRepository competitionRepository,
-            StatRepository statRepository
+            StatRepository statRepository,
+            MatchNotificationService matchNotificationService
     ) {
         this.matchRepository = matchRepository;
         this.competitionRepository = competitionRepository;
         this.statRepository = statRepository;
+        this.matchNotificationService = matchNotificationService;
     }
 
     @Cacheable(value = "homeMatches", key = "#pageable.pageNumber + '-' + #pageable.pageSize + '-' + #pageable.sort.toString()")
@@ -119,7 +122,9 @@ public class MatchService {
     public MatchDTO createMatch(MatchRequestDTO matchRequestDTO) {
         Match match = new Match();
         mapRequestToEntity(matchRequestDTO, match);
-        return toDto(matchRepository.save(match));
+        Match saved = matchRepository.save(match);
+        matchNotificationService.notifyIfConfirmed(saved);
+        return toDto(saved);
     }
 
     @CacheEvict(value = {"homeMatches", "nextMatch"}, allEntries = true)
@@ -127,7 +132,9 @@ public class MatchService {
     public MatchDTO updateMatch(Long id, MatchRequestDTO matchRequestDTO) {
         Match match = getMatchById(id);
         mapRequestToEntity(matchRequestDTO, match);
-        return toDto(matchRepository.save(match));
+        Match saved = matchRepository.save(match);
+        matchNotificationService.notifyIfConfirmed(saved);
+        return toDto(saved);
     }
 
     @CacheEvict(value = {"homeMatches", "nextMatch"}, allEntries = true)

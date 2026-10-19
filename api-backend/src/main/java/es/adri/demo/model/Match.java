@@ -50,6 +50,9 @@ public class Match extends BaseEntity {
 
     private Integer jornada;
 
+    // Fecha en la que se aviso por email del horario confirmado (null = sin avisar).
+    private LocalDateTime scheduleNotifiedAt;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "competition_id", nullable = false)
     private Competition competition;

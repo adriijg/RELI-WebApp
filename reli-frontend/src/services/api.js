@@ -153,6 +153,10 @@ export const getEmailStatus = () => apiFetch('/admin/emails/status');
 export const sendTestEmail = (to) => apiFetch('/admin/emails/test', { method: 'POST', body: { to } });
 export const sendNextMatchTestEmail = (competitionId, to) =>
   apiFetch('/admin/emails/next-match-test', { method: 'POST', params: { competitionId }, body: { to } });
+export const resendMatchNotice = (matchId) =>
+  apiFetch(`/admin/emails/match/${matchId}/notify`, { method: 'POST' });
+export const resendVerificationEmail = (email) =>
+  apiFetch('/admin/emails/verification/resend', { method: 'POST', body: { to: email } });
 export const fetchEmailPreviewHtml = async (type, competitionId) => {
   const token = localStorage.getItem('re-token');
   const url = new URL(`${API_URL}/admin/emails/preview`, window.location.origin);
