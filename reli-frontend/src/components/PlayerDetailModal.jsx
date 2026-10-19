@@ -113,15 +113,20 @@ export default function PlayerDetailModal({ player, seasonId, seasonName, onClos
         aria-labelledby="player-modal-title"
         className="relative flex w-full max-w-lg max-h-[90vh] flex-col overflow-hidden rounded-3xl bg-background border border-card-border shadow-2xl"
       >
-        <div className="relative shrink-0 overflow-hidden bg-re-azul-oscuro px-6 pt-6 pb-5 text-white">
-          <div className="absolute -right-6 -top-8 text-8xl font-black italic text-white/5 select-none">
-            {player.jerseyNumber}
-          </div>
+        <div className="relative shrink-0 overflow-hidden bg-re-azul-oscuro text-white">
+          <img
+            src={player.photoUrl || FALLBACK_PHOTO}
+            alt=""
+            className="h-72 w-full object-cover object-top sm:h-80"
+            onError={(event) => { event.target.src = FALLBACK_PHOTO; }}
+          />
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-black/10" />
+
           <button
             type="button"
             onClick={onClose}
             autoFocus
-            className="absolute top-4 right-4 text-white/60 hover:text-white transition-colors"
+            className="absolute top-4 right-4 flex h-10 w-10 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-colors hover:bg-black/60"
             aria-label="Cerrar"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -129,27 +134,19 @@ export default function PlayerDetailModal({ player, seasonId, seasonName, onClos
             </svg>
           </button>
 
-          <div className="flex items-center gap-4 relative">
-            <div className="relative shrink-0">
-              <img
-                src={player.photoUrl}
-                alt=""
-                className="w-24 h-24 rounded-full object-cover border-2 border-white/20"
-                onError={(event) => { event.target.src = FALLBACK_PHOTO; }}
-              />
-              <span className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-re-rojo text-white font-black text-sm flex items-center justify-center shadow-lg">
-                {player.jerseyNumber}
-              </span>
-            </div>
-            <div className="min-w-0 pr-8">
+          <div className="absolute inset-x-0 bottom-0 flex items-end gap-3 px-5 pb-4 sm:px-6 sm:pb-5">
+            <div className="min-w-0 flex-1">
               <p className="text-[10px] font-black uppercase tracking-[0.22em] text-re-dorado">{positionLabel}</p>
-              <h2 id="player-modal-title" className="text-2xl font-black uppercase tracking-tight truncate">
+              <h2 id="player-modal-title" className="truncate text-3xl font-black uppercase tracking-tight drop-shadow-lg">
                 {displayName}
               </h2>
               {player.nickname && (
-                <p className="mt-0.5 text-sm font-medium text-white/75 truncate">{legalName}</p>
+                <p className="mt-0.5 truncate text-sm font-medium text-white/75">{legalName}</p>
               )}
             </div>
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-re-rojo text-lg font-black text-white shadow-lg">
+              {player.jerseyNumber}
+            </span>
           </div>
         </div>
 
