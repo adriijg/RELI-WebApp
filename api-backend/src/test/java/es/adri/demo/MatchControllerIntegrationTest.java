@@ -95,7 +95,7 @@ class MatchControllerIntegrationTest {
     @Test
     void getMatchesIsPublic() throws Exception {
         Competition competition = createCompetition("Liga");
-        matchRepository.save(new Match(null, "Rival FC", true, LocalDateTime.now().plusDays(1), "Madrid", MatchStatus.SCHEDULED, 0, 0, null, competition));
+        matchRepository.save(new Match(null, "Rival FC", true, LocalDateTime.now().plusDays(1), "Madrid", MatchStatus.SCHEDULED, 0, 0, null, null, competition));
 
         mockMvc.perform(get("/api/matches"))
                 .andExpect(status().isOk())
@@ -156,7 +156,7 @@ class MatchControllerIntegrationTest {
         User admin = createUser("admin", "admin@example.com", "Password123", Role.ROLE_ADMIN);
         Competition competition = createCompetition("Liga");
         Competition otherCompetition = createCompetition("Copa");
-        Match match = matchRepository.save(new Match(null, "Rival FC", true, LocalDateTime.now().plusDays(1), "Madrid", MatchStatus.SCHEDULED, 0, 0, null, competition));
+        Match match = matchRepository.save(new Match(null, "Rival FC", true, LocalDateTime.now().plusDays(1), "Madrid", MatchStatus.SCHEDULED, 0, 0, null, null, competition));
         MatchRequestDTO request = new MatchRequestDTO(
                 "Otro Rival",
                 false,
@@ -183,7 +183,7 @@ class MatchControllerIntegrationTest {
     void deleteMatchAsAdminReturnsNoContent() throws Exception {
         User admin = createUser("admin", "admin@example.com", "Password123", Role.ROLE_ADMIN);
         Competition competition = createCompetition("Liga");
-        Match match = matchRepository.save(new Match(null, "Rival FC", true, LocalDateTime.now().plusDays(1), "Madrid", MatchStatus.SCHEDULED, 0, 0, null, competition));
+        Match match = matchRepository.save(new Match(null, "Rival FC", true, LocalDateTime.now().plusDays(1), "Madrid", MatchStatus.SCHEDULED, 0, 0, null, null, competition));
 
         mockMvc.perform(delete("/api/matches/{id}", match.getId())
                         .header("Authorization", bearer(admin)))

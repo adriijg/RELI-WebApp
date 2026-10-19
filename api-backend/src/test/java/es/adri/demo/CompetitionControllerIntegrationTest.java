@@ -159,9 +159,9 @@ class CompetitionControllerIntegrationTest {
     void getStandingsIsPublicAndOrdered() throws Exception {
         Season season = seasonRepository.save(new Season(null, "2025/2026", true));
         Competition competition = competitionRepository.save(new Competition(null, "Liga", CompetitionType.LIGA, season, null, null, null, null));
-        matchRepository.save(new Match(null, "Rival A", true, LocalDateTime.now().minusDays(3), "Madrid", MatchStatus.FINISHED, 3, 1, 1, competition));
-        matchRepository.save(new Match(null, "Rival B", false, LocalDateTime.now().minusDays(2), "Fuera", MatchStatus.FINISHED, 2, 2, 1, competition));
-        matchRepository.save(new Match(null, "Rival C", true, LocalDateTime.now().plusDays(1), "Madrid", MatchStatus.SCHEDULED, 0, 0, 2, competition));
+        matchRepository.save(new Match(null, "Rival A", true, LocalDateTime.now().minusDays(3), "Madrid", MatchStatus.FINISHED, 3, 1, 1, null, competition));
+        matchRepository.save(new Match(null, "Rival B", false, LocalDateTime.now().minusDays(2), "Fuera", MatchStatus.FINISHED, 2, 2, 1, null, competition));
+        matchRepository.save(new Match(null, "Rival C", true, LocalDateTime.now().plusDays(1), "Madrid", MatchStatus.SCHEDULED, 0, 0, 2, null, competition));
 
         mockMvc.perform(get("/api/competitions/{id}/standings", competition.getId()))
                 .andExpect(status().isOk())
@@ -181,8 +181,8 @@ class CompetitionControllerIntegrationTest {
     void getStandingsUpToJornadaIncludesAllTeams() throws Exception {
         Season season = seasonRepository.save(new Season(null, "2025/2026", true));
         Competition competition = competitionRepository.save(new Competition(null, "Liga", CompetitionType.LIGA, season, null, null, null, null));
-        matchRepository.save(new Match(null, "Rival A", true, LocalDateTime.now().minusDays(3), "Madrid", MatchStatus.FINISHED, 3, 1, 1, competition));
-        matchRepository.save(new Match(null, "Rival B", false, LocalDateTime.now().plusDays(5), "Fuera", MatchStatus.SCHEDULED, 0, 0, 5, competition));
+        matchRepository.save(new Match(null, "Rival A", true, LocalDateTime.now().minusDays(3), "Madrid", MatchStatus.FINISHED, 3, 1, 1, null, competition));
+        matchRepository.save(new Match(null, "Rival B", false, LocalDateTime.now().plusDays(5), "Fuera", MatchStatus.SCHEDULED, 0, 0, 5, null, competition));
 
         mockMvc.perform(get("/api/competitions/{id}/standings", competition.getId()).param("jornada", "1"))
                 .andExpect(status().isOk())

@@ -203,7 +203,7 @@ class StatControllerIntegrationTest {
     private Match createMatch(String rival) {
         Season season = seasonRepository.save(new Season(null, "2025/2026", true));
         Competition competition = competitionRepository.save(new Competition(null, "Liga", CompetitionType.LIGA, season, null, null, null, null));
-        return matchRepository.save(new Match(null, rival, true, LocalDateTime.now().plusDays(1), "Madrid", MatchStatus.SCHEDULED, 0, 0, null, competition));
+        return matchRepository.save(new Match(null, rival, true, LocalDateTime.now().plusDays(1), "Madrid", MatchStatus.SCHEDULED, 0, 0, null, null, competition));
     }
 
     private User createUser(String username, String email, String rawPassword, Role role) {
