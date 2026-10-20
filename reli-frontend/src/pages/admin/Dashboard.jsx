@@ -14,6 +14,7 @@ import {
 } from '../../services/api';
 import { getRecentAdminMatches } from '../../utils/adminRecentMatches';
 import { getMatchOutcome, scoreTextClass } from '../../utils/matchResult';
+import { formatDate } from '../../utils/format';
 
 const CARDS = [
   { key: 'matches', label: 'Partidos', to: '/admin/partidos', accent: 'red', fetcher: (p) => getMatches({ ...p, size: 1 }) },
@@ -118,7 +119,7 @@ export default function Dashboard() {
                   <span className="flex-1 min-w-0">
                     <span className="block truncate font-black text-[15px] leading-none">{match.rival}</span>
                     <span className="block text-[11px] font-bold text-muted-foreground">
-                      {match.date ? new Date(match.date).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' }) : 'Sin fecha'}
+                      {match.date ? formatDate(match.date) : 'Sin fecha'}
                       {match.competitionName ? ` · ${match.competitionName}` : ''}
                     </span>
                   </span>

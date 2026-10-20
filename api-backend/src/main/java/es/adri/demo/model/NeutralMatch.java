@@ -41,6 +41,13 @@ public class NeutralMatch extends BaseEntity {
     @Column(nullable = false)
     private Integer jornada;
 
+    @Enumerated(EnumType.STRING)
+    @Column(length = 30)
+    private MatchPhase phase;
+
+    @Column(name = "group_name", length = 60)
+    private String groupName;
+
     @Column(nullable = false)
     private String homeName;
 

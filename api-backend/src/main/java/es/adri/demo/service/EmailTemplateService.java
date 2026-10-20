@@ -140,6 +140,21 @@ public class EmailTemplateService {
         return layout(subject, "Pr\u00f3ximo partido &bull; Real Lisiados", subject, innerContentHtml, ctaText, ctaUrl, note);
     }
 
+    public String contactMessage(String name, String email, String message) {
+        String safeName = escape(name);
+        String safeEmail = escape(email);
+        String safeMessage = escape(message).replace("\r\n", "\n").replace("\n", "<br>");
+        String body = "<p>Has recibido un nuevo mensaje desde el formulario de la web.</p>"
+                + infoCard(matchRow("Nombre", safeName) + matchRow("Email", safeEmail))
+                + "<div style=\"margin-top:8px;padding:16px 18px;background-color:#F8FAFC;border-left:4px solid "
+                + RED + ";border-radius:12px;font-family:" + FONT + ";font-size:14px;line-height:22px;color:"
+                + TEXT + ";\">" + safeMessage + "</div>";
+        return layout("Nuevo mensaje desde la web de RELI.",
+                "Formulario de contacto", "Mensaje de " + name,
+                body, "Responder a " + name, "mailto:" + email,
+                "Tambien puedes responder directamente a este correo: " + safeEmail + ".");
+    }
+
     /**
      * Para la vista previa del navegador: sustituye el cid: por el logo en
      * base64 para que se vea sin enviar el correo. En el envío real se sigue

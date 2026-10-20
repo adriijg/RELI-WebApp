@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion, MotionConfig } from 'framer-motion';
 import { fetchHomeMatches, isMatchLive } from '../utils/matches';
 import { STATUS_LABELS } from '../constants/matchStatus';
+import { formatDate, formatTime } from '../utils/format';
 import AdminMatchEditButton from './admin/AdminMatchEditButton';
 
 const WEEKDAYS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
@@ -52,10 +53,6 @@ function eventTone(match) {
 function formatMonth(date) {
   const label = date.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
   return label.charAt(0).toUpperCase() + label.slice(1);
-}
-
-function formatTime(date) {
-  return date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
 }
 
 function CalendarMatch({ match, navigate }) {
@@ -186,9 +183,7 @@ export default function MatchCalendar() {
     e.currentTarget.releasePointerCapture?.(e.pointerId);
   };
 
-  const agendaTitle = selectedDay
-    ? selectedDay.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })
-    : formatMonth(cursor);
+  const agendaTitle = selectedDay ? formatDate(selectedDay) : formatMonth(cursor);
 
   return (
     <MotionConfig reducedMotion="user">
@@ -280,7 +275,7 @@ export default function MatchCalendar() {
                             ? 'bg-re-rojo text-white shadow-[0_0_14px_rgba(226,29,44,0.65)]'
                             : inMonth ? 'text-foreground dark:text-white hover:bg-muted/10 dark:hover:bg-white/10' : 'text-muted-foreground dark:text-white/30'
                         }`}
-                        aria-label={`Ver partidos del ${date.toLocaleDateString('es-ES')}`}
+                        aria-label={`Ver partidos del ${formatDate(date)}`}
                         aria-pressed={isSelected}
                       >
                         {date.getDate()}

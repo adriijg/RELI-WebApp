@@ -5,12 +5,15 @@ import es.adri.demo.dto.CompetitionRequestDTO;
 import es.adri.demo.model.Competition;
 import es.adri.demo.model.CompetitionType;
 import es.adri.demo.model.Match;
+import es.adri.demo.model.MatchPhase;
 import es.adri.demo.model.MatchStatus;
+import es.adri.demo.model.NeutralMatch;
 import es.adri.demo.model.Role;
 import es.adri.demo.model.Season;
 import es.adri.demo.model.User;
 import es.adri.demo.repository.CompetitionRepository;
 import es.adri.demo.repository.MatchRepository;
+import es.adri.demo.repository.NeutralMatchRepository;
 import es.adri.demo.repository.SeasonRepository;
 import es.adri.demo.repository.StatRepository;
 import es.adri.demo.repository.UserRepository;
@@ -67,6 +70,9 @@ class CompetitionControllerIntegrationTest {
     private MatchRepository matchRepository;
 
     @Autowired
+    private NeutralMatchRepository neutralMatchRepository;
+
+    @Autowired
     private StatRepository statRepository;
 
     @Autowired
@@ -81,6 +87,7 @@ class CompetitionControllerIntegrationTest {
     @BeforeEach
     void setUp() {
         statRepository.deleteAll();
+        neutralMatchRepository.deleteAll();
         matchRepository.deleteAll();
         competitionRepository.deleteAll();
         seasonRepository.deleteAll();
@@ -194,6 +201,97 @@ class CompetitionControllerIntegrationTest {
                 .andExpect(jsonPath("$[1].played").value(0))
                 .andExpect(jsonPath("$[2].teamName").value("Rival A"))
                 .andExpect(jsonPath("$[2].played").value(1));
+    }
+
+    @Test
+    void cupStandingsOnlyCountGroupStageMatches() throws Exception {
+        Season season = seasonRepository.save(new Season(null, "2025/2026", true));
+        Competition competition = competitionRepository.save(new Competition(null, "Copa", CompetitionType.COPA, season, null, null, null, null));
+        Match groupMatch = new Match(null, "Rival A", true, LocalDateTime.now().minusDays(3), "Madrid", MatchStatus.FINISHED, 2, 0, 1, null, competition);
+        groupMatch.setPhase(MatchPhase.LIGUILLA);
+        groupMatch.setGroupName("Grupo 3");
+        matchRepository.save(groupMatch);
+        Match knockoutMatch = new Match(null, "Rival B", true, LocalDateTime.now().minusDays(2), "Madrid", MatchStatus.FINISHED, 1, 0, null, null, competition);
+        knockoutMatch.setPhase(MatchPhase.OCTAVOS);
+        matchRepository.save(knockoutMatch);
+
+        mockMvc.perform(get("/api/competitions/{id}/standings", competition.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].teamName").value("REAL LISIADOS"))
+                .andExpect(jsonPath("$[0].played").value(1))
+                .andExpect(jsonPath("$[0].points").value(3))
+                .andExpect(jsonPath("$[1].teamName").value("Rival A"));
+    }
+
+    @Test
+    void cupStandingsIncludeNeutralGroupMatchesButNotKnockout() throws Exception {
+        Season season = seasonRepository.save(new Season(null, "2025/2026", true));
+        Competition competition = competitionRepository.save(new Competition(null, "Copa", CompetitionType.COPA, season, null, null, null, null));
+        Match ours = new Match(null, "Rival A", true, LocalDateTime.now().minusDays(3), "Madrid", MatchStatus.FINISHED, 2, 0, 1, null, competition);
+        ours.setPhase(MatchPhase.LIGUILLA);
+        ours.setGroupName("6");
+        matchRepository.save(ours);
+
+        NeutralMatch groupMatch = new NeutralMatch();
+        groupMatch.setCompetition(competition);
+        groupMatch.setJornada(1);
+        groupMatch.setPhase(MatchPhase.LIGUILLA);
+        groupMatch.setGroupName("6");
+        groupMatch.setHomeName("RIVAL  A.");
+        groupMatch.setAwayName("Rival B");
+        groupMatch.setStatus(MatchStatus.FINISHED);
+        groupMatch.setHomeGoals(3);
+        groupMatch.setAwayGoals(1);
+        neutralMatchRepository.save(groupMatch);
+
+        NeutralMatch otherGroupMatch = new NeutralMatch();
+        otherGroupMatch.setCompetition(competition);
+        otherGroupMatch.setJornada(1);
+        otherGroupMatch.setPhase(MatchPhase.LIGUILLA);
+        otherGroupMatch.setGroupName("7");
+        otherGroupMatch.setHomeName("Rival E");
+        otherGroupMatch.setAwayName("Rival F");
+        otherGroupMatch.setStatus(MatchStatus.FINISHED);
+        otherGroupMatch.setHomeGoals(2);
+        otherGroupMatch.setAwayGoals(2);
+        neutralMatchRepository.save(otherGroupMatch);
+
+        NeutralMatch knockoutMatch = new NeutralMatch();
+        knockoutMatch.setCompetition(competition);
+        knockoutMatch.setJornada(4);
+        knockoutMatch.setPhase(MatchPhase.OCTAVOS);
+        knockoutMatch.setHomeName("Rival C");
+        knockoutMatch.setAwayName("Rival D");
+        knockoutMatch.setStatus(MatchStatus.FINISHED);
+        knockoutMatch.setHomeGoals(1);
+        knockoutMatch.setAwayGoals(0);
+        neutralMatchRepository.save(knockoutMatch);
+
+        mockMvc.perform(get("/api/competitions/{id}/standings", competition.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(3))
+                .andExpect(jsonPath("$[0].teamName").value("REAL LISIADOS"))
+                .andExpect(jsonPath("$[0].points").value(3))
+                .andExpect(jsonPath("$[1].teamName").value("Rival A"))
+                .andExpect(jsonPath("$[1].played").value(2))
+                .andExpect(jsonPath("$[1].points").value(3))
+                .andExpect(jsonPath("$[2].teamName").value("Rival B"))
+                .andExpect(jsonPath("$[2].played").value(1))
+                .andExpect(jsonPath("$[2].points").value(0));
+    }
+
+    @Test
+    void cupStandingsWithoutGroupStageMatchesAreEmpty() throws Exception {
+        Season season = seasonRepository.save(new Season(null, "2025/2026", true));
+        Competition competition = competitionRepository.save(new Competition(null, "Copa", CompetitionType.COPA, season, null, null, null, null));
+        Match knockoutMatch = new Match(null, "Rival B", true, LocalDateTime.now().minusDays(2), "Madrid", MatchStatus.FINISHED, 1, 0, null, null, competition);
+        knockoutMatch.setPhase(MatchPhase.OCTAVOS);
+        matchRepository.save(knockoutMatch);
+
+        mockMvc.perform(get("/api/competitions/{id}/standings", competition.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
     }
 
     @Test

@@ -1,9 +1,21 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { getCompetitions, getMatches, getStats, toPage } from '../services/api';
+import { getPlayerMatchStats } from '../services/api';
 import { POSITION_LABELS } from '../constants/positions';
+import { formatDate } from '../utils/format';
 
 const FALLBACK_PHOTO = 'https://pjefzhrnoftaovlvnjaz.supabase.co/storage/v1/object/public/images/default-player.png';
+const MATCH_STATS_TTL = 60_000;
+const matchStatsCache = new Map();
+
+async function loadMatchStats(playerId, seasonId) {
+  const key = `${playerId}:${seasonId || 'current'}`;
+  const cached = matchStatsCache.get(key);
+  if (cached && Date.now() - cached.at < MATCH_STATS_TTL) return cached.data;
+  const data = await getPlayerMatchStats(playerId, seasonId);
+  matchStatsCache.set(key, { at: Date.now(), data: Array.isArray(data) ? data : [] });
+  return data;
+}
 
 const STAT_ITEMS = [
   { key: 'appearances', label: 'PJ', hint: 'PJ', color: 'text-sky-500' },
@@ -13,10 +25,7 @@ const STAT_ITEMS = [
 ];
 
 function formatMatchDate(date) {
-  if (!date) return 'Sin fecha';
-  const parsed = new Date(date);
-  if (Number.isNaN(parsed.getTime())) return 'Sin fecha';
-  return parsed.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
+  return date ? formatDate(date) : 'Sin fecha';
 }
 
 function rate(value, appearances) {
@@ -46,36 +55,15 @@ export default function PlayerDetailModal({ player, seasonId, seasonName, onClos
   useEffect(() => {
     if (!player) return undefined;
     let cancelled = false;
+    const cached = matchStatsCache.get(`${player.playerId}:${seasonId || 'current'}`);
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setLoadingMatches(true);
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLoadingMatches(!cached);
     setMatchesError('');
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setMatches([]);
+    setMatches(cached?.data ?? []);
 
-    Promise.all([
-      getStats({ playerId: player.playerId, size: 100, sortBy: 'id', direction: 'desc' }),
-      getMatches({ size: 100, sortBy: 'date', direction: 'desc' }),
-      getCompetitions({ size: 100 }),
-    ])
-      .then(([statsData, matchesData, competitionsData]) => {
-        if (cancelled) return;
-        const seasonCompetitionIds = new Set(
-          toPage(competitionsData).content
-            .filter((competition) => !seasonId || String(competition.seasonId) === String(seasonId))
-            .map((competition) => competition.id)
-        );
-        const matchById = new Map();
-        for (const match of toPage(matchesData).content) {
-          if (!seasonId || seasonCompetitionIds.has(match.competitionId)) {
-            matchById.set(match.id, match);
-          }
-        }
-        const rows = toPage(statsData).content
-          .filter((stat) => matchById.has(stat.matchId))
-          .map((stat) => ({ ...stat, match: matchById.get(stat.matchId) }))
-          .sort((a, b) => new Date(b.match?.date || 0) - new Date(a.match?.date || 0));
-        setMatches(rows);
+    loadMatchStats(player.playerId, seasonId)
+      .then((data) => {
+        if (!cancelled) setMatches(data);
       })
       .catch(() => {
         if (!cancelled) setMatchesError('No se pudo cargar el detalle por partido.');
@@ -205,11 +193,11 @@ export default function PlayerDetailModal({ player, seasonId, seasonName, onClos
                     >
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-black uppercase tracking-tight truncate">
-                          {stat.match?.home === false ? 'Visitante' : stat.match?.home ? 'Local' : 'Partido'} · {stat.matchRival}
+                          {stat.home === false ? 'Visitante' : stat.home ? 'Local' : 'Partido'} · {stat.rival}
                         </p>
                         <p className="text-[10px] font-bold uppercase tracking-widest text-foreground/40">
-                          {formatMatchDate(stat.match?.date)}
-                          {stat.match?.jornada ? ` · J${stat.match.jornada}` : ''}
+                          {formatMatchDate(stat.date)}
+                          {stat.jornada ? ` · J${stat.jornada}` : ''}
                           {stat.mvp ? ' · MVP' : ''}
                         </p>
                       </div>

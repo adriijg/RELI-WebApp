@@ -10,6 +10,7 @@ import es.adri.demo.repository.PlayerRepository;
 import es.adri.demo.repository.PlayerSeasonRepository;
 import es.adri.demo.repository.SeasonRepository;
 import java.util.List;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -52,6 +53,7 @@ public class PlayerSeasonService {
         }
     }
 
+    @CacheEvict(value = "playerSeasonStats", allEntries = true)
     public PlayerSeasonDTO assign(PlayerSeasonRequestDTO req) {
         var existing = playerSeasonRepository.findByPlayerIdAndSeasonId(req.getPlayerId(), req.getSeasonId());
         if (existing.isPresent()) {
@@ -70,6 +72,7 @@ public class PlayerSeasonService {
         return toDto(playerSeasonRepository.save(ps));
     }
 
+    @CacheEvict(value = "playerSeasonStats", allEntries = true)
     public void unassign(Long seasonId, Long playerId) {
         PlayerSeason ps = playerSeasonRepository.findByPlayerIdAndSeasonId(playerId, seasonId)
                 .orElseThrow(() -> new ResourceNotFoundException("Asignación no encontrada"));

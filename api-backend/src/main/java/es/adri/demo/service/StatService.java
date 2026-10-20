@@ -12,6 +12,7 @@ import es.adri.demo.repository.PlayerRepository;
 import es.adri.demo.repository.StatRepository;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -70,6 +71,7 @@ public class StatService {
         return toPagedResponse(page.map(this::toDto));
     }
 
+    @CacheEvict(value = "playerSeasonStats", allEntries = true)
     @Transactional
     public StatDTO createStat(StatRequestDTO statRequestDTO) {
         // Fuente única: un registro por jugador y partido. Si ya existe, se actualiza.
@@ -80,6 +82,7 @@ public class StatService {
         return toDto(statRepository.save(stat));
     }
 
+    @CacheEvict(value = "playerSeasonStats", allEntries = true)
     @Transactional
     public StatDTO updateStat(Long id, StatRequestDTO statRequestDTO) {
         Stat stat = getStatById(id);
@@ -87,6 +90,7 @@ public class StatService {
         return toDto(statRepository.save(stat));
     }
 
+    @CacheEvict(value = "playerSeasonStats", allEntries = true)
     @Transactional
     public void deleteStat(Long id) {
         statRepository.delete(getStatById(id));

@@ -4,6 +4,7 @@ import Seo from '../components/Seo';
 import { getAllPlayers, getCompetitions, getMatches, getMatchDetail, getPlayerSeasonStats, getQuintetBallots, getQuintetSeasonTally, getQuintetStatus, getQuintetTally, deleteQuintetVote, getMyQuintetVote, getSeasons, openQuintet, closeQuintet, saveQuintetVote, toPage } from '../services/api';
 import { jerseyForSeason } from '../constants/jerseys';
 import { POSITION_LABELS } from '../constants/positions';
+import { formatDate, formatDateTime } from '../utils/format';
 
 const FALLBACK_PHOTO = 'https://pjefzhrnoftaovlvnjaz.supabase.co/storage/v1/object/public/images/default-player.png';
 const VOTES_KEY = 'reli-quinteto-votes';
@@ -68,10 +69,7 @@ function weekMatch(matches) {
 }
 
 function formatWhen(date) {
-  if (!date) return '';
-  const parsed = new Date(date);
-  if (Number.isNaN(parsed.getTime())) return '';
-  return parsed.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' });
+  return date ? formatDate(date) : '';
 }
 
 export default function QuintetPage() {
@@ -390,7 +388,7 @@ export default function QuintetPage() {
 
       {quintetStatus && (
         <div className={`rounded-xl border px-3 py-2 text-[11px] font-black uppercase tracking-widest ${isVoteOpen ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' : 'bg-re-rojo/10 text-re-rojo border-re-rojo/20'}`}>
-          {isVoteOpen ? `Votación abierta · cierra jueves 23:59${quintetStatus.closesAt ? ` (${new Date(quintetStatus.closesAt).toLocaleString('es-ES', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' })})` : ''}` : 'Votación cerrada · espera a que el admin la abra'}
+          {isVoteOpen ? `Votación abierta · cierra jueves 23:59${quintetStatus.closesAt ? ` (${formatDateTime(quintetStatus.closesAt)})` : ''}` : 'Votación cerrada · espera a que el admin la abra'}
         </div>
       )}
       {voterKey && !canVote && (

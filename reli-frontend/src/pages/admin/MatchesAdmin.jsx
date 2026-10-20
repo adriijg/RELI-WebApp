@@ -24,9 +24,11 @@ import {
   scrapeMatchActa,
 } from '../../services/api';
 import { STATUS_LABELS } from '../../constants/matchStatus';
+import { MATCH_PHASE_LABELS, MATCH_PHASE_OPTIONS } from '../../constants/matchPhases';
 import { POSITION_LABELS } from '../../constants/positions';
 import { rememberAdminMatch } from '../../utils/adminRecentMatches';
 import { getMatchOutcome, scoreTextClass } from '../../utils/matchResult';
+import { formatDate } from '../../utils/format';
 
 const TIME_OPTIONS = (() => {
   const opts = [];
@@ -558,6 +560,14 @@ export default function MatchesAdmin() {
     { name: 'ourGoals', label: 'Nuestros goles', type: 'number', min: 0 },
     { name: 'rivalGoals', label: 'Goles del rival', type: 'number', min: 0 },
     { name: 'jornada', label: 'Jornada', type: 'number', min: 1, placeholder: 'Solo ligas' },
+    {
+      name: 'phase',
+      label: 'Fase',
+      type: 'select',
+      section: 'Copa (grupo y eliminatorias)',
+      options: [{ value: '', label: 'Liga / sin fase' }, ...MATCH_PHASE_OPTIONS],
+    },
+    { name: 'groupName', label: 'Grupo', type: 'text', section: 'Copa (grupo y eliminatorias)', placeholder: 'Ej. Grupo 3' },
   ];
 
   const competitionSeasonById = new Map(
@@ -580,7 +590,12 @@ export default function MatchesAdmin() {
     ) },
     { key: 'date', label: 'Fecha', className: 'w-28', render: (value) => (
       value
-        ? <span className="text-[13px] font-bold text-foreground">{new Date(value).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: '2-digit' })}</span>
+        ? <span className="text-[13px] font-bold text-foreground">{formatDate(value)}</span>
+        : <span className="text-muted-foreground">—</span>
+    ) },
+    { key: 'phase', label: 'Fase', className: 'w-32', render: (value) => (
+      value
+        ? <Badge variant="blue">{MATCH_PHASE_LABELS[value] || value}</Badge>
         : <span className="text-muted-foreground">—</span>
     ) },
     { key: 'status', label: 'Estado', className: 'w-28', render: (value) => (
@@ -634,6 +649,8 @@ export default function MatchesAdmin() {
       date: values.date ? `${values.date}T${time || '00:00'}:00` : null,
       competitionId: Number(values.competitionId),
       jornada: values.jornada ? Number(values.jornada) : null,
+      phase: values.phase || null,
+      groupName: values.groupName?.trim() ? values.groupName.trim() : null,
     };
     await crud.save(payload, editing?.id);
     setModalOpen(false);

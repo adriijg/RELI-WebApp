@@ -9,6 +9,7 @@ import es.adri.demo.repository.NeutralMatchRepository;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,6 +35,7 @@ public class NeutralMatchService {
     }
 
     /** Crea o actualiza por (competición, jornada, códigos): idempotente para el editor de jornada. */
+    @CacheEvict(value = "standings", allEntries = true)
     @Transactional
     public NeutralMatchDTO upsert(NeutralMatchDTO dto) {
         if (dto.getCompetitionId() == null || dto.getJornada() == null
@@ -58,6 +60,8 @@ public class NeutralMatchService {
         }
         match.setCompetition(competition);
         match.setJornada(dto.getJornada());
+        match.setPhase(dto.getPhase());
+        match.setGroupName(blankToNull(dto.getGroupName()));
         match.setHomeName(dto.getHomeName().trim());
         match.setAwayName(dto.getAwayName().trim());
         match.setHomeCode(blankToNull(dto.getHomeCode()));
@@ -71,6 +75,7 @@ public class NeutralMatchService {
         return toDto(repository.save(match));
     }
 
+    @CacheEvict(value = "standings", allEntries = true)
     @Transactional
     public void delete(Long id) {
         if (!repository.existsById(id)) {
@@ -84,6 +89,8 @@ public class NeutralMatchService {
                 match.getId(),
                 match.getCompetition() != null ? match.getCompetition().getId() : null,
                 match.getJornada(),
+                match.getPhase(),
+                match.getGroupName(),
                 match.getHomeName(),
                 match.getAwayName(),
                 match.getHomeCode(),

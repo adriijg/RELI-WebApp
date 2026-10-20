@@ -192,12 +192,6 @@
   animation: pitch-draw 2s ease forwards;
 }
 
-.squad-radar {
-  background: conic-gradient(from 0deg, transparent 0 76%, rgba(243, 229, 171, 0.55) 100%);
-  animation: ring-spin 6s linear infinite;
-  mask-image: radial-gradient(circle, transparent 30%, #000 46%, transparent 72%);
-}
-
 .player-float {
   animation: player-float 3.4s ease-in-out infinite;
 }
@@ -267,7 +261,6 @@
   .stadium-beam,
   .stadium-dust,
   .pitch-draw,
-  .squad-radar,
   .player-float,
   .squad-ring-wrap::before,
   .squad-cycle-bar,

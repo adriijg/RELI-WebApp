@@ -4,6 +4,7 @@ import AdminSelect from '../../components/admin/AdminSelect';
 import Badge from '../../components/admin/Badge';
 import {
   getCompetitions,
+  getSeasons,
   getEmailStatus,
   fetchEmailPreviewHtml,
   sendNextMatchTestEmail,
@@ -13,6 +14,7 @@ import {
   getMatchesByCompetition,
   toPage,
 } from '../../services/api';
+import { formatDate } from '../../utils/format';
 
 const PREVIEW_TABS = [
   { id: 'test', label: 'Prueba' },
@@ -54,6 +56,7 @@ export default function EmailsAdmin() {
   const [verifyTo, setVerifyTo] = useState('');
   const [competitionId, setCompetitionId] = useState('');
   const [matches, setMatches] = useState([]);
+  const [matchesError, setMatchesError] = useState('');
   const [matchId, setMatchId] = useState('');
   const [sending, setSending] = useState(false);
   const [message, setMessage] = useState('');
@@ -64,11 +67,16 @@ export default function EmailsAdmin() {
 
   useEffect(() => {
     getEmailStatus().then(setStatus).catch(() => setStatus(null));
-    getCompetitions({ size: 200 })
-      .then((data) => {
-        const list = toPage(data).content;
+    Promise.all([getCompetitions({ size: 200 }), getSeasons({ size: 200 })])
+      .then(([competitionsData, seasonsData]) => {
+        const list = toPage(competitionsData).content;
+        const currentSeason = toPage(seasonsData).content.find((season) => season.current);
         setCompetitions(list);
-        if (list.length > 0) setCompetitionId(String(list[0].id));
+        const currentCompetition = currentSeason
+          ? list.find((competition) => competition.seasonId === currentSeason.id)
+          : null;
+        if (currentCompetition) setCompetitionId(String(currentCompetition.id));
+        else if (list.length > 0) setCompetitionId(String(list[0].id));
       })
       .catch(() => setCompetitions([]));
   }, []);
@@ -113,17 +121,21 @@ export default function EmailsAdmin() {
       return;
     }
     let cancelled = false;
+    setMatchesError('');
     getMatchesByCompetition(competitionId)
       .then((data) => {
         if (cancelled) return;
-        const list = (Array.isArray(data) ? data : []).filter(
-          (match) => match.status === 'SCHEDULED',
-        );
+        const list = (Array.isArray(data) ? data : [])
+          .slice()
+          .sort((a, b) => (a.jornada ?? 0) - (b.jornada ?? 0));
         setMatches(list);
         setMatchId(list.length ? String(list[0].id) : '');
       })
       .catch(() => {
-        if (!cancelled) setMatches([]);
+        if (!cancelled) {
+          setMatches([]);
+          setMatchesError('No se pudieron cargar los partidos de esta competición.');
+        }
       });
     return () => {
       cancelled = true;
@@ -221,7 +233,10 @@ export default function EmailsAdmin() {
               label="Competición"
               value={competitionId}
               onChange={setCompetitionId}
-              options={competitions.map((competition) => ({ value: String(competition.id), label: competition.name }))}
+              options={competitions.map((competition) => ({
+                value: String(competition.id),
+                label: `${competition.name} · ${competition.seasonName}`,
+              }))}
               className="sm:max-w-xs sm:flex-1"
             />
             <input
@@ -267,24 +282,28 @@ export default function EmailsAdmin() {
 
         <Section
           title="Reenviar aviso de horario"
-          description="Reenvía a todos los usuarios verificados el aviso del horario confirmado de un partido (por si el automático falló)."
+          description="Reenvía a todos los usuarios verificados el aviso del horario confirmado de un partido (por si el automático falló). Debe tener hora distinta de las 00:00 y sede."
         >
+          {matchesError && <p className="mb-3 text-xs font-bold text-re-rojo">{matchesError}</p>}
           <form onSubmit={handleResendMatch} className="flex flex-col sm:flex-row gap-3 sm:items-end">
             <AdminSelect
               label="Competición"
               value={competitionId}
               onChange={setCompetitionId}
-              options={competitions.map((competition) => ({ value: String(competition.id), label: competition.name }))}
+              options={competitions.map((competition) => ({
+                value: String(competition.id),
+                label: `${competition.name} · ${competition.seasonName}`,
+              }))}
               className="sm:max-w-xs sm:flex-1"
             />
             <AdminSelect
               label="Partido"
               value={matchId}
               onChange={setMatchId}
-              placeholder={matches.length ? 'Selecciona…' : 'Sin partidos programados'}
+              placeholder={matches.length ? 'Selecciona…' : 'Sin partidos'}
               options={matches.map((match) => ({
                 value: String(match.id),
-                label: `J${match.jornada ?? '—'} · ${match.rival}${match.date ? ` · ${new Date(match.date).toLocaleDateString('es-ES')}` : ''}`,
+                label: `J${match.jornada ?? '—'} · ${match.rival}${match.date ? ` · ${formatDate(match.date)}` : ''}${match.status === 'FINISHED' ? ' · Finalizado' : match.status === 'IN_PROGRESS' ? ' · En juego' : match.status === 'POSTPONED' ? ' · Aplazado' : ''}`,
               }))}
               className="sm:flex-1"
             />

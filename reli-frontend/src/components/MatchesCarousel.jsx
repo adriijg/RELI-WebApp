@@ -7,6 +7,7 @@ import { STATUS_LABELS } from '../constants/matchStatus';
 import { fetchHomeMatches, pickFeaturedMatch, selectCarouselMatches } from '../utils/matches';
 import { getMatchOutcome, scoreTextClass } from '../utils/matchResult';
 import AdminMatchEditButton from './admin/AdminMatchEditButton';
+import { formatDate } from '../utils/format';
 
 const NAME_LIMIT = 14;
 
@@ -235,7 +236,7 @@ export default function MatchesCarousel() {
 
                   <div className="border-t border-card-border dark:border-white/10 pt-6 text-center">
                     <p className="text-re-rojo font-black text-xs lg:text-sm mb-1 uppercase tracking-widest">
-                      {match.date ? new Date(match.date).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: '2-digit' }).toUpperCase() : "FECHA TBD"}
+                      {match.date ? formatDate(match.date) : "FECHA TBD"}
                     </p>
                     <p className="text-[9px] font-black uppercase tracking-tighter text-muted-foreground dark:text-white/45 lg:text-[10px]">
                       📍 {match.location || "Sede por confirmar"}

@@ -95,6 +95,9 @@ export const resendVerification = (email) => apiFetch('/users/verify-email/resen
 export const requestPasswordReset = (email) => apiFetch('/users/password-reset/request', { method: 'POST', body: { email }, auth: false });
 export const confirmPasswordReset = (token, password) => apiFetch('/users/password-reset/confirm', { method: 'POST', body: { token, password }, auth: false });
 
+export const sendContactMessage = (payload) =>
+    apiFetch('/contact', { method: 'POST', body: payload, auth: false });
+
 export const saveQuintetVote = (body) => apiFetch('/quintet/votes', { method: 'POST', body });
 export const getMyQuintetVote = (seasonId, jornada) => apiFetch('/quintet/me', { params: { seasonId, jornada } });
 export const deleteQuintetVote = (seasonId, jornada) => apiFetch('/quintet/me', { method: 'DELETE', params: { seasonId, jornada } });
@@ -126,6 +129,7 @@ export const deleteEvent = (id) => apiFetch(`/events/${id}`, { method: 'DELETE' 
 export const getPlayers = (params) => apiFetch('/players', { params });
 export const getAllPlayers = () => apiFetch('/players/all');
 export const getPlayerSeasonStats = (params) => apiFetch('/players/season-stats', { params });
+export const getPlayerMatchStats = (playerId, seasonId) => apiFetch(`/players/${playerId}/match-stats`, { params: { seasonId } });
 export const createPlayer = (body) => apiFetch('/players', { method: 'POST', body });
 export const updatePlayer = (id, body) => apiFetch(`/players/${id}`, { method: 'PUT', body });
 export const deletePlayer = (id) => apiFetch(`/players/${id}`, { method: 'DELETE' });
@@ -190,6 +194,7 @@ export const getNeutralMatches = (competitionId, jornada) => {
   return apiFetch('/neutral-matches', { params });
 };
 export const saveNeutralMatch = (body) => apiFetch('/neutral-matches', { method: 'POST', body });
+export const updateNeutralMatch = (id, body) => apiFetch(`/neutral-matches/${id}`, { method: 'PUT', body });
 export const deleteNeutralMatch = (id) => apiFetch(`/neutral-matches/${id}`, { method: 'DELETE' });
 
 /* ---------- Actas FFM (admin) ---------- */

@@ -1,5 +1,6 @@
 package es.adri.demo.dto;
 
+import es.adri.demo.model.MatchPhase;
 import es.adri.demo.model.MatchStatus;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -12,6 +13,8 @@ public class NeutralMatchDTO {
     private Long id;
     private Long competitionId;
     private Integer jornada;
+    private MatchPhase phase;
+    private String groupName;
     private String homeName;
     private String awayName;
     private String homeCode;

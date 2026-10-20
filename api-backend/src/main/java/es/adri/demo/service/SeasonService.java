@@ -8,6 +8,8 @@ import es.adri.demo.model.Season;
 import es.adri.demo.repository.SeasonRepository;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -21,6 +23,7 @@ public class SeasonService {
         this.seasonRepository = seasonRepository;
     }
 
+    @Cacheable(value = "seasons", key = "#pageable.pageNumber + '-' + #pageable.pageSize + '-' + #pageable.sort.toString()")
     public PagedResponseDTO<SeasonDTO> findAllSeasons(Pageable pageable) {
         Page<SeasonDTO> page = seasonRepository.findAll(pageable)
                 .map(this::toDto);
@@ -37,18 +40,21 @@ public class SeasonService {
         return toDto(getSeasonById(id));
     }
 
+    @CacheEvict(value = {"seasons", "competitions"}, allEntries = true)
     public SeasonDTO createSeason(SeasonRequestDTO seasonRequestDTO) {
         Season season = new Season();
         mapRequestToEntity(seasonRequestDTO, season);
         return toDto(seasonRepository.save(season));
     }
 
+    @CacheEvict(value = {"seasons", "competitions"}, allEntries = true)
     public SeasonDTO updateSeason(Long id, SeasonRequestDTO seasonRequestDTO) {
         Season season = getSeasonById(id);
         mapRequestToEntity(seasonRequestDTO, season);
         return toDto(seasonRepository.save(season));
     }
 
+    @CacheEvict(value = {"seasons", "competitions"}, allEntries = true)
     public void deleteSeason(Long id) {
         seasonRepository.delete(getSeasonById(id));
     }

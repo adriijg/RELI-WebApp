@@ -4,6 +4,7 @@ import { fetchHomeMatches } from '../utils/matches';
 import { getMatchOutcome, scoreBadgeClass, scoreTextClass } from '../utils/matchResult';
 import logo from '../assets/reli-badge.png';
 import AdminMatchEditButton from './admin/AdminMatchEditButton';
+import { formatDate } from '../utils/format';
 
 export default function LastMatches() {
   const navigate = useNavigate();
@@ -38,8 +39,7 @@ export default function LastMatches() {
   const restDesc = [...restAsc].reverse();
 
   const renderBigCard = (match, extraClass = '') => {
-    const d = match.date ? new Date(match.date) : null;
-    const dateFull = d ? d.toLocaleDateString('es-ES', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' }) : 'Fecha TBD';
+    const dateFull = match.date ? formatDate(match.date) : 'Fecha TBD';
     const our = match.ourGoals; const rival = match.rivalGoals; const outcome = getMatchOutcome(our, rival); const isHome = match.home !== false;
     return (
       <button onClick={() => navigate(`/partidos/${match.id}`)} className={`snap-start shrink-0 w-[300px] sm:w-[340px] h-[168px] flex flex-col justify-between bg-gradient-to-br from-re-rojo/10 via-card-bg to-card-bg dark:from-re-rojo/20 dark:to-black/30 border-2 border-re-dorado/40 rounded-3xl p-5 text-left shadow-lg ${extraClass}`}>
@@ -63,8 +63,7 @@ export default function LastMatches() {
   };
 
   const renderSmallCard = (m) => {
-    const d = m.date ? new Date(m.date) : null;
-    const dateShort = d ? d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' }) : '';
+    const dateShort = m.date ? formatDate(m.date) : '';
     const our = m.ourGoals; const rival = m.rivalGoals; const outcome = getMatchOutcome(our, rival);
     return (
       <button key={m.id} onClick={() => navigate(`/partidos/${m.id}`)} className="snap-start shrink-0 w-[148px] sm:w-[168px] h-[168px] flex flex-col justify-between bg-muted/5 dark:bg-black/20 border border-card-border dark:border-white/10 rounded-3xl p-4 text-left">

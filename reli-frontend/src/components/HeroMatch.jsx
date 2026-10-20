@@ -5,6 +5,7 @@ import { motion, MotionConfig } from 'framer-motion';
 import logo from '../assets/reli-badge.png';
 import { fetchHomeMatches, pickFeaturedMatch, isMatchLive } from '../utils/matches';
 import { useApp } from '../context/AppContext';
+import { formatDate, formatTime } from '../utils/format';
 
 export default function HeroMatch() {
   const navigate = useNavigate();
@@ -79,7 +80,7 @@ export default function HeroMatch() {
   const kickoffLabel = isMatchLive(nextMatch)
     ? 'EN JUEGO'
     : nextMatch?.date
-      ? `${new Date(nextMatch.date).toLocaleDateString('es-ES', { weekday: 'long', hour: '2-digit', minute: '2-digit' }).toUpperCase()}${nextMatch?.jornada != null ? ` · J${nextMatch.jornada}` : ''}`
+      ? `${formatDate(nextMatch.date)} · ${formatTime(nextMatch.date)}${nextMatch?.jornada != null ? ` · J${nextMatch.jornada}` : ''}`
       : 'FECHA TBD';
 
   return (

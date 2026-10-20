@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Seo from '../components/Seo';
 import { getEvents, toPage } from '../services/api';
+import { formatDate } from '../utils/format';
 
 const TYPE_BADGES = {
   INFO: 'Noticia',
@@ -12,13 +13,6 @@ const TYPE_BADGES = {
 
 const FALLBACK_IMAGE =
   'https://images.unsplash.com/photo-1574629810360-7efbbe195018?q=80&w=2076&auto=format&fit=crop';
-
-function formatDate(date) {
-  if (!date) return '';
-  const d = new Date(date);
-  if (Number.isNaN(d.getTime())) return '';
-  return d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase();
-}
 
 export default function NewsPage() {
   const [news, setNews] = useState([]);
@@ -93,7 +87,7 @@ export default function NewsPage() {
                       {TYPE_BADGES[item.type] || item.type}
                     </span>
                     <span className="text-[9px] sm:text-[10px] font-bold text-muted-foreground tracking-widest">
-                      {formatDate(item.date)}
+                      {item.date ? formatDate(item.date) : ''}
                     </span>
                   </div>
                   <h3 className="text-sm sm:text-base font-black leading-tight uppercase group-hover:text-re-rojo transition-colors line-clamp-2">

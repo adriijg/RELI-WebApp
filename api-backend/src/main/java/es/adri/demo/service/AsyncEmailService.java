@@ -27,12 +27,17 @@ public class AsyncEmailService {
 
     @Async
     public void sendWithRetry(String recipient, String subject, String html) {
+        sendWithRetry(recipient, subject, html, null);
+    }
+
+    @Async
+    public void sendWithRetry(String recipient, String subject, String html, String replyTo) {
         if (!emailService.isEnabled()) {
             return;
         }
         for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
             try {
-                emailService.send(recipient, subject, html);
+                emailService.send(recipient, subject, html, replyTo);
                 return;
             } catch (Exception e) {
                 log.warn("Fallo enviando correo a {} (intento {}/{}): {}",

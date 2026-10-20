@@ -1,26 +1,26 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, MotionConfig } from 'framer-motion';
 import Seo from '../components/Seo';
 import { getCompetitions, getSeasons, getStandings, getMatchesByCompetition, toPage, getNeutralMatches, saveNeutralMatch, deleteNeutralMatch, syncJornadaResults, syncMatchResult, scrapeMatchActa, fetchActaHtml, fetchActaPdf } from '../services/api';
 import { useApp } from '../context/AppContext';
 import { STATUS_LABELS } from '../constants/matchStatus';
+import { MATCH_PHASE_LABELS, MATCH_PHASE_ORDER } from '../constants/matchPhases';
 import AdminMatchEditButton from '../components/admin/AdminMatchEditButton';
 import { computeStandings } from '../utils/standings';
 import { getMatchOutcome, scoreTextClass } from '../utils/matchResult';
+import { formatDate as formatDateValue, formatTime as formatTimeValue } from '../utils/format';
 
 function formatDate(dateStr) {
-  if (!dateStr) return 'Por confirmar';
-  const d = new Date(dateStr);
-  if (Number.isNaN(d.getTime())) return 'Por confirmar';
-  return d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
+  return dateStr ? formatDateValue(dateStr) : 'Por confirmar';
 }
 
 function formatTime(dateStr) {
-  if (!dateStr) return '';
-  const d = new Date(dateStr);
-  if (Number.isNaN(d.getTime())) return '';
-  return d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+  return dateStr ? formatTimeValue(dateStr) : '';
+}
+
+function normalizeGroupName(value) {
+  return String(value || '').trim().toLowerCase().replace(/^grupo\s*/, '');
 }
 
 function MatchRow({ match, navigate }) {
@@ -78,6 +78,47 @@ function MatchRow({ match, navigate }) {
       </div>
       <div className="shrink-0" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
         <AdminMatchEditButton matchId={match.id} />
+      </div>
+    </div>
+  );
+}
+
+function NeutralMatchRow({ match }) {
+  const finished = match.status === 'FINISHED' && match.homeGoals != null && match.awayGoals != null;
+
+  return (
+    <div className="mx-3 my-2 flex items-center gap-2 rounded-2xl border border-dashed border-card-border dark:border-white/10 bg-muted/5 dark:bg-black/20 px-3 py-3 sm:gap-3 sm:px-4">
+      <div className="w-14 shrink-0 border-r border-card-border dark:border-re-dorado/25 pr-2 text-center sm:w-20">
+        <p className="text-[8px] font-black uppercase tracking-widest text-muted-foreground sm:text-[10px]">{formatDate(match.date)}</p>
+        {match.date && (
+          <p className="text-[8px] font-bold text-muted-foreground/70 sm:text-[10px]">{formatTime(match.date)}</p>
+        )}
+      </div>
+      <div className="flex-1 min-w-0 text-right overflow-hidden team-name-cell">
+        <span className="team-name-ticker text-[10px] font-black uppercase tracking-tight text-foreground dark:text-white sm:text-sm">
+          {match.homeName}
+        </span>
+      </div>
+      <div className="shrink-0 text-center px-1 sm:px-2">
+        {finished ? (
+          <span className="font-black italic text-base sm:text-xl tracking-tighter text-foreground dark:text-white">
+            {match.homeGoals} - {match.awayGoals}
+          </span>
+        ) : (
+          <span className="text-xs font-black italic text-re-rojo sm:text-sm">VS</span>
+        )}
+      </div>
+      <div className="flex-1 min-w-0 text-left overflow-hidden team-name-cell">
+        <span className="team-name-ticker text-[10px] sm:text-sm font-black uppercase tracking-tight text-foreground dark:text-white">
+          {match.awayName}
+        </span>
+      </div>
+      <div className="shrink-0 text-right">
+        <span className={`text-[7px] sm:text-[9px] font-black px-1.5 sm:px-2 py-1 rounded-full uppercase tracking-widest whitespace-nowrap ${
+          finished ? 'bg-muted/10 text-foreground/50' : 'bg-re-dorado/15 text-re-dorado'
+        }`}>
+          {STATUS_LABELS[match.status] || match.status}
+        </span>
       </div>
     </div>
   );
@@ -145,17 +186,20 @@ function RoundRow({ game, onClick, dbId }) {
 function normTeam(name) {
   return String(name || '')
     .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
+    .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim();
+    .replace(/[^a-z0-9]/g, '');
 }
 
 function sameGame(a, b) {
-  if (a?.homeCode && b?.homeCode && a?.awayCode && b?.awayCode) {
-    return String(a.homeCode) === String(b.homeCode) && String(a.awayCode) === String(b.awayCode);
+  if (a?.homeCode && b?.homeCode && a?.awayCode && b?.awayCode
+      && String(a.homeCode) === String(b.homeCode)
+      && String(a.awayCode) === String(b.awayCode)) {
+    return true;
   }
-  return normTeam(a?.home) === normTeam(b?.home) && normTeam(a?.away) === normTeam(b?.away);
+  const home = normTeam(a?.home);
+  const away = normTeam(a?.away);
+  return Boolean(home && away) && home === normTeam(b?.home) && away === normTeam(b?.away);
 }
 
 function toInputDateTime(iso) {
@@ -427,16 +471,28 @@ function JornadaGameRow({ game, ourDbId, onOpenOurs, codacta, neutral, isAdmin, 
 
 const selectClass = 'w-full rounded-lg border border-card-border dark:border-re-dorado/25 bg-card-bg dark:bg-black/30 px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-foreground dark:text-white focus:outline-none focus:ring-2 focus:ring-re-dorado';
 
+const DATA_CACHE_TTL = 30_000;
+const dataCache = new Map();
+
 export default function CompetitionPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { isAdmin } = useApp();
+  const initialSelection = useRef({
+    seasonId: searchParams.get('temporada') || '',
+    competitionId: searchParams.get('competicion') || '',
+    jornada: /^\d+$/.test(searchParams.get('jornada') || '') ? Number(searchParams.get('jornada')) : null,
+    phase: MATCH_PHASE_ORDER.includes(searchParams.get('fase')) ? searchParams.get('fase') : '',
+  });
+  const didInitRef = useRef(false);
   const [seasons, setSeasons] = useState([]);
   const [selectedSeasonId, setSelectedSeasonId] = useState('');
   const [competitions, setCompetitions] = useState([]);
   const [selectedId, setSelectedId] = useState('');
   const [standings, setStandings] = useState([]);
   const [allMatches, setAllMatches] = useState([]);
-  const [selectedJornada, setSelectedJornada] = useState(null);
+  const [selectedJornada, setSelectedJornada] = useState(initialSelection.current.jornada);
+  const [selectedPhase, setSelectedPhase] = useState(initialSelection.current.phase);
   const [roundIndex, setRoundIndex] = useState(null);
   const [roundData, setRoundData] = useState(null);
   const [ffmRounds, setFfmRounds] = useState(undefined);
@@ -459,21 +515,33 @@ export default function CompetitionPage() {
       .catch(() => []);
   }, []);
 
-  const loadData = useCallback((competitionId, jornada) => {
-    setLoading(true);
-    setError('');
+  const loadData = useCallback((competitionId, jornada, { silent = false, force = false } = {}) => {
+    const key = `${competitionId}:${jornada ?? 'all'}`;
+    const cached = dataCache.get(key);
+    if (!force && cached && Date.now() - cached.at < DATA_CACHE_TTL) {
+      setStandings(cached.standings);
+      setAllMatches(cached.matches);
+      setError('');
+      setLoading(false);
+      return;
+    }
+    if (!silent) setLoading(true);
+    if (!silent) setError('');
     Promise.all([
       loadStandings(competitionId, jornada),
       loadMatches(competitionId),
     ])
       .then(([standingsData, matchesData]) => {
+        dataCache.set(key, { at: Date.now(), standings: standingsData, matches: matchesData });
         setStandings(standingsData);
         setAllMatches(matchesData);
       })
       .catch((err) => {
-        setError(err.message || 'No se pudieron cargar los datos');
-        setStandings([]);
-        setAllMatches([]);
+        if (!silent) {
+          setError(err.message || 'No se pudieron cargar los datos');
+          setStandings([]);
+          setAllMatches([]);
+        }
       })
       .finally(() => setLoading(false));
   }, [loadStandings, loadMatches]);
@@ -484,6 +552,18 @@ export default function CompetitionPage() {
       .then((data) => setNeutralAll(Array.isArray(data) ? data : []))
       .catch(() => setNeutralAll([]));
   }, []);
+
+  // Mantiene temporada/competición/jornada en la URL para que "atrás" restaure la vista
+  const updateParams = useCallback(({ seasonId, competitionId, jornada, phase }) => {
+    setSearchParams((prev) => {
+      const params = new URLSearchParams(prev);
+      if (seasonId) params.set('temporada', String(seasonId)); else params.delete('temporada');
+      if (competitionId) params.set('competicion', String(competitionId)); else params.delete('competicion');
+      if (jornada != null) params.set('jornada', String(jornada)); else params.delete('jornada');
+      if (phase) params.set('fase', phase); else params.delete('fase');
+      return params;
+    }, { replace: true });
+  }, [setSearchParams]);
 
   useEffect(() => {
     loadNeutrals(selectedId);
@@ -518,7 +598,7 @@ export default function CompetitionPage() {
       }
 
       loadNeutrals(selectedId);
-      loadData(selectedId, selectedJornada);
+      loadData(selectedId, selectedJornada, { force: true });
     } catch (e) {
       setSyncError(e.message || 'No se pudieron sincronizar los resultados');
     } finally {
@@ -555,6 +635,8 @@ export default function CompetitionPage() {
   }, [findNeutral]);
 
   useEffect(() => {
+    if (didInitRef.current) return;
+    didInitRef.current = true;
     Promise.all([
       getSeasons({ size: 100, sortBy: 'name', direction: 'desc' }),
       getCompetitions({ size: 100, sortBy: 'name', direction: 'asc' }),
@@ -565,14 +647,29 @@ export default function CompetitionPage() {
         const compList = toPage(competitionsData).content;
         setCompetitions(compList);
 
-        const currentSeason = seasonList.find((s) => s.current) || seasonList[0];
+        const initial = initialSelection.current;
+        const wantedSeason = initial.seasonId
+          ? seasonList.find((s) => String(s.id) === String(initial.seasonId))
+          : null;
+        const currentSeason = wantedSeason || seasonList.find((s) => s.current) || seasonList[0];
         if (currentSeason) {
           setSelectedSeasonId(String(currentSeason.id));
           const seasonComps = compList.filter((c) => String(c.seasonId) === String(currentSeason.id));
-          const preferred = seasonComps.find((c) => c.type === 'LIGA') || seasonComps[0];
+          const wantedComp = initial.competitionId
+            ? seasonComps.find((c) => String(c.id) === String(initial.competitionId))
+            : null;
+          const preferred = wantedComp || seasonComps.find((c) => c.type === 'LIGA') || seasonComps[0];
           if (preferred) {
+            const jornada = preferred.type === 'COPA' ? null : initial.jornada;
             setSelectedId(String(preferred.id));
-            loadData(preferred.id, null);
+            setSelectedJornada(jornada);
+            loadData(preferred.id, jornada);
+            updateParams({
+              seasonId: currentSeason.id,
+              competitionId: preferred.id,
+              jornada,
+              phase: preferred.type === 'COPA' ? initial.phase : '',
+            });
           } else {
             setLoading(false);
           }
@@ -584,19 +681,23 @@ export default function CompetitionPage() {
         setError(err.message || 'No se pudieron cargar los datos');
         setLoading(false);
       });
-  }, [loadData]);
+  }, [loadData, updateParams]);
 
   const handleSelectSeason = (e) => {
     const seasonId = e.target.value;
     setSelectedSeasonId(seasonId);
     setSelectedId('');
     setSelectedJornada(null);
+    setSelectedPhase('');
     setLoading(false);
     const seasonComps = competitions.filter((c) => String(c.seasonId) === seasonId);
     const preferred = seasonComps.find((c) => c.type === 'LIGA') || seasonComps[0];
     if (preferred) {
       setSelectedId(String(preferred.id));
       loadData(preferred.id, null);
+      updateParams({ seasonId, competitionId: preferred.id, jornada: null, phase: '' });
+    } else {
+      updateParams({ seasonId, competitionId: '', jornada: null, phase: '' });
     }
   };
 
@@ -604,7 +705,15 @@ export default function CompetitionPage() {
     const id = e.target.value;
     setSelectedId(id);
     setSelectedJornada(null);
+    setSelectedPhase('');
     loadData(id, null);
+    updateParams({ seasonId: selectedSeasonId, competitionId: id, jornada: null, phase: '' });
+  };
+
+  const handleSelectPhase = (e) => {
+    const phase = e.target.value;
+    setSelectedPhase(phase);
+    updateParams({ seasonId: selectedSeasonId, competitionId: selectedId, jornada: selectedJornada, phase });
   };
 
   const standingsReq = useRef(0);
@@ -612,13 +721,16 @@ export default function CompetitionPage() {
   const handleSelectJornada = (e) => {
     const val = e.target.value === 'all' ? null : Number(e.target.value);
     setSelectedJornada(val);
+    updateParams({ seasonId: selectedSeasonId, competitionId: selectedId, jornada: val, phase: selectedPhase });
     if (!selectedId) return;
     const req = ++standingsReq.current;
     setLoading(true);
     getStandings(selectedId, val)
       .then((data) => {
         if (standingsReq.current !== req) return;
-        setStandings(Array.isArray(data) ? data : []);
+        const rows = Array.isArray(data) ? data : [];
+        dataCache.set(`${selectedId}:${val ?? 'all'}`, { at: Date.now(), standings: rows, matches: allMatches });
+        setStandings(rows);
         setError('');
       })
       .catch((err) => {
@@ -764,13 +876,22 @@ export default function CompetitionPage() {
   }, [allMatches, ffmAvailable, roundIndex]);
 
   const isLiga = selected?.type === 'LIGA';
+  const isCopa = selected?.type === 'COPA';
+
+  const showStandings = !isCopa || !selectedPhase || selectedPhase === 'LIGUILLA';
 
   const displayMatches = useMemo(() => {
     let list = allMatches;
     if (selectedJornada != null) {
       list = list.filter((m) => m.jornada === selectedJornada);
     }
+    if (isCopa && selectedPhase) {
+      list = list.filter((m) => m.phase === selectedPhase);
+    }
     return [...list].sort((a, b) => {
+      if (isCopa && a.phase !== b.phase) {
+        return MATCH_PHASE_ORDER.indexOf(a.phase) - MATCH_PHASE_ORDER.indexOf(b.phase);
+      }
       if (selectedJornada == null && a.jornada !== b.jornada) {
         return (a.jornada ?? 999) - (b.jornada ?? 999);
       }
@@ -778,16 +899,46 @@ export default function CompetitionPage() {
       if (!b.date) return -1;
       return new Date(a.date) - new Date(b.date);
     });
-  }, [allMatches, selectedJornada]);
+  }, [allMatches, selectedJornada, isCopa, selectedPhase]);
+
+  const displayNeutrals = useMemo(() => {
+    if (!isCopa) return [];
+    let list = neutralAll;
+    const ourGroups = new Set(allMatches.map((match) => match.groupName).filter(Boolean).map(normalizeGroupName));
+    if (ourGroups.size > 0) {
+      list = list.filter((match) => !match.groupName || ourGroups.has(normalizeGroupName(match.groupName)));
+    }
+    if (selectedPhase) {
+      list = list.filter((match) => (match.phase || 'LIGUILLA') === selectedPhase);
+    }
+    return [...list].sort((a, b) => {
+      const phaseA = a.phase || 'LIGUILLA';
+      const phaseB = b.phase || 'LIGUILLA';
+      if (phaseA !== phaseB) {
+        return MATCH_PHASE_ORDER.indexOf(phaseA) - MATCH_PHASE_ORDER.indexOf(phaseB);
+      }
+      if ((a.jornada ?? 999) !== (b.jornada ?? 999)) {
+        return (a.jornada ?? 999) - (b.jornada ?? 999);
+      }
+      if (!a.date) return 1;
+      if (!b.date) return -1;
+      return new Date(a.date) - new Date(b.date);
+    });
+  }, [neutralAll, allMatches, isCopa, selectedPhase]);
 
   // Refrescar al volver de admin para que se vea el nuevo resultado/puntos
   useEffect(() => {
-    const onFocus = () => { if (selectedId) loadData(selectedId, selectedJornada); };
+    const refresh = () => {
+      if (!selectedId) return;
+      loadData(selectedId, selectedJornada, { silent: true, force: true });
+      loadNeutrals(selectedId);
+    };
+    const onFocus = () => refresh();
     window.addEventListener('focus', onFocus);
-    const onVis = () => { if (!document.hidden && selectedId) loadData(selectedId, selectedJornada); };
+    const onVis = () => { if (!document.hidden) refresh(); };
     document.addEventListener('visibilitychange', onVis);
     return () => { window.removeEventListener('focus', onFocus); document.removeEventListener('visibilitychange', onVis); };
-  }, [selectedId, selectedJornada, loadData]);
+  }, [selectedId, selectedJornada, loadData, loadNeutrals]);
 
   return (
     <MotionConfig reducedMotion="user">
@@ -853,6 +1004,25 @@ export default function CompetitionPage() {
               </select>
             </div>
 
+            {isCopa && (
+              <div className="flex-1 sm:max-w-xs">
+                <label htmlFor="phase-select" className="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-re-dorado">
+                  Fase
+                </label>
+                <select
+                  id="phase-select"
+                  value={selectedPhase}
+                  onChange={handleSelectPhase}
+                  className={selectClass}
+                >
+                  <option value="">Todas</option>
+                  {MATCH_PHASE_ORDER.map((phase) => (
+                    <option key={phase} value={phase}>{MATCH_PHASE_LABELS[phase]}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             {isLiga && (
               <div className="flex-1 sm:max-w-xs">
                 <label htmlFor="jornada-select" className="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-re-dorado">
@@ -890,7 +1060,7 @@ export default function CompetitionPage() {
             <div className="h-96 rounded-3xl bg-card-bg animate-pulse" />
           )}
 
-          {!tableLoading && displayStandings && displayStandings.length > 0 && (
+          {!tableLoading && showStandings && displayStandings && displayStandings.length > 0 && (
             <motion.section
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
@@ -1003,7 +1173,9 @@ export default function CompetitionPage() {
               <p className="border-t border-card-border dark:border-white/10 px-6 py-4 text-[9px] font-bold uppercase tracking-widest text-muted-foreground dark:text-white/40">
                 {selectedJornada != null
                   ? `Clasificación parcial hasta la jornada ${selectedJornada} · Victoria = 3 pts · Empate = 1 pt`
-                  : 'Solo cuentan los partidos finalizados · Victoria = 3 pts · Empate = 1 pt'}
+                  : isCopa
+                    ? 'Clasificación de la liguilla · Las eliminatorias no suman puntos · Victoria = 3 pts · Empate = 1 pt'
+                    : 'Solo cuentan los partidos finalizados · Victoria = 3 pts · Empate = 1 pt'}
                 {' · Fuente: ' + standingsSource}
               </p>
             </motion.section>
@@ -1083,7 +1255,7 @@ export default function CompetitionPage() {
                           competitionId={selectedId}
                           jornada={selectedJornada}
                           onNeutralSaved={() => loadNeutrals(selectedId)}
-                          onSynced={() => { loadNeutrals(selectedId); loadData(selectedId, selectedJornada); }}
+                          onSynced={() => { loadNeutrals(selectedId); loadData(selectedId, selectedJornada, { force: true }); }}
                         />
                       );
                     })}
@@ -1150,7 +1322,89 @@ export default function CompetitionPage() {
             );
           })()}
 
-          {displayMatches.length > 0 && selectedJornada == null && !(isLiga && availableJornadas.length > 0) && (
+          {(displayMatches.length > 0 || displayNeutrals.length > 0) && selectedJornada == null && isCopa && (() => {
+            const grouped = new Map();
+            const addEntry = (phase, entry) => {
+              const key = phase || 'SIN_FASE';
+              if (!grouped.has(key)) grouped.set(key, []);
+              grouped.get(key).push(entry);
+            };
+            for (const match of displayMatches) addEntry(match.phase, { kind: 'ours', match });
+            for (const match of displayNeutrals) addEntry(match.phase || 'LIGUILLA', { kind: 'neutral', match });
+            const phases = Array.from(grouped.entries()).sort(([phaseA], [phaseB]) => {
+              const indexA = MATCH_PHASE_ORDER.indexOf(phaseA);
+              const indexB = MATCH_PHASE_ORDER.indexOf(phaseB);
+              return (indexA === -1 ? 99 : indexA) - (indexB === -1 ? 99 : indexB);
+            });
+
+            return (
+              <section className="overflow-hidden rounded-[1.7rem] border border-card-border dark:border-re-dorado/30 bg-card-bg dark:bg-[#071018] text-foreground dark:text-white shadow-card dark:shadow-[0_24px_60px_rgba(0,0,0,0.28)]">
+                <div className="border-b border-card-border dark:border-re-dorado/20 px-4 py-4 sm:px-6">
+                  <p className="mb-1 text-[10px] font-black uppercase tracking-[0.28em] text-re-dorado">Copa</p>
+                  <h2 className="text-lg font-black italic uppercase tracking-tight">
+                    {selectedPhase ? MATCH_PHASE_LABELS[selectedPhase] : 'Partidos por fase'}
+                  </h2>
+                </div>
+                <div className="pb-3">
+                  {phases.map(([phase, entries]) => {
+                    const groupNames = [...new Set(entries.map((entry) => entry.match.groupName).filter(Boolean))];
+                    return (
+                      <div key={phase}>
+                        <div className="flex items-center gap-3 px-4 pb-1 pt-4 sm:px-6">
+                          <h3 className="text-[11px] font-black uppercase tracking-[0.22em] text-re-rojo">
+                            {phase === 'SIN_FASE' ? 'Sin fase' : MATCH_PHASE_LABELS[phase] || phase}
+                          </h3>
+                          {phase === 'LIGUILLA' && groupNames.length > 0 && (
+                            <span className="text-[9px] font-black uppercase tracking-widest text-re-dorado">
+                              {groupNames.join(' · ')}
+                            </span>
+                          )}
+                          <span className="h-px flex-1 bg-card-border dark:bg-re-dorado/25" />
+                        </div>
+                        {phase === 'LIGUILLA' ? (() => {
+                          const byJornada = new Map();
+                          for (const entry of entries) {
+                            const key = entry.match.jornada ?? 'none';
+                            if (!byJornada.has(key)) byJornada.set(key, []);
+                            byJornada.get(key).push(entry);
+                          }
+                          return Array.from(byJornada.entries())
+                            .sort(([a], [b]) => {
+                              if (a === 'none') return 1;
+                              if (b === 'none') return -1;
+                              return Number(a) - Number(b);
+                            })
+                            .map(([jornada, jornadaEntries]) => (
+                              <div key={jornada}>
+                                <div className="flex items-center gap-3 px-4 pb-1 pt-3 sm:px-6">
+                                  <h4 className="text-[10px] font-black uppercase tracking-[0.18em] text-re-dorado">
+                                    {jornada === 'none' ? 'Sin jornada' : `Jornada ${jornada}`}
+                                  </h4>
+                                  <span className="h-px flex-1 bg-card-border dark:bg-re-dorado/25" />
+                                </div>
+                                {jornadaEntries.map((entry) => (
+                                  entry.kind === 'ours'
+                                    ? <MatchRow key={`ours-${entry.match.id}`} match={entry.match} navigate={navigate} />
+                                    : <NeutralMatchRow key={`neutral-${entry.match.id}`} match={entry.match} />
+                                ))}
+                              </div>
+                            ));
+                        })() : (
+                          entries.map((entry) => (
+                            entry.kind === 'ours'
+                              ? <MatchRow key={`ours-${entry.match.id}`} match={entry.match} navigate={navigate} />
+                              : <NeutralMatchRow key={`neutral-${entry.match.id}`} match={entry.match} />
+                          ))
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            );
+          })()}
+
+          {displayMatches.length > 0 && selectedJornada == null && !isCopa && !(isLiga && availableJornadas.length > 0) && (
             <section className="overflow-hidden rounded-[1.7rem] border border-card-border dark:border-re-dorado/30 bg-card-bg dark:bg-[#071018] text-foreground dark:text-white shadow-card dark:shadow-[0_24px_60px_rgba(0,0,0,0.28)]">
               <div className="px-4 sm:px-6 py-4 border-b border-card-border">
                 <h2 className="text-lg font-black uppercase tracking-tight">Partidos</h2>
@@ -1163,7 +1417,7 @@ export default function CompetitionPage() {
             </section>
           )}
 
-          {!tableLoading && (!displayStandings || displayStandings.length === 0) && displayMatches.length === 0 && (
+          {!tableLoading && (!displayStandings || displayStandings.length === 0) && displayMatches.length === 0 && displayNeutrals.length === 0 && (
             <div className="py-20 bg-muted/5 rounded-3xl border border-dashed border-card-border text-center text-muted-foreground font-bold text-sm tracking-widest">
               Todavía no hay datos en esta competición.
             </div>

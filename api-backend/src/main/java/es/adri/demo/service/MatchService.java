@@ -66,6 +66,7 @@ public class MatchService {
         return page.getContent().isEmpty() ? null : page.getContent().get(0);
     }
 
+    @Cacheable(value = "competitionMatches", key = "#competitionId")
     public List<MatchDTO> findMatchesByCompetitionId(Long competitionId) {
         return matchRepository.findByCompetitionId(competitionId).stream()
                 .map(this::toDto)
@@ -117,7 +118,7 @@ public class MatchService {
         return new RivalInfoDTO(rival, recent, headToHead, rivalWins, draws, ourWins);
     }
 
-    @CacheEvict(value = {"homeMatches", "nextMatch"}, allEntries = true)
+    @CacheEvict(value = {"homeMatches", "nextMatch", "playerSeasonStats", "competitionMatches", "standings"}, allEntries = true)
     @Transactional
     public MatchDTO createMatch(MatchRequestDTO matchRequestDTO) {
         Match match = new Match();
@@ -127,7 +128,7 @@ public class MatchService {
         return toDto(saved);
     }
 
-    @CacheEvict(value = {"homeMatches", "nextMatch"}, allEntries = true)
+    @CacheEvict(value = {"homeMatches", "nextMatch", "playerSeasonStats", "competitionMatches", "standings"}, allEntries = true)
     @Transactional
     public MatchDTO updateMatch(Long id, MatchRequestDTO matchRequestDTO) {
         Match match = getMatchById(id);
@@ -137,7 +138,7 @@ public class MatchService {
         return toDto(saved);
     }
 
-    @CacheEvict(value = {"homeMatches", "nextMatch"}, allEntries = true)
+    @CacheEvict(value = {"homeMatches", "nextMatch", "playerSeasonStats", "competitionMatches", "standings"}, allEntries = true)
     @Transactional
     public void deleteMatch(Long id) {
         // Borra las estadísticas asociadas y el partido
@@ -180,6 +181,8 @@ public class MatchService {
         match.setOurGoals(matchRequestDTO.getOurGoals());
         match.setRivalGoals(matchRequestDTO.getRivalGoals());
         match.setJornada(matchRequestDTO.getJornada());
+        match.setPhase(matchRequestDTO.getPhase());
+        match.setGroupName(trimToNull(matchRequestDTO.getGroupName()));
         match.setCompetition(getCompetitionById(matchRequestDTO.getCompetitionId()));
     }
 
@@ -195,8 +198,17 @@ public class MatchService {
                 match.getRivalGoals(),
                 match.getJornada(),
                 match.getCompetition().getId(),
-                match.getCompetition().getName()
+                match.getCompetition().getName(),
+                match.getPhase(),
+                match.getGroupName()
         );
+    }
+
+    private String trimToNull(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim();
     }
 
     private PagedResponseDTO<MatchDTO> toPagedResponse(Page<MatchDTO> page) {

@@ -1,5 +1,6 @@
 package es.adri.demo.dto;
 
+import es.adri.demo.model.MatchPhase;
 import es.adri.demo.model.MatchStatus;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -36,4 +37,13 @@ public class MatchRequestDTO {
 
     @NotNull(message = "La competicion es obligatoria")
     private Long competitionId;
+
+    private MatchPhase phase;
+
+    private String groupName;
+
+    public MatchRequestDTO(String rival, boolean home, LocalDateTime date, String location, MatchStatus status,
+                           Integer ourGoals, Integer rivalGoals, Integer jornada, Long competitionId) {
+        this(rival, home, date, location, status, ourGoals, rivalGoals, jornada, competitionId, null, null);
+    }
 }

@@ -2,6 +2,7 @@ package es.adri.demo.service;
 
 import es.adri.demo.dto.PagedResponseDTO;
 import es.adri.demo.dto.PlayerDTO;
+import es.adri.demo.dto.PlayerMatchStatDTO;
 import es.adri.demo.dto.PlayerRequestDTO;
 import es.adri.demo.dto.PlayerSeasonStatsDTO;
 import es.adri.demo.exception.ResourceNotFoundException;
@@ -14,6 +15,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -53,6 +56,7 @@ public class PlayerService {
                 .toList();
     }
 
+    @Cacheable(value = "playerSeasonStats", key = "#seasonId == null ? 'current' : #seasonId")
     public List<PlayerSeasonStatsDTO> findSeasonStats(Long seasonId) {
         // Usar Stat como fuente única para que los cambios desde /admin/estadísticas se reflejen en Jugadores
         Map<Long, Long> goalsMap = new HashMap<>();
@@ -140,6 +144,24 @@ public class PlayerService {
         return result;
     }
 
+    public List<PlayerMatchStatDTO> findPlayerMatchStats(Long playerId, Long seasonId) {
+        return statRepository.findPlayerMatchStats(playerId, seasonId).stream()
+                .map(stat -> new PlayerMatchStatDTO(
+                        stat.getId(),
+                        stat.getMatch().getId(),
+                        stat.getMatch().getRival(),
+                        stat.getMatch().isHome(),
+                        stat.getMatch().getDate(),
+                        stat.getMatch().getJornada(),
+                        stat.getGoals(),
+                        stat.getYellowCards(),
+                        stat.getRedCards(),
+                        stat.isMvp()
+                ))
+                .toList();
+    }
+
+    @CacheEvict(value = "playerSeasonStats", allEntries = true)
     public PlayerDTO createPlayer(PlayerRequestDTO playerRequestDTO) {
         Player player = new Player();
         mapRequestToEntity(playerRequestDTO, player);
@@ -147,12 +169,14 @@ public class PlayerService {
         return toDto(playerRepository.save(player));
     }
 
+    @CacheEvict(value = "playerSeasonStats", allEntries = true)
     public PlayerDTO updatePlayer(Long id, PlayerRequestDTO playerRequestDTO) {
         Player player = getPlayerById(id);
         mapRequestToEntity(playerRequestDTO, player);
         return toDto(playerRepository.save(player));
     }
 
+    @CacheEvict(value = "playerSeasonStats", allEntries = true)
     public void softDeletePlayer(Long id) {
         Player player = getPlayerById(id);
         player.setActive(false);

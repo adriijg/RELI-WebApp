@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import Seo from '../components/Seo';
 import { SITE_NAME, SITE_URL } from '../constants/seo';
 import { getEvent, getEvents, toPage } from '../services/api';
+import { formatDate } from '../utils/format';
 
 const TYPE_BADGES = {
   INFO: 'Noticia',
@@ -125,9 +126,7 @@ export default function NewsDetail() {
               {news.title}
             </h1>
             <p className="text-[10px] lg:text-xs text-muted-foreground font-black uppercase tracking-widest">
-              {news.date
-                ? new Date(news.date).toLocaleDateString('es-ES', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })
-                : ''}
+              {news.date ? formatDate(news.date) : ''}
               {news.location ? ` • 📍 ${news.location}` : ''}
             </p>
             {news.description && (

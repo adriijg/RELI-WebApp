@@ -12,22 +12,9 @@ import { jerseyForCompetition } from '../constants/jerseys';
 import { POSITION_LABELS } from '../constants/positions';
 import { isMatchLive } from '../utils/matches';
 import { getMatchOutcome, scoreTextClass } from '../utils/matchResult';
+import { formatDate, formatDateTime } from '../utils/format';
 
 const FALLBACK_PHOTO = 'https://pjefzhrnoftaovlvnjaz.supabase.co/storage/v1/object/public/images/default-player.png';
-
-function formatDateTime(date) {
-  if (!date) return null;
-  const d = new Date(date);
-  if (Number.isNaN(d.getTime())) return null;
-  return d.toLocaleString('es-ES', {
-    weekday: 'long',
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
 
 function groupScorers(stats) {
   return stats
@@ -462,7 +449,7 @@ export default function MatchDetail() {
   }
   const convocados = stats.filter((s) => s?.attended);
   const carded = stats.filter((s) => (s?.yellowCards ?? 0) > 0 || (s?.redCards ?? 0) > 0);
-  const formattedDate = formatDateTime(match.date);
+  const formattedDate = match.date ? formatDateTime(match.date) : null;
   const finished = match.status === 'FINISHED' && match.ourGoals != null && match.rivalGoals != null;
   const displayName = (playerId, fallback) => {
     const p = allPlayersMap.get(playerId);
@@ -716,7 +703,7 @@ export default function MatchDetail() {
 
           {quintetStatus && (
             <div className={`mb-3 rounded-xl border px-3 py-2 text-[11px] font-black uppercase tracking-widest ${isVoteOpen ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' : 'bg-re-rojo/10 text-re-rojo border-re-rojo/20'}`}>
-              {isVoteOpen ? `Votación abierta · cierra jueves 23:59${quintetStatus.closesAt ? ` (${new Date(quintetStatus.closesAt).toLocaleString('es-ES', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' })})` : ''}` : 'Votación cerrada · espera a que el admin la abra'}
+              {isVoteOpen ? `Votación abierta · cierra jueves 23:59${quintetStatus.closesAt ? ` (${formatDateTime(quintetStatus.closesAt)})` : ''}` : 'Votación cerrada · espera a que el admin la abra'}
             </div>
           )}
           {isAdmin && quintetSeasonId && match.jornada != null && (
@@ -865,7 +852,7 @@ export default function MatchDetail() {
               // (primer número), si juega fuera gana si marca más "al final" (segundo número).
               const rivalGoals = mIsHome ? homeGoals : awayGoals;
               const opponentGoals = mIsHome ? awayGoals : homeGoals;
-              const mDate = m.date ? new Date(m.date).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }) : '';
+              const mDate = m.date ? formatDate(m.date) : '';
               return (
                 <div key={m.id} className="flex items-center gap-2 sm:gap-3 bg-muted/5 dark:bg-white/5 border border-card-border dark:border-white/10 rounded-2xl px-3 sm:px-4 py-2.5 sm:py-3">
                   <span className="text-[9px] sm:text-[10px] font-bold text-muted-foreground tracking-widest shrink-0 w-20 text-center">{mDate}</span>
@@ -914,7 +901,7 @@ export default function MatchDetail() {
               const mOurGoals = mIsHome ? m.ourGoals : m.rivalGoals;
               const mRivalGoals = mIsHome ? m.rivalGoals : m.ourGoals;
               const resultGoals = getResultGoals(m);
-              const mDate = m.date ? new Date(m.date).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }) : '';
+              const mDate = m.date ? formatDate(m.date) : '';
               return (
                 <div key={m.id} className="flex items-center gap-2 sm:gap-3 bg-muted/5 dark:bg-white/5 border border-card-border dark:border-white/10 rounded-2xl px-3 sm:px-4 py-2.5 sm:py-3">
                   <span className="text-[9px] sm:text-[10px] font-bold text-muted-foreground tracking-widest shrink-0 w-20 text-center">{mDate}</span>

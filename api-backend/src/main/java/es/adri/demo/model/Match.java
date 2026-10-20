@@ -53,7 +53,21 @@ public class Match extends BaseEntity {
     // Fecha en la que se aviso por email del horario confirmado (null = sin avisar).
     private LocalDateTime scheduleNotifiedAt;
 
+    @Enumerated(EnumType.STRING)
+    @Column(length = 30)
+    private MatchPhase phase;
+
+    @Column(name = "group_name", length = 60)
+    private String groupName;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "competition_id", nullable = false)
     private Competition competition;
+
+    public Match(Long id, String rival, boolean home, LocalDateTime date, String location, MatchStatus status,
+                 Integer ourGoals, Integer rivalGoals, Integer jornada, LocalDateTime scheduleNotifiedAt,
+                 Competition competition) {
+        this(id, rival, home, date, location, status, ourGoals, rivalGoals, jornada, scheduleNotifiedAt,
+                null, null, competition);
+    }
 }

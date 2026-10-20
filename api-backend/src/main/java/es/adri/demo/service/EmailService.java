@@ -33,6 +33,10 @@ public class EmailService {
     }
 
     public void send(String recipient, String subject, String html) {
+        send(recipient, subject, html, null);
+    }
+
+    public void send(String recipient, String subject, String html, String replyTo) {
         if (!enabled) return;
         if (from == null || from.isBlank()) {
             throw new IllegalStateException("Email activado pero falta app.email.from");
@@ -44,6 +48,9 @@ public class EmailService {
             helper.setTo(recipient);
             helper.setSubject(subject);
             helper.setText(html, true);
+            if (replyTo != null && !replyTo.isBlank()) {
+                helper.setReplyTo(replyTo);
+            }
             // Escudo incrustado: viaja con el correo, no depende de URL externa.
             try {
                 ClassPathResource logo = new ClassPathResource("email/reli-badge-email.png");

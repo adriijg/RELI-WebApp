@@ -12,7 +12,9 @@ public class CacheConfig {
 
     @Bean
     public CacheManager cacheManager() {
-        CaffeineCacheManager manager = new CaffeineCacheManager("homeMatches", "nextMatch", "playerSeasonStats", "seasons", "competitions");
+        CaffeineCacheManager manager = new CaffeineCacheManager(
+                "homeMatches", "nextMatch", "playerSeasonStats", "seasons", "competitions",
+                "competitionMatches", "standings");
         manager.setCaffeine(Caffeine.newBuilder()
                 .expireAfterWrite(60, TimeUnit.SECONDS)
                 .maximumSize(500)

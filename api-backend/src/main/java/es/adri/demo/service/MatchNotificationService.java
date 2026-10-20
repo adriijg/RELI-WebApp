@@ -1,6 +1,7 @@
 package es.adri.demo.service;
 
 import es.adri.demo.model.Match;
+import es.adri.demo.model.MatchPhase;
 import es.adri.demo.model.MatchStatus;
 import es.adri.demo.model.User;
 import es.adri.demo.repository.CompetitionRepository;
@@ -33,7 +34,7 @@ import org.springframework.web.server.ResponseStatusException;
 public class MatchNotificationService {
 
     private static final Logger log = LoggerFactory.getLogger(MatchNotificationService.class);
-    private static final DateTimeFormatter DATE_TIME_FORMAT = DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm");
+    private static final DateTimeFormatter DATE_TIME_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
 
     private final MatchRepository matchRepository;
     private final CompetitionRepository competitionRepository;
@@ -68,7 +69,11 @@ public class MatchNotificationService {
      * 00:00 (la federacion usa 00:00 cuando aun no ha fijado hora) y hay sede.
      */
     public static boolean isScheduleConfirmed(Match match) {
-        if (match == null || match.getStatus() != MatchStatus.SCHEDULED) {
+        return match != null && match.getStatus() == MatchStatus.SCHEDULED && hasConfirmedSchedule(match);
+    }
+
+    public static boolean hasConfirmedSchedule(Match match) {
+        if (match == null) {
             return false;
         }
         if (match.getDate() == null || match.getDate().toLocalTime().equals(LocalTime.MIDNIGHT)) {
@@ -103,7 +108,7 @@ public class MatchNotificationService {
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
                     "El envio de correos esta desactivado (EMAIL_ENABLED=false)");
         }
-        if (!isScheduleConfirmed(match)) {
+        if (!hasConfirmedSchedule(match)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "El partido no tiene horario confirmado (hora distinta de 00:00 y sede)");
         }
@@ -140,6 +145,10 @@ public class MatchNotificationService {
                                         : templateService.matchRow("Sede", escapeHtml(match.getLocation())))
                                 + (match.getJornada() == null ? ""
                                         : templateService.matchRow("Jornada", "Jornada " + match.getJornada()))
+                                + (match.getPhase() == null ? ""
+                                        : templateService.matchRow("Fase", phaseLabel(match.getPhase())))
+                                + (match.getGroupName() == null || match.getGroupName().isBlank() ? ""
+                                        : templateService.matchRow("Grupo", escapeHtml(match.getGroupName())))
                                 + (competitionName == null || competitionName.isBlank() ? ""
                                         : templateService.matchRow("Competici\u00f3n", escapeHtml(competitionName))));
         String html = templateService.scheduleWrapper(subject, inner,
@@ -186,6 +195,17 @@ public class MatchNotificationService {
     private Optional<Match> findNextScheduledMatch(Long competitionId) {
         return matchRepository.findFirstByCompetitionIdAndStatusAndDateGreaterThanEqualOrderByDateAsc(
                 competitionId, MatchStatus.SCHEDULED, LocalDateTime.now());
+    }
+
+    private static String phaseLabel(MatchPhase phase) {
+        return switch (phase) {
+            case LIGUILLA -> "Liguilla";
+            case DIECISEISAVOS -> "Dieciseisavos";
+            case OCTAVOS -> "Octavos";
+            case CUARTOS -> "Cuartos";
+            case SEMIFINAL -> "Semifinal";
+            case FINAL -> "Final";
+        };
     }
 
     private static String escapeHtml(String s) {

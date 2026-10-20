@@ -14,6 +14,10 @@
 - API REST para gestionar datos del equipo y partidos.
 - Despliegue en Vercel para el frontend y Heroku para el backend (futuro).
 
+### Pendientes.
+
+- **Optimizar fotos de jugadores con wsrv.nl** (próximamente): las fotos actuales pesan ~411 KB cada una (~6,2 MB la plantilla completa) para mostrarse a 40-64 px. Usar el proxy `https://wsrv.nl/?url=<foto>&w=128&h=128&fit=cover&output=webp&q=72` reduciría el total a ~0,1 MB (~98 % menos), sin tocar Supabase. Alternativa futura: activar las transformaciones de imagen de Supabase (plan Pro).
+
 ## DDBB.
 
 - Jugador: id, nombre, dorsal, posición, foto_url.

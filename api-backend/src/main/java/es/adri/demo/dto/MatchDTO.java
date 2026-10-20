@@ -1,5 +1,6 @@
 package es.adri.demo.dto;
 
+import es.adri.demo.model.MatchPhase;
 import es.adri.demo.model.MatchStatus;
 import java.time.LocalDateTime;
 import lombok.AllArgsConstructor;
@@ -22,4 +23,6 @@ public class MatchDTO {
     private Integer jornada;
     private Long competitionId;
     private String competitionName;
+    private MatchPhase phase;
+    private String groupName;
 }

@@ -2,6 +2,7 @@ package es.adri.demo.controller;
 
 import es.adri.demo.dto.PagedResponseDTO;
 import es.adri.demo.dto.PlayerDTO;
+import es.adri.demo.dto.PlayerMatchStatDTO;
 import es.adri.demo.dto.PlayerRequestDTO;
 import es.adri.demo.dto.PlayerSeasonStatsDTO;
 import es.adri.demo.service.PlayerService;
@@ -42,6 +43,13 @@ public class PlayerController {
     public ResponseEntity<List<PlayerSeasonStatsDTO>> getSeasonStats(
             @RequestParam(required = false) Long seasonId) {
         return ResponseEntity.ok(playerService.findSeasonStats(seasonId));
+    }
+
+    @GetMapping("/{id}/match-stats")
+    public ResponseEntity<List<PlayerMatchStatDTO>> getPlayerMatchStats(
+            @PathVariable Long id,
+            @RequestParam(required = false) Long seasonId) {
+        return ResponseEntity.ok(playerService.findPlayerMatchStats(id, seasonId));
     }
 
     @GetMapping

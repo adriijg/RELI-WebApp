@@ -7,6 +7,7 @@ import ThemeToggle from '../ThemeToggle';
 const NAV_ITEMS = [
   { to: '/admin', label: 'Dashboard', icon: 'grid', end: true },
   { to: '/admin/partidos', label: 'Partidos', icon: 'ball' },
+  { to: '/admin/partidos-grupo', label: 'Partidos de grupo', icon: 'ball' },
   { to: '/admin/noticias', label: 'Noticias', icon: 'news' },
   { to: '/admin/jugadores', label: 'Jugadores', icon: 'users' },
   { to: '/admin/temporadas', label: 'Temporadas', icon: 'calendar' },

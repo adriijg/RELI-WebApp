@@ -122,6 +122,7 @@ function FeaturedPlayer({ player, seasonName, maxes, onOpen, paused, compact }) 
         <img
           src={player.photoUrl || FALLBACK_PHOTO}
           alt=""
+          decoding="async"
           className="h-12 w-12 shrink-0 rounded-full object-cover ring-2 ring-re-dorado"
           onError={(event) => { event.target.src = FALLBACK_PHOTO; }}
         />
@@ -163,6 +164,7 @@ function FeaturedPlayer({ player, seasonName, maxes, onOpen, paused, compact }) 
               <img
                 src={player.photoUrl || FALLBACK_PHOTO}
                 alt=""
+                decoding="async"
                 className="relative z-[1] h-20 w-20 rounded-full object-cover"
                 onError={(event) => { event.target.src = FALLBACK_PHOTO; }}
               />
@@ -218,7 +220,7 @@ function PlayerToken({ player, active, dimmed, compact, sortBy, onOpen, onFocus,
       onFocus={() => onFocus(player)}
       onMouseLeave={onBlur}
       onBlur={onBlur}
-      className={`player-float overflow-hidden text-center ${compact ? 'w-14' : 'w-[4.2rem]'} ${dimmed ? 'opacity-40' : 'opacity-100'}`}
+      className={`player-float text-center ${compact ? 'w-14' : 'w-[4.2rem]'} ${dimmed ? 'opacity-40' : 'opacity-100'}`}
       style={{ animationDelay: `${(player.jerseyNumber % 5) * 0.35}s` }}
       aria-label={`Ver ficha de ${label}`}
     >
@@ -227,6 +229,7 @@ function PlayerToken({ player, active, dimmed, compact, sortBy, onOpen, onFocus,
         <img
           src={player.photoUrl || FALLBACK_PHOTO}
           alt=""
+          decoding="async"
           className={`relative rounded-full object-cover shadow-lg ${compact ? 'h-10 w-10' : 'h-12 w-12'} ${active ? 'ring-2 ring-re-dorado' : 'ring-2 ring-white/75'}`}
           onError={(event) => { event.target.src = FALLBACK_PHOTO; }}
         />
@@ -383,7 +386,6 @@ export default function StadiumSquad({ grouped, players, line, seasonName, sortB
             className="pointer-events-none absolute left-0 top-0 z-[1] h-40 w-40 -translate-x-1/2 -translate-y-1/2 rounded-full bg-re-dorado/20 blur-3xl"
           />
           <PitchMarkings vertical={narrow} />
-          <div className="squad-radar pointer-events-none absolute left-1/2 top-1/2 z-[1] h-16 w-16 sm:h-28 sm:w-28 -translate-x-1/2 -translate-y-1/2 rounded-full opacity-70" />
           <div className="pointer-events-none absolute inset-0 z-[3] bg-[radial-gradient(circle_at_center,transparent_40%,rgba(0,0,0,0.45)_100%)]" />
 
           {players.map((player) => (

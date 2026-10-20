@@ -105,6 +105,15 @@ public interface StatRepository extends JpaRepository<Stat, Long> {
 
     @Query("""
             SELECT s FROM Stat s
+            JOIN FETCH s.match m
+            WHERE s.player.id = :playerId
+              AND (:seasonId IS NULL OR m.competition.season.id = :seasonId)
+            ORDER BY m.date DESC
+            """)
+    List<Stat> findPlayerMatchStats(@Param("playerId") Long playerId, @Param("seasonId") Long seasonId);
+
+    @Query("""
+            SELECT s FROM Stat s
             WHERE s.match.competition.season.id = :seasonId
             """)
     Page<Stat> findBySeasonId(@Param("seasonId") Long seasonId, Pageable pageable);

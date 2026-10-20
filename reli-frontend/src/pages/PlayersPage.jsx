@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, MotionConfig } from 'framer-motion';
 import Seo from '../components/Seo';
 import { getPlayerSeasonStats, getSeasons, toPage } from '../services/api';
@@ -27,9 +27,12 @@ export default function PlayersPage() {
   const [selectedSeasonId, setSelectedSeasonId] = useState('');
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [line, setLine] = useState('ALL');
+  const loadedSeasonRef = useRef('');
+  const loadedAtRef = useRef(0);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async ({ silent = false } = {}) => {
+    const seasonChanged = loadedSeasonRef.current !== selectedSeasonId;
+    if (seasonChanged) setLoading(true);
     setError('');
     try {
       const data = await getPlayerSeasonStats({ seasonId: selectedSeasonId });
@@ -38,9 +41,14 @@ export default function PlayersPage() {
         ...player,
         jerseyNumber: jerseyForSeason(player.playerId, selectedSeasonId, player.jerseyNumber),
       })));
+      loadedSeasonRef.current = selectedSeasonId;
+      loadedAtRef.current = Date.now();
     } catch {
-      setError('No se pudieron cargar los jugadores');
-      setPlayers([]);
+      // En refrescos silenciosos mantenemos los datos ya visibles
+      if (seasonChanged || !silent) {
+        setError('No se pudieron cargar los jugadores');
+        setPlayers([]);
+      }
     } finally {
       setLoading(false);
     }
@@ -63,9 +71,14 @@ export default function PlayersPage() {
 
   // Refrescar al volver de /admin/estadísticas para que se vea la edición
   useEffect(() => {
-    const onFocus = () => { if (selectedSeasonId) load(); };
+    const refreshIfStale = () => {
+      if (!selectedSeasonId) return;
+      if (Date.now() - loadedAtRef.current < 30_000) return;
+      load({ silent: true });
+    };
+    const onFocus = () => refreshIfStale();
     window.addEventListener('focus', onFocus);
-    const onVis = () => { if (!document.hidden && selectedSeasonId) load(); };
+    const onVis = () => { if (!document.hidden) refreshIfStale(); };
     document.addEventListener('visibilitychange', onVis);
     return () => {
       window.removeEventListener('focus', onFocus);
@@ -222,7 +235,7 @@ export default function PlayersPage() {
                       <tr key={p.playerId} onClick={() => setSelectedPlayer(p)} className="cursor-pointer transition hover:bg-muted/5 dark:hover:bg-white/[0.04]">
                         <td className="px-4 py-3.5 sm:px-6">
                           <div className="flex items-center gap-3">
-                            <img src={p.photoUrl || 'https://pjefzhrnoftaovlvnjaz.supabase.co/storage/v1/object/public/images/default-player.png'} alt="" className="h-10 w-10 rounded-full object-cover ring-1 ring-card-border dark:ring-white/10" onError={(e) => { e.target.src = 'https://pjefzhrnoftaovlvnjaz.supabase.co/storage/v1/object/public/images/default-player.png'; }} />
+                            <img src={p.photoUrl || 'https://pjefzhrnoftaovlvnjaz.supabase.co/storage/v1/object/public/images/default-player.png'} alt="" loading="lazy" decoding="async" className="h-10 w-10 rounded-full object-cover ring-1 ring-card-border dark:ring-white/10" onError={(e) => { e.target.src = 'https://pjefzhrnoftaovlvnjaz.supabase.co/storage/v1/object/public/images/default-player.png'; }} />
                             <div className="min-w-0">
                               <p className="flex items-center gap-1.5 truncate text-[15px] font-black uppercase leading-none tracking-tight text-foreground dark:text-white">
                                 {p.nickname || p.name}
@@ -246,7 +259,7 @@ export default function PlayersPage() {
               <div className="sm:hidden divide-y divide-card-border dark:divide-white/5">
                 {filtered.map((p) => (
                   <button key={p.playerId} type="button" onClick={() => setSelectedPlayer(p)} className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-muted/5 dark:hover:bg-white/[0.04]">
-                    <img src={p.photoUrl || 'https://pjefzhrnoftaovlvnjaz.supabase.co/storage/v1/object/public/images/default-player.png'} alt="" className="h-10 w-10 shrink-0 rounded-full object-cover ring-1 ring-card-border dark:ring-white/10" onError={(e) => { e.target.src = 'https://pjefzhrnoftaovlvnjaz.supabase.co/storage/v1/object/public/images/default-player.png'; }} />
+                    <img src={p.photoUrl || 'https://pjefzhrnoftaovlvnjaz.supabase.co/storage/v1/object/public/images/default-player.png'} alt="" loading="lazy" decoding="async" className="h-10 w-10 shrink-0 rounded-full object-cover ring-1 ring-card-border dark:ring-white/10" onError={(e) => { e.target.src = 'https://pjefzhrnoftaovlvnjaz.supabase.co/storage/v1/object/public/images/default-player.png'; }} />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
                         <p className="truncate text-sm font-black uppercase leading-none tracking-tight text-foreground dark:text-white">{p.nickname || p.name}</p>

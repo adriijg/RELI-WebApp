@@ -16,6 +16,7 @@ import {
   getPlayerSeasonStats,
   toPage,
 } from '../../services/api';
+import { formatDate } from '../../utils/format';
 
 const STAT_FIELDS = [
   { name: 'goals', label: 'Goles', type: 'number', required: true, default: 0, min: 0 },
@@ -99,7 +100,7 @@ export default function StatsAdmin() {
           matches.map((match) => ({
             value: String(match.id),
             label: `${match.rival}${match.jornada ? ` · J${match.jornada}` : ''}${
-              match.date ? ` (${new Date(match.date).toLocaleDateString('es-ES')})` : ''
+              match.date ? ` (${formatDate(match.date)})` : ''
             }`,
           })),
         );

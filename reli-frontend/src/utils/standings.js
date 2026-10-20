@@ -3,12 +3,22 @@
  * jornadas (datos FFM). Victoria = 3 pts, empate = 1 pt.
  * Devuelve filas ordenadas: puntos, diferencia, goles a favor, nombre.
  */
+function teamKey(code, name) {
+  const normalized = String(name || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '');
+  return normalized || (code != null ? `code:${code}` : '');
+}
+
 export function computeStandings(rounds, ourCode, upTo = null) {
   const table = new Map();
 
   const ensure = (code, name) => {
-    if (!table.has(code)) {
-      table.set(code, {
+    const key = teamKey(code, name);
+    if (!table.has(key)) {
+      table.set(key, {
         teamName: name,
         isUs: code != null && String(code) === String(ourCode),
         played: 0,
@@ -22,7 +32,10 @@ export function computeStandings(rounds, ourCode, upTo = null) {
         form: '',
       });
     }
-    return table.get(code);
+    const row = table.get(key);
+    if (code != null && String(code) === String(ourCode)) row.isUs = true;
+    if (!row.teamName && name) row.teamName = name;
+    return row;
   };
 
   const applyResult = (row, scored, conceded) => {

@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, MotionConfig } from 'framer-motion';
 import { getEvents, toPage } from '../services/api';
+import { formatDateTime } from '../utils/format';
 
 const TYPE_BADGES = {
   INFO: 'Noticia',
@@ -87,9 +88,7 @@ export default function NewsSection() {
                 <p className="text-white/80 text-xs lg:text-sm line-clamp-2 max-w-md">{main.description}</p>
               )}
               <p className="text-white/60 text-[10px] font-black uppercase tracking-widest mt-3">
-                {main.date
-                  ? new Date(main.date).toLocaleString('es-ES', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-                  : ''}
+                {main.date ? formatDateTime(main.date) : ''}
               </p>
             </div>
           </Link>
@@ -124,9 +123,7 @@ export default function NewsSection() {
                     {item.title}
                   </h4>
                   <p className="mt-2 text-[9px] font-bold tracking-widest text-muted-foreground dark:text-white/50 lg:text-xs">
-                    {item.date
-                      ? `🕒 ${new Date(item.date).toLocaleString('es-ES', { day: '2-digit', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' }).toUpperCase()}`
-                      : ''}
+                    {item.date ? `🕒 ${formatDateTime(item.date)}` : ''}
                     {item.location ? ` • ${item.location}` : ''}
                   </p>
                 </div>

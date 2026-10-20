@@ -18,6 +18,7 @@ import QuintetPage from './pages/QuintetPage';
 import CalendarPage from './pages/CalendarPage';
 import Dashboard from './pages/admin/Dashboard';
 import MatchesAdmin from './pages/admin/MatchesAdmin';
+import GroupMatchesAdmin from './pages/admin/GroupMatchesAdmin';
 import NewsAdmin from './pages/admin/NewsAdmin';
 import PlayersAdmin from './pages/admin/PlayersAdmin';
 import SeasonsAdmin from './pages/admin/SeasonsAdmin';
@@ -86,6 +87,7 @@ export default function App() {
         >
           <Route index element={<Dashboard />} />
           <Route path="partidos" element={<MatchesAdmin />} />
+          <Route path="partidos-grupo" element={<GroupMatchesAdmin />} />
           <Route path="noticias" element={<NewsAdmin />} />
           <Route path="jugadores" element={<PlayersAdmin />} />
           <Route path="temporadas" element={<SeasonsAdmin />} />
