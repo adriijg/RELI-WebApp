@@ -40,7 +40,7 @@ public class RosterScrapeService {
     private String ffmPassword;
     @Value("${app.bootstrap-admin.username:admin}")
     private String adminUsername;
-    @Value("${app.bootstrap-admin.password:Admin1234}")
+    @Value("${app.bootstrap-admin.password:}")
     private String adminPassword;
     @Value("${server.port:8080}")
     private String serverPort;
@@ -69,7 +69,6 @@ public class RosterScrapeService {
                     "--competition-id", String.valueOf(comp.getId()),
                     "--api", "http://localhost:" + serverPort + "/api",
                     "--admin-user", adminUsername,
-                    "--admin-pass", adminPassword,
                     "--apply",
                     "--ffm-competicion", comp.getFfmCompeticion().trim(),
                     "--ffm-grupo", comp.getFfmGrupo() == null ? "" : comp.getFfmGrupo().trim(),
@@ -125,6 +124,9 @@ public class RosterScrapeService {
     private void checkCredentials() {
         if (ffmUser == null || ffmUser.isBlank() || ffmPassword == null || ffmPassword.isBlank()) {
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Faltan credenciales FFM (FFM_USER / FFM_PASS)");
+        }
+        if (adminUsername == null || adminUsername.isBlank() || adminPassword == null || adminPassword.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Faltan credenciales del admin (ADMIN_USERNAME / ADMIN_PASSWORD)");
         }
     }
 }

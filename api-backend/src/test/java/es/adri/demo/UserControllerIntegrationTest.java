@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.TestPropertySource;
@@ -20,6 +21,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -162,6 +164,33 @@ class UserControllerIntegrationTest {
         User user = createUser("user1", "user1@example.com", "Password123", Role.ROLE_USER);
 
         mockMvc.perform(get("/api/users").header("Authorization", bearer(user)))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void getUserByIdRequiresAdminRole() throws Exception {
+        User user = createUser("user1", "user1@example.com", "Password123", Role.ROLE_USER);
+
+        mockMvc.perform(get("/api/users/{id}", user.getId())
+                        .header("Authorization", bearer(user)))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void corsAllowsConfiguredOrigin() throws Exception {
+        mockMvc.perform(get("/api/players")
+                        .header(HttpHeaders.ORIGIN, "https://reallisiados.duckdns.org"))
+                .andExpect(status().isOk())
+                .andExpect(header().string(
+                        HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN,
+                        "https://reallisiados.duckdns.org"
+                ));
+    }
+
+    @Test
+    void corsRejectsNgrokOrigin() throws Exception {
+        mockMvc.perform(get("/api/players")
+                        .header(HttpHeaders.ORIGIN, "https://reli.ngrok-free.app"))
                 .andExpect(status().isForbidden());
     }
 

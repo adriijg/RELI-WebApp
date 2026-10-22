@@ -3,6 +3,7 @@ package es.adri.demo.config;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import jakarta.annotation.PostConstruct;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.function.Function;
@@ -18,6 +19,13 @@ public class JwtService {
 
     @Value("${app.jwt.expiration:86400000}")
     private long expirationMs;
+
+    @PostConstruct
+    void validateSecret() {
+        if (secret == null || secret.getBytes(StandardCharsets.UTF_8).length < 32) {
+            throw new IllegalStateException("app.jwt.secret debe tener al menos 32 bytes (JWT_SECRET)");
+        }
+    }
 
     public String generateToken(String username, String role) {
         Date now = new Date();

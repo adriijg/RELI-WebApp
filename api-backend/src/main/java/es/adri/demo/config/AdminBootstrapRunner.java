@@ -31,6 +31,10 @@ public class AdminBootstrapRunner implements ApplicationRunner {
             return;
         }
 
+        if (properties.getPassword() == null || properties.getPassword().isBlank()) {
+            throw new IllegalStateException("BOOTSTRAP_ADMIN_ENABLED=true requiere ADMIN_PASSWORD");
+        }
+
         userRepository.findByEmail(properties.getEmail())
                 .filter(user -> !user.getUsername().equals(properties.getUsername()))
                 .ifPresent(user -> {

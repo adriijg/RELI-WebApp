@@ -23,6 +23,8 @@ services:
     # (http://backend:8080). El 8080 del host lo ocupa otra app (admana-web).
     expose:
       - "8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
     env_file:
       - ./.env
     # El backend tarda ~50s en arrancar (conecta a Supabase Postgres).

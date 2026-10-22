@@ -1,7 +1,10 @@
 name: CD
 
+# Solo se despliega cuando CI termina con exito en main (o manualmente).
 on:
-  push:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
     branches: [main]
   workflow_dispatch:
 
@@ -20,9 +23,12 @@ permissions:
 jobs:
   build-push:
     name: Build & push images
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
@@ -145,7 +151,8 @@ jobs:
           DEPLOY_PATH: ${{ vars.DEPLOY_PATH || '/volume1/docker/reli-app' }}
           IMAGE_REGISTRY: ${{ vars.DEPLOY_IMAGE_REGISTRY || format('ghcr.io/{0}', github.repository_owner) }}
           IMAGE_TAG: latest
-          COMPOSE_URL: https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/docker-compose.nas.yml
+          SOURCE_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+          COMPOSE_URL: https://raw.githubusercontent.com/${{ github.repository }}/${{ github.event.workflow_run.head_sha || github.sha }}/docker-compose.nas.yml
         run: |
           set -e
           mkdir -p "$DEPLOY_PATH"
