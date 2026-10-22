@@ -118,7 +118,20 @@ export default function GroupMatchesAdmin() {
     setError('');
     try {
       const data = await getNeutralMatches(selectedCompetitionId);
-      setRows(Array.isArray(data) ? data : []);
+      const sorted = (Array.isArray(data) ? data : []).slice().sort((a, b) => {
+        const jornadaA = a.jornada ?? Number.POSITIVE_INFINITY;
+        const jornadaB = b.jornada ?? Number.POSITIVE_INFINITY;
+        if (jornadaA !== jornadaB) return jornadaA - jornadaB;
+        const timeA = a.date ? new Date(a.date).getTime() : NaN;
+        const timeB = b.date ? new Date(b.date).getTime() : NaN;
+        const validA = !Number.isNaN(timeA);
+        const validB = !Number.isNaN(timeB);
+        if (!validA && !validB) return 0;
+        if (!validA) return 1;
+        if (!validB) return -1;
+        return timeA - timeB;
+      });
+      setRows(sorted);
     } catch (err) {
       setError(err?.message || 'No se pudieron cargar los partidos');
       setRows([]);

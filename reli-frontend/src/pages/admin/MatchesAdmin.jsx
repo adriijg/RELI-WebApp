@@ -573,11 +573,25 @@ export default function MatchesAdmin() {
   const competitionSeasonById = new Map(
     competitions.map((competition) => [String(competition.id), String(competition.seasonId ?? '')]),
   );
-  const seasonRows = selectedSeasonId
+  const seasonRows = (selectedSeasonId
     ? crud.rows.filter(
         (row) => String(row.seasonId ?? competitionSeasonById.get(String(row.competitionId)) ?? '') === selectedSeasonId,
       )
-    : crud.rows;
+    : crud.rows
+  ).slice().sort((a, b) => {
+    const competitionA = a.competitionName || '';
+    const competitionB = b.competitionName || '';
+    if (competitionA !== competitionB) return competitionA.localeCompare(competitionB, 'es');
+    const jornadaA = a.jornada ?? Number.POSITIVE_INFINITY;
+    const jornadaB = b.jornada ?? Number.POSITIVE_INFINITY;
+    if (jornadaA !== jornadaB) return jornadaA - jornadaB;
+    const timeA = a.date ? new Date(a.date).getTime() : NaN;
+    const timeB = b.date ? new Date(b.date).getTime() : NaN;
+    if (Number.isNaN(timeA) && Number.isNaN(timeB)) return 0;
+    if (Number.isNaN(timeA)) return 1;
+    if (Number.isNaN(timeB)) return -1;
+    return timeA - timeB;
+  });
 
   const columns = [
     { key: 'rival', label: 'Rival', className: 'min-w-[160px]', render: (value) => (
@@ -592,6 +606,9 @@ export default function MatchesAdmin() {
       value
         ? <span className="text-[13px] font-bold text-foreground">{formatDate(value)}</span>
         : <span className="text-muted-foreground">—</span>
+    ) },
+    { key: 'jornada', label: 'J', className: 'w-12', render: (value) => (
+      value != null ? value : <span className="text-muted-foreground">—</span>
     ) },
     { key: 'phase', label: 'Fase', className: 'w-32', render: (value) => (
       value
@@ -708,8 +725,8 @@ export default function MatchesAdmin() {
         onDelete={setDeleteTarget}
         onBulkDelete={handleBulkDelete}
         searchKeys={['rival', 'location', 'competitionName', 'status']}
-        groupBy="jornada"
-        groupLabel={(jornada) => (jornada == null ? 'Sin jornada' : `Jornada ${jornada}`)}
+        groupBy="competitionName"
+        groupLabel={(competitionName) => competitionName || 'Sin competición'}
         emptyMessage="Todavía no hay partidos en esta temporada."
       />
 

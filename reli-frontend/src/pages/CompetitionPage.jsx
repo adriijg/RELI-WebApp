@@ -1374,7 +1374,18 @@ export default function CompetitionPage() {
                               if (b === 'none') return -1;
                               return Number(a) - Number(b);
                             })
-                            .map(([jornada, jornadaEntries]) => (
+                            .map(([jornada, jornadaEntries]) => {
+                              const sortedEntries = [...jornadaEntries].sort((a, b) => {
+                                const timeA = a.match.date ? new Date(a.match.date).getTime() : NaN;
+                                const timeB = b.match.date ? new Date(b.match.date).getTime() : NaN;
+                                const validA = !Number.isNaN(timeA);
+                                const validB = !Number.isNaN(timeB);
+                                if (!validA && !validB) return 0;
+                                if (!validA) return 1;
+                                if (!validB) return -1;
+                                return timeA - timeB;
+                              });
+                              return (
                               <div key={jornada}>
                                 <div className="flex items-center gap-3 px-4 pb-1 pt-3 sm:px-6">
                                   <h4 className="text-[10px] font-black uppercase tracking-[0.18em] text-re-dorado">
@@ -1382,13 +1393,14 @@ export default function CompetitionPage() {
                                   </h4>
                                   <span className="h-px flex-1 bg-card-border dark:bg-re-dorado/25" />
                                 </div>
-                                {jornadaEntries.map((entry) => (
+                                {sortedEntries.map((entry) => (
                                   entry.kind === 'ours'
                                     ? <MatchRow key={`ours-${entry.match.id}`} match={entry.match} navigate={navigate} />
                                     : <NeutralMatchRow key={`neutral-${entry.match.id}`} match={entry.match} />
                                 ))}
                               </div>
-                            ));
+                              );
+                            });
                         })() : (
                           entries.map((entry) => (
                             entry.kind === 'ours'

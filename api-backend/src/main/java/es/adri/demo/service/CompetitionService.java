@@ -17,6 +17,7 @@ import es.adri.demo.repository.MatchRepository;
 import es.adri.demo.repository.NeutralMatchRepository;
 import es.adri.demo.repository.SeasonRepository;
 import java.text.Normalizer;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -142,14 +143,6 @@ public class CompetitionService {
                 .sorted(Comparator.comparing(Match::getDate, Comparator.nullsLast(Comparator.naturalOrder()))
                         .thenComparing(Match::getId, Comparator.nullsLast(Comparator.naturalOrder())))
                 .collect(Collectors.toList());
-        for (Match match : scored) {
-            String rivalKey = canonicalTeamKey(match.getRival());
-            int ourGoals = match.getOurGoals();
-            int rivalGoals = match.getRivalGoals();
-            applyResult(table.get(OUR_TEAM_KEY), forms.get(OUR_TEAM_KEY), ourGoals, rivalGoals);
-            applyResult(table.get(rivalKey), forms.get(rivalKey), rivalGoals, ourGoals);
-        }
-
         List<NeutralMatch> scoredNeutrals = neutralMatches.stream()
                 .filter(m -> jornada == null || m.getJornada() == null || m.getJornada() <= jornada)
                 .filter(m -> m.getStatus() == MatchStatus.FINISHED)
@@ -157,14 +150,33 @@ public class CompetitionService {
                 .filter(m -> !isOurTeam(m.getHomeName()) && !isOurTeam(m.getAwayName()))
                 .filter(m -> table.containsKey(canonicalTeamKey(m.getHomeName()))
                         && table.containsKey(canonicalTeamKey(m.getAwayName())))
-                .sorted(Comparator.comparing(NeutralMatch::getDate, Comparator.nullsLast(Comparator.naturalOrder()))
-                        .thenComparing(NeutralMatch::getId, Comparator.nullsLast(Comparator.naturalOrder())))
                 .toList();
+
+        // Nuestros partidos y los de los rivales se puntuan juntos en orden
+        // cronologico (jornada y despues fecha) para que la racha sea correcta.
+        List<ScoredGame> results = new ArrayList<>();
+        for (Match match : scored) {
+            results.add(new ScoredGame(match.getJornada(), match.getDate(), match.getId(),
+                    OUR_TEAM_KEY, match.getOurGoals(),
+                    canonicalTeamKey(match.getRival()), match.getRivalGoals()));
+        }
         for (NeutralMatch match : scoredNeutrals) {
-            String homeKey = canonicalTeamKey(match.getHomeName());
-            String awayKey = canonicalTeamKey(match.getAwayName());
-            applyResult(table.get(homeKey), forms.get(homeKey), match.getHomeGoals(), match.getAwayGoals());
-            applyResult(table.get(awayKey), forms.get(awayKey), match.getAwayGoals(), match.getHomeGoals());
+            results.add(new ScoredGame(match.getJornada(), match.getDate(), match.getId(),
+                    canonicalTeamKey(match.getHomeName()), match.getHomeGoals(),
+                    canonicalTeamKey(match.getAwayName()), match.getAwayGoals()));
+        }
+        results.sort(Comparator
+                .comparing(ScoredGame::jornada, Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(ScoredGame::date, Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(ScoredGame::id, Comparator.nullsLast(Comparator.naturalOrder())));
+        for (ScoredGame game : results) {
+            StandingDTO homeRow = table.get(game.homeKey());
+            StandingDTO awayRow = table.get(game.awayKey());
+            if (homeRow == null || awayRow == null) {
+                continue;
+            }
+            applyResult(homeRow, forms.get(game.homeKey()), game.homeGoals(), game.awayGoals());
+            applyResult(awayRow, forms.get(game.awayKey()), game.awayGoals(), game.homeGoals());
         }
 
         for (Map.Entry<String, StandingDTO> entry : table.entrySet()) {
@@ -212,6 +224,10 @@ public class CompetitionService {
 
     private static boolean isOurTeam(String value) {
         return cleanTeamName(value).toUpperCase().contains("LISIADOS");
+    }
+
+    private record ScoredGame(Integer jornada, LocalDateTime date, Long id,
+                              String homeKey, int homeGoals, String awayKey, int awayGoals) {
     }
 
     private void applyResult(StandingDTO row, StringBuilder form, int scored, int conceded) {
