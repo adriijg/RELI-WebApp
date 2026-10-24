@@ -17,6 +17,7 @@ const HistoryPage = lazy(() => import('./pages/HistoryPage'));
 const PlayersPage = lazy(() => import('./pages/PlayersPage'));
 const QuintetPage = lazy(() => import('./pages/QuintetPage'));
 const CalendarPage = lazy(() => import('./pages/CalendarPage'));
+const KitCreator = lazy(() => import('./pages/KitCreator'));
 const EmailActionPage = lazy(() => import('./pages/EmailActionPage'));
 
 const AdminLayout = lazy(() => import('./components/admin/AdminLayout'));
@@ -87,6 +88,7 @@ export default function App() {
             <Route path="/jugadores" element={<PlayersPage />} />
             <Route path="/quinteto" element={<QuintetPage />} />
             <Route path="/calendario" element={<CalendarPage />} />
+            <Route path="/equipaciones" element={<KitCreator />} />
             <Route path="/auth" element={<EmailActionPage />} />
           </Route>
           <Route
