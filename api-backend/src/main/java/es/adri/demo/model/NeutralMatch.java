@@ -73,6 +73,6 @@ public class NeutralMatch extends BaseEntity {
     /** CodActa de la federación, para descargar el acta sin re-scrapear la jornada. */
     private String codacta;
 
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "boolean default false")
     private boolean manual = false;
 }

@@ -59,7 +59,7 @@ public class Match extends BaseEntity {
     @Column(name = "group_name", length = 60)
     private String groupName;
 
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "boolean default false")
     private boolean manual = false;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
