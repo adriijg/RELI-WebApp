@@ -166,7 +166,15 @@ def parse_cards(block: str, side: str) -> list[dict]:
     return uniq
 
 
-def parse_goals(html: str, home: str, away: str) -> list[dict]:
+def norm_name(text: str | None) -> str:
+    text = unicodedata.normalize("NFKD", text or "")
+    text = "".join(c for c in text if not unicodedata.combining(c))
+    text = text.upper()
+    text = re.sub(r"[^A-Z0-9 ]", " ", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def parse_goals(html: str, home: str, away: str, home_roster: list[dict] | None = None, away_roster: list[dict] | None = None) -> list[dict]:
     out: list[dict] = []
     gb = RE_GOLES_BLOCK.search(html)
     seg = gb.group(1) if gb else html
@@ -192,15 +200,32 @@ def parse_goals(html: str, home: str, away: str) -> list[dict]:
             "minuto": int(mw.group(2)),
             "tipo": clean(mt.group(1)) if mt else None,
         })
-    # Asigna lado local/visitante por evolucion del marcador.
+
+    home_names = {norm_name(p["nombre"]) for p in (home_roster or []) if p.get("nombre")}
+    away_names = {norm_name(p["nombre"]) for p in (away_roster or []) if p.get("nombre")}
+
+    # Asigna lado local/visitante combinando la convocatoria y la evolucion del marcador.
     prev_h, prev_a = 0, 0
     for g in out:
+        j_norm = norm_name(g["jugador"])
+        in_home = j_norm in home_names or any(j_norm and (j_norm in hn or hn in j_norm) for hn in home_names)
+        in_away = j_norm in away_names or any(j_norm and (j_norm in an or an in j_norm) for an in away_names)
+
+        side_by_score = None
         if g["home_goals"] > prev_h and g["away_goals"] == prev_a:
+            side_by_score = "local"
+        elif g["away_goals"] > prev_a and g["home_goals"] == prev_h:
+            side_by_score = "visitante"
+
+        if in_home and not in_away:
             g["equipo"] = "local"
             g["equipo_nombre"] = home
-        elif g["away_goals"] > prev_a and g["home_goals"] == prev_h:
+        elif in_away and not in_home:
             g["equipo"] = "visitante"
             g["equipo_nombre"] = away
+        elif side_by_score:
+            g["equipo"] = side_by_score
+            g["equipo_nombre"] = home if side_by_score == "local" else away
         else:
             g["equipo"] = None
             g["equipo_nombre"] = None
@@ -227,7 +252,7 @@ def parse_acta(html: str, codacta: str) -> dict:
             if name and len(name) > 3:
                 arbitros.append(name)
 
-    goles = parse_goals(html, home, away)
+    goles = parse_goals(html, home, away, home_tit + home_sub, away_tit + away_sub)
     tarjetas = parse_cards(local_block, "local") + parse_cards(away_block, "visitante")
 
     for t in tarjetas:

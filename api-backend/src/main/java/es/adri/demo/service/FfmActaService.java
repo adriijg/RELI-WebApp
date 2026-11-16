@@ -61,6 +61,8 @@ public class FfmActaService {
     private String ffmUser;
     @Value("${app.ffm.password:}")
     private String ffmPassword;
+    @Value("${app.ffm.device-id:}")
+    private String ffmDeviceId;
     @Value("${app.ffm.cod-primaria:1000128}")
     private String codPrimaria;
     @Value("${app.ffm.cod-agrupacion:1}")
@@ -238,10 +240,17 @@ public class FfmActaService {
 
     private void login(HttpClient client) throws Exception {
         checkCredentials();
-        String body = "NUser=" + urlEncode(ffmUser) + "&NPass=" + urlEncode(ffmPassword) + "&LoginAjax=1";
+        String deviceId = (ffmDeviceId != null && !ffmDeviceId.isBlank())
+                ? ffmDeviceId.trim() : "4a5c8120-e71c-4b53-9a3b-21a4f0de74b9";
+        String body = "NUser=" + urlEncode(ffmUser)
+                + "&NPass=" + urlEncode(ffmPassword)
+                + "&deviceid=" + urlEncode(deviceId)
+                + "&LoginAjax=1";
         politePause();
         HttpResponse<String> login = client.send(
-                baseRequest(baseUrl + "/nfg/NLogin", baseUrl + "/").header("Content-Type", "application/x-www-form-urlencoded")
+                baseRequest(baseUrl + "/nfg/NLogin", baseUrl + "/")
+                        .header("Content-Type", "application/x-www-form-urlencoded")
+                        .header("X-Requested-With", "XMLHttpRequest")
                         .POST(HttpRequest.BodyPublishers.ofString(body)).build(),
                 HttpResponse.BodyHandlers.ofString());
         if (login.statusCode() == 403 || login.statusCode() == 429) {
@@ -249,15 +258,24 @@ public class FfmActaService {
                     "La federación está limitando las peticiones desde nuestra IP (HTTP " + login.statusCode() + "). "
                             + "Espera unos minutos y reintenta; si persiste, prueba con datos del móvil.");
         }
-        String location = login.headers().firstValue("Location").orElse("");
-        if (login.statusCode() != 302 || !location.contains("NLogin")) {
-            throw new IllegalStateException("Login inesperado en la federación: HTTP " + login.statusCode());
+        String resp = login.body();
+        if (login.statusCode() == 302) {
+            String location = login.headers().firstValue("Location").orElse("");
+            if (location.contains("NLogin")) {
+                politePause();
+                HttpResponse<String> session = client.send(
+                        baseRequest(baseUrl + location, baseUrl + "/nfg/NLogin").GET().build(),
+                        HttpResponse.BodyHandlers.ofString());
+                resp = session.body();
+            }
         }
-        politePause();
-        HttpResponse<String> session = client.send(
-                baseRequest(baseUrl + location, baseUrl + "/nfg/NLogin").GET().build(),
-                HttpResponse.BodyHandlers.ofString());
-        if (!session.body().contains("estado=\"1\"") && !session.body().contains("estado='1'")) {
+        if (resp == null || (!resp.contains("estado=\"1\"") && !resp.contains("estado='1'"))) {
+            if (resp != null && resp.contains("10005")) {
+                java.util.regex.Matcher m = java.util.regex.Pattern.compile("NURL=\"([^\"]+)\"").matcher(resp);
+                String nurl = m.find() ? (baseUrl + m.group(1)) : baseUrl;
+                throw new IllegalStateException("Novanet requiere validar este dispositivo (error 10005). "
+                        + "Abre este enlace para autorizarlo o configura FFM_DEVICE_ID: " + nurl);
+            }
             throw new IllegalStateException("Login rechazado por la federación (revisa FFM_USER / FFM_PASS)");
         }
     }

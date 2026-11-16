@@ -568,6 +568,13 @@ export default function MatchesAdmin() {
       options: [{ value: '', label: 'Liga / sin fase' }, ...MATCH_PHASE_OPTIONS],
     },
     { name: 'groupName', label: 'Grupo', type: 'text', section: 'Copa (grupo y eliminatorias)', placeholder: 'Ej. Grupo 3' },
+    {
+      name: 'manual',
+      label: 'Protección contra sobreescritura',
+      checkboxLabel: 'Partido manual (no sobreescribir con scraping federativo)',
+      type: 'checkbox',
+      default: true,
+    },
   ];
 
   const competitionSeasonById = new Map(
@@ -625,10 +632,15 @@ export default function MatchesAdmin() {
         ? <span className={`font-black text-[18px] leading-none ${scoreTextClass(getMatchOutcome(row.ourGoals, row.rivalGoals))}`}>{row.ourGoals}-{row.rivalGoals}</span>
         : <span className="text-muted-foreground font-bold text-sm">—</span>
     ) },
+    { key: 'manual', label: 'Tipo', className: 'w-24', render: (value) => (
+      value
+        ? <Badge variant="yellow">Manual</Badge>
+        : <Badge variant="outline">FFM</Badge>
+    ) },
   ];
 
   const handleOpenCreate = () => {
-    setEditing(null);
+    setEditing({ manual: true });
     setModalOpen(true);
   };
 
@@ -641,6 +653,7 @@ export default function MatchesAdmin() {
       home: String(row.home ?? true),
       date: datePart,
       time: timePart ? timePart.slice(0, 5) : '',
+      manual: row.manual !== undefined ? Boolean(row.manual) : true,
     });
     setModalOpen(true);
   }, []);
@@ -668,6 +681,7 @@ export default function MatchesAdmin() {
       jornada: values.jornada ? Number(values.jornada) : null,
       phase: values.phase || null,
       groupName: values.groupName?.trim() ? values.groupName.trim() : null,
+      manual: values.manual !== undefined ? Boolean(values.manual) : true,
     };
     await crud.save(payload, editing?.id);
     setModalOpen(false);

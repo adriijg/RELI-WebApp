@@ -12,7 +12,6 @@ import lombok.NoArgsConstructor;
 
 @Data
 @NoArgsConstructor
-@AllArgsConstructor
 public class MatchRequestDTO {
 
     @NotBlank(message = "El rival es obligatorio")
@@ -42,8 +41,33 @@ public class MatchRequestDTO {
 
     private String groupName;
 
+    private Boolean manual;
+
+    public MatchRequestDTO(String rival, boolean home, LocalDateTime date, String location, MatchStatus status,
+                           Integer ourGoals, Integer rivalGoals, Integer jornada, Long competitionId,
+                           MatchPhase phase, String groupName, Boolean manual) {
+        this.rival = rival;
+        this.home = home;
+        this.date = date;
+        this.location = location;
+        this.status = status;
+        this.ourGoals = ourGoals;
+        this.rivalGoals = rivalGoals;
+        this.jornada = jornada;
+        this.competitionId = competitionId;
+        this.phase = phase;
+        this.groupName = groupName;
+        this.manual = manual;
+    }
+
     public MatchRequestDTO(String rival, boolean home, LocalDateTime date, String location, MatchStatus status,
                            Integer ourGoals, Integer rivalGoals, Integer jornada, Long competitionId) {
-        this(rival, home, date, location, status, ourGoals, rivalGoals, jornada, competitionId, null, null);
+        this(rival, home, date, location, status, ourGoals, rivalGoals, jornada, competitionId, null, null, null);
+    }
+
+    public MatchRequestDTO(String rival, boolean home, LocalDateTime date, String location, MatchStatus status,
+                           Integer ourGoals, Integer rivalGoals, Integer jornada, Long competitionId,
+                           MatchPhase phase, String groupName) {
+        this(rival, home, date, location, status, ourGoals, rivalGoals, jornada, competitionId, phase, groupName, null);
     }
 }

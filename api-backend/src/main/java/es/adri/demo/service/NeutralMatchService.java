@@ -72,6 +72,11 @@ public class NeutralMatchService {
         match.setHomeGoals(dto.getHomeGoals());
         match.setAwayGoals(dto.getAwayGoals());
         match.setCodacta(blankToNull(dto.getCodacta()));
+        if (dto.getManual() != null) {
+            match.setManual(dto.getManual());
+        } else {
+            match.setManual(true);
+        }
         return toDto(repository.save(match));
     }
 
@@ -100,7 +105,8 @@ public class NeutralMatchService {
                 match.getStatus(),
                 match.getHomeGoals(),
                 match.getAwayGoals(),
-                match.getCodacta());
+                match.getCodacta(),
+                match.isManual());
     }
 
     private static String blankToNull(String value) {

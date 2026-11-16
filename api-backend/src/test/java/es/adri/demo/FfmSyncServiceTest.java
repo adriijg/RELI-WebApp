@@ -67,4 +67,27 @@ class FfmSyncServiceTest {
         assertEquals("PABELLON NIDO - PISTA", match.venue());
         assertNull(match.homeGoals());
     }
+
+    @Test
+    void parseJornadaDoesNotStealScoreFromNextMatch() {
+        String html = "<div class=\"portlet-body body_fed\">"
+                + "<a href=\"NFG_VisEquipos?Codigo_Equipo=111\">TEAM A</a>"
+                + "<a href=\"NFG_VisEquipos?Codigo_Equipo=222\">TEAM B</a>"
+                + "<a href=\"NFG_LstComparativaEquipos?equipo1=111&equipo2=222\">x</a>"
+                + "</div>"
+                + "<div class=\"portlet-body body_fed\">"
+                + "<span class=\"resultado_cerrada\">3 -</span><span class=\"resultado_cerrada\">1</span>"
+                + "<a href=\"NFG_VisEquipos?Codigo_Equipo=333\">TEAM C</a>"
+                + "<a href=\"NFG_VisEquipos?Codigo_Equipo=444\">TEAM D</a>"
+                + "<a href=\"NFG_LstComparativaEquipos?equipo1=333&equipo2=444\">x</a>"
+                + "</div>";
+
+        List<FfmMatch> matches = FfmSyncService.parseJornada(html, 1, "111");
+
+        assertEquals(2, matches.size());
+        assertNull(matches.get(0).homeGoals());
+        assertNull(matches.get(0).awayGoals());
+        assertEquals(3, matches.get(1).homeGoals());
+        assertEquals(1, matches.get(1).awayGoals());
+    }
 }

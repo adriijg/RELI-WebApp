@@ -61,6 +61,9 @@ public class FfmSyncService {
     private static final Pattern RE_ROUND_OPT =
             Pattern.compile("<option[^>]*value=\"(\\d+)\"[^>]*>\\s*\\d+\\s*-\\s*(\\d{2}-\\d{2}-\\d{4})");
     private static final Pattern RE_SCORE = Pattern.compile("(?<!\\d)(\\d{1,2})\\s*-\\s*(\\d{1,2})(?!\\d)");
+    private static final Pattern RE_RESULTADO_SPAN = Pattern.compile(
+            "resultado_(?:cerrada|prov|enjuego)[^>]*>\\s*(\\d{1,2})\\s*-[^<]*<.*?resultado_(?:cerrada|prov|enjuego)[^>]*>\\s*(\\d{1,2})\\s*<",
+            Pattern.DOTALL | Pattern.CASE_INSENSITIVE);
     private static final Pattern RE_SELECT = Pattern.compile("<select.*?</select>", Pattern.DOTALL | Pattern.CASE_INSENSITIVE);
     private static final Pattern RE_TAG = Pattern.compile("<[^>]+>");
     private static final Pattern RE_DATE = Pattern.compile("\\d{2}-\\d{2}-\\d{4}");
@@ -88,6 +91,9 @@ public class FfmSyncService {
 
     @Value("${app.ffm.password:}")
     private String ffmPassword;
+
+    @Value("${app.ffm.device-id:}")
+    private String ffmDeviceId;
 
     @Value("${app.ffm.cod-primaria:1000128}")
     private String codPrimaria;
@@ -163,6 +169,9 @@ public class FfmSyncService {
                     continue;
                 }
                 Match target = findExisting(existing, competition.getId(), parsed);
+                if (target != null && target.isManual()) {
+                    continue;
+                }
                 if (target == null) {
                     matchService.createMatch(toRequest(competition, parsed, null));
                     created++;
@@ -220,6 +229,11 @@ public class FfmSyncService {
     public FfmJornadaResultDTO syncMatchResult(Long matchId) {
         Match match = matchRepository.findById(matchId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Partido no encontrado"));
+        if (match.isManual()) {
+            return new FfmJornadaResultDTO(match.getCompetition() != null ? match.getCompetition().getId() : null,
+                    match.getCompetition() != null ? match.getCompetition().getName() : null,
+                    match.getJornada(), 0, false, 0, "Partido manual: protegido contra sobreescritura");
+        }
         Competition competition = match.getCompetition();
         if (competition == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El partido no tiene competicion");
@@ -256,11 +270,20 @@ public class FfmSyncService {
             if (p.wePlay()) {
                 Match target = findExisting(existing, competition.getId(), p);
                 if (target != null) {
+                    if (target.isManual()) {
+                        log.info("Partido {} J{} es manual: se omite sobreescritura desde federación", target.getId(), target.getJornada());
+                        continue;
+                    }
                     matchService.updateMatch(target.getId(), toRequest(competition, p, target));
                     ourUpdated = true;
                 }
             } else if (includeNeutral) {
-                upsertNeutralFromFfm(competition, p, existingNeutral.get(neutralKey(p.homeCode(), p.awayCode())));
+                NeutralMatchDTO extNeutral = existingNeutral.get(neutralKey(p.homeCode(), p.awayCode()));
+                if (extNeutral != null && Boolean.TRUE.equals(extNeutral.getManual())) {
+                    log.info("Partido neutral J{} {}-{} es manual: se omite sobreescritura", p.jornada(), p.homeCode(), p.awayCode());
+                    continue;
+                }
+                upsertNeutralFromFfm(competition, p, extNeutral);
                 neutralSaved++;
             }
         }
@@ -286,6 +309,7 @@ public class FfmSyncService {
         dto.setHomeGoals(finished ? p.homeGoals() : (existing != null ? existing.getHomeGoals() : null));
         dto.setAwayGoals(finished ? p.awayGoals() : (existing != null ? existing.getAwayGoals() : null));
         dto.setCodacta(p.codacta() != null ? p.codacta() : (existing != null ? existing.getCodacta() : null));
+        dto.setManual(false);
         neutralMatchService.upsert(dto);
     }
 
@@ -402,25 +426,46 @@ public class FfmSyncService {
                 .followRedirects(HttpClient.Redirect.NEVER)
                 .connectTimeout(Duration.ofSeconds(30))
                 .build();
+        try {
+            client.send(HttpRequest.newBuilder(URI.create(baseUrl + "/")).GET().timeout(Duration.ofSeconds(15)).build(),
+                    HttpResponse.BodyHandlers.discarding());
+        } catch (Exception ignored) {
+        }
+        String deviceId = (ffmDeviceId != null && !ffmDeviceId.isBlank())
+                ? ffmDeviceId.trim() : "4a5c8120-e71c-4b53-9a3b-21a4f0de74b9";
         String loginBody = "NUser=" + urlEncode(ffmUser)
                 + "&NPass=" + urlEncode(ffmPassword)
+                + "&deviceid=" + urlEncode(deviceId)
                 + "&LoginAjax=1";
         HttpResponse<String> login = client.send(
                 HttpRequest.newBuilder(URI.create(baseUrl + "/nfg/NLogin"))
                         .header("Content-Type", "application/x-www-form-urlencoded")
+                        .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/126.0.0.0")
+                        .header("Referer", baseUrl + "/")
+                        .header("X-Requested-With", "XMLHttpRequest")
                         .POST(HttpRequest.BodyPublishers.ofString(loginBody))
                         .timeout(Duration.ofSeconds(30))
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
-        String location = login.headers().firstValue("Location").orElse("");
-        if (login.statusCode() != 302 || !location.contains("NLogin")) {
-            throw new IllegalStateException("Login inesperado: HTTP " + login.statusCode());
+
+        String resp = login.body();
+        if (login.statusCode() == 302) {
+            String location = login.headers().firstValue("Location").orElse("");
+            if (location.contains("NLogin")) {
+                HttpResponse<String> session = client.send(
+                        HttpRequest.newBuilder(URI.create(baseUrl + location))
+                                .GET().timeout(Duration.ofSeconds(30)).build(),
+                        HttpResponse.BodyHandlers.ofString());
+                resp = session.body();
+            }
         }
-        HttpResponse<String> session = client.send(
-                HttpRequest.newBuilder(URI.create(baseUrl + location))
-                        .GET().timeout(Duration.ofSeconds(30)).build(),
-                HttpResponse.BodyHandlers.ofString());
-        if (!session.body().contains("estado=\"1\"") && !session.body().contains("estado='1'")) {
+        if (resp == null || (!resp.contains("estado=\"1\"") && !resp.contains("estado='1'"))) {
+            if (resp != null && resp.contains("10005")) {
+                Matcher m = Pattern.compile("NURL=\"([^\"]+)\"").matcher(resp);
+                String nurl = m.find() ? (baseUrl + m.group(1)) : baseUrl;
+                throw new IllegalStateException("Novanet requiere validar este dispositivo (error 10005). "
+                        + "Abre este enlace para autorizarlo o configura FFM_DEVICE_ID: " + nurl);
+            }
             throw new IllegalStateException("Login rechazado por la federacion");
         }
         return client;
@@ -515,26 +560,86 @@ public class FfmSyncService {
     }
 
     public static List<FfmMatch> parseJornada(String html, int jornada, String ourCode) {
+        int loopIdx = html.indexOf("<!--loop de partidos");
+        String tableHtml = loopIdx != -1 ? html.substring(0, loopIdx) : html;
+
         Map<String, String> names = new LinkedHashMap<>();
-        Matcher teams = RE_TEAMS.matcher(html);
+        Matcher teams = RE_TEAMS.matcher(tableHtml);
         while (teams.find()) {
             names.putIfAbsent(teams.group(1), teams.group(2).trim().replaceAll("\\s+", " "));
         }
-        List<Object[]> dates = findAll(RE_DATES, html);
-        List<Object[]> times = findAll(RE_TIMES, html);
-        List<Object[]> campos = findAll(RE_CAMPO, html);
-        List<Object[]> actas = findAll(RE_CODACTA, html);
+        List<Object[]> dates = findAll(RE_DATES, tableHtml);
+        List<Object[]> times = findAll(RE_TIMES, tableHtml);
+        List<Object[]> campos = findAll(RE_CAMPO, tableHtml);
+        List<Object[]> actas = findAll(RE_CODACTA, tableHtml);
         String fallback = null;
-        Matcher roundOpt = RE_ROUND_OPT.matcher(html);
+        Matcher roundOpt = RE_ROUND_OPT.matcher(tableHtml);
         while (roundOpt.find()) {
             if (Integer.parseInt(roundOpt.group(1)) == jornada) {
                 fallback = roundOpt.group(2);
             }
         }
 
+        if (tableHtml.contains("portlet-body body_fed")) {
+            String[] parts = tableHtml.split("portlet-body\\s+body_fed");
+            if (parts.length > 1) {
+                List<FfmMatch> out = new ArrayList<>();
+                for (int i = 1; i < parts.length; i++) {
+                    String part = parts[i];
+                    Matcher compM = RE_COMP.matcher(part);
+                    if (!compM.find()) {
+                        continue;
+                    }
+                    String e1 = compM.group(1);
+                    String e2 = compM.group(2);
+
+                    Matcher teamsM = RE_TEAMS.matcher(part);
+                    Map<String, String> partNames = new LinkedHashMap<>();
+                    while (teamsM.find()) {
+                        partNames.putIfAbsent(teamsM.group(1), teamsM.group(2).trim().replaceAll("\\s+", " "));
+                    }
+
+                    Matcher dateM = RE_DATES.matcher(part);
+                    String fecha = dateM.find() ? dateM.group(1).trim() : fallback;
+                    Matcher timeM = RE_TIMES.matcher(part);
+                    String hora = timeM.find() ? timeM.group(1).trim() : "00:00";
+                    Matcher campoM = RE_CAMPO.matcher(part);
+                    String venue = campoM.find() ? campoM.group(1).trim().replaceAll("\\s+", " ") : null;
+                    Matcher actaM = RE_CODACTA.matcher(part);
+                    String codacta = actaM.find() ? actaM.group(1).trim() : null;
+
+                    Integer homeGoals = null;
+                    Integer awayGoals = null;
+                    Matcher scoreM = RE_RESULTADO_SPAN.matcher(part);
+                    if (scoreM.find()) {
+                        homeGoals = Integer.parseInt(scoreM.group(1));
+                        awayGoals = Integer.parseInt(scoreM.group(2));
+                    }
+
+                    LocalDateTime date = null;
+                    if (fecha != null) {
+                        try {
+                            date = LocalDateTime.parse(fecha + " " + hora, DATE_TIME_FORMAT);
+                        } catch (Exception ignored) {
+                            date = null;
+                        }
+                    }
+                    boolean wePlay = ourCode.equals(e1) || ourCode.equals(e2);
+                    Boolean weAreHome = wePlay ? ourCode.equals(e1) : null;
+                    out.add(new FfmMatch(jornada, date, venue == null || venue.isBlank() ? null : venue.trim(),
+                            e1, partNames.getOrDefault(e1, names.getOrDefault(e1, e1)),
+                            e2, partNames.getOrDefault(e2, names.getOrDefault(e2, e2)),
+                            homeGoals, awayGoals, wePlay, weAreHome, codacta));
+                }
+                if (!out.isEmpty()) {
+                    return out;
+                }
+            }
+        }
+
         List<Object[]> comps = new ArrayList<>();
         Set<String> seenPairs = new LinkedHashSet<>();
-        Matcher comp = RE_COMP.matcher(html);
+        Matcher comp = RE_COMP.matcher(tableHtml);
         while (comp.find()) {
             String key = comp.group(1) + "-" + comp.group(2);
             if (seenPairs.add(key)) {
@@ -548,7 +653,7 @@ public class FfmSyncService {
             String e2 = (String) comps.get(i)[1];
             int pos = (int) comps.get(i)[2];
             int lo = i > 0 ? (int) comps.get(i - 1)[2] : 0;
-            int hi = i < comps.size() - 1 ? (int) comps.get(i + 1)[2] : html.length();
+            int hi = i < comps.size() - 1 ? (int) comps.get(i + 1)[2] : tableHtml.length();
             String fecha = nearest(dates, pos, lo, hi);
             String hora = nearest(times, pos, lo, hi);
             String venue = nearest(campos, pos, lo, hi);
@@ -561,15 +666,22 @@ public class FfmSyncService {
             }
             Integer homeGoals = null;
             Integer awayGoals = null;
-            String seg = html.substring(lo, hi);
-            seg = RE_SELECT.matcher(seg).replaceAll(" ");
-            seg = RE_TAG.matcher(seg).replaceAll(" ");
-            seg = RE_DATE.matcher(seg).replaceAll(" ");
-            seg = RE_TIME.matcher(seg).replaceAll(" ");
-            Matcher score = RE_SCORE.matcher(seg);
-            if (score.find()) {
-                homeGoals = Integer.parseInt(score.group(1));
-                awayGoals = Integer.parseInt(score.group(2));
+            int scoreHi = Math.min(pos + 200, hi);
+            String scoreSeg = tableHtml.substring(lo, scoreHi);
+            Matcher spanScore = RE_RESULTADO_SPAN.matcher(scoreSeg);
+            if (spanScore.find()) {
+                homeGoals = Integer.parseInt(spanScore.group(1));
+                awayGoals = Integer.parseInt(spanScore.group(2));
+            } else if (!scoreSeg.contains("resultado_")) {
+                String seg = RE_SELECT.matcher(scoreSeg).replaceAll(" ");
+                seg = RE_TAG.matcher(seg).replaceAll(" ");
+                seg = RE_DATE.matcher(seg).replaceAll(" ");
+                seg = RE_TIME.matcher(seg).replaceAll(" ");
+                Matcher score = RE_SCORE.matcher(seg);
+                if (score.find()) {
+                    homeGoals = Integer.parseInt(score.group(1));
+                    awayGoals = Integer.parseInt(score.group(2));
+                }
             }
             LocalDateTime date = null;
             if (fecha != null) {
@@ -718,6 +830,7 @@ public class FfmSyncService {
         }
         dto.setJornada(parsed.jornada());
         dto.setCompetitionId(competition.getId());
+        dto.setManual(false);
         return dto;
     }
 
@@ -734,7 +847,10 @@ public class FfmSyncService {
             action.setDate(wanted.getDate() == null ? null : wanted.getDate().toString());
             action.setVenue(wanted.getLocation());
             action.setStatus(wanted.getStatus() == null ? null : wanted.getStatus().name());
-            if (parsed.date() == null) {
+            if (target != null && target.isManual()) {
+                action.setAction("SKIP");
+                action.setDetail("Partido manual (protegido contra sobreescritura)");
+            } else if (parsed.date() == null) {
                 action.setAction("SKIP");
                 action.setDetail("Sin fecha en la federacion");
             } else if (target == null) {

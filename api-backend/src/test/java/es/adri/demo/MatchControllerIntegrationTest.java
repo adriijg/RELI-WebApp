@@ -125,7 +125,8 @@ class MatchControllerIntegrationTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.rival").value("Rival FC"))
-                .andExpect(jsonPath("$.competitionId").value(competition.getId()));
+                .andExpect(jsonPath("$.competitionId").value(competition.getId()))
+                .andExpect(jsonPath("$.manual").value(true));
     }
 
     @Test
@@ -176,7 +177,8 @@ class MatchControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.rival").value("Otro Rival"))
                 .andExpect(jsonPath("$.status").value("FINISHED"))
-                .andExpect(jsonPath("$.competitionName").value("Copa"));
+                .andExpect(jsonPath("$.competitionName").value("Copa"))
+                .andExpect(jsonPath("$.manual").value(true));
     }
 
     @Test

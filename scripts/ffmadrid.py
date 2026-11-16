@@ -51,6 +51,10 @@ RE_CAMPO = re.compile(r"Campo:</b></span>\s*([^<]+?)\s*(?:<|$)")
 RE_ROUND_OPT = re.compile(r'<option[^>]*value="(\d+)"[^>]*>\s*\d+\s*-\s*(\d{2}-\d{2}-\d{4})')
 # Resultado tipo "3 - 1" dentro del bloque del partido (cuando lo haya)
 RE_SCORE = re.compile(r"(?<!\d)(\d{1,2})\s*-\s*(\d{1,2})(?!\d)")
+RE_RESULTADO_SPAN = re.compile(
+    r"resultado_(?:cerrada|prov|enjuego)[^>]*>\s*(\d{1,2})\s*-[^<]*<.*?resultado_(?:cerrada|prov|enjuego)[^>]*>\s*(\d{1,2})\s*<",
+    re.S | re.I,
+)
 
 
 def norm(name: str) -> str:
@@ -81,19 +85,37 @@ def smart_title(name: str) -> str:
     return " ".join(out)
 
 
-def login(session: requests.Session, user: str, password: str) -> None:
+def login(session: requests.Session, user: str, password: str, device_id: str | None = None) -> None:
+    dev = device_id or os.environ.get("FFM_DEVICE_ID", "").strip() or "4a5c8120-e71c-4b53-9a3b-21a4f0de74b9"
+    try:
+        session.get(f"{BASE}/", timeout=15)
+    except Exception:
+        pass
     r = session.post(
         f"{BASE}/nfg/NLogin",
-        data={"NUser": user, "NPass": password, "LoginAjax": "1"},
+        data={"NUser": user, "NPass": password, "deviceid": dev, "LoginAjax": "1"},
+        headers={"Referer": f"{BASE}/", "X-Requested-With": "XMLHttpRequest"},
         timeout=30,
         allow_redirects=False,
     )
-    loc = r.headers.get("Location", "")
-    if r.status_code != 302 or "NLogin" not in loc:
-        raise RuntimeError(f"Login inesperado: HTTP {r.status_code}")
-    r2 = session.get(f"{BASE}{loc}", timeout=30)
-    if 'estado="1"' not in r2.text and "estado='1'" not in r2.text:
-        raise RuntimeError("Login rechazado (estado != 1). Revisa usuario/clave.")
+    text = r.text
+    if r.status_code == 302:
+        loc = r.headers.get("Location", "")
+        if "NLogin" in loc:
+            r2 = session.get(f"{BASE}{loc}", timeout=30)
+            text = r2.text
+    if 'estado="1"' in text or "estado='1'" in text:
+        return
+    if "10005" in text:
+        nurl_match = re.search(r'NURL="([^"]+)"', text)
+        url_help = f"{BASE}{nurl_match.group(1)}" if nurl_match else f"{BASE}/"
+        raise RuntimeError(
+            f"Novanet requiere verificar este dispositivo (error 10005).\n"
+            f"Device ID: {dev}\n"
+            f"Abre este enlace en tu navegador para autorizarlo:\n{url_help}\n"
+            f"O copia el 'device_id' de las cookies de tu navegador en FFM_DEVICE_ID."
+        )
+    raise RuntimeError(f"Login rechazado por la federación: {text[:200]}")
 
 
 def get_jornada(session: requests.Session, jornada: int, params_base: dict | None = None) -> str:
@@ -126,46 +148,99 @@ def parse_jornada(html: str, jornada: int, our_code: str = OUR_TEAM_CODE) -> lis
     equipo2 = visitante). Fecha/hora/sede = las mas cercanas dentro del tramo.
     La web repite el listado en el HTML: se conserva la primera aparicion.
     Devuelve tambien los codigos de todos los equipos vistos ('all_codes')."""
+    loop_idx = html.find("<!--loop de partidos")
+    table_html = html[:loop_idx] if loop_idx != -1 else html
+
     names: dict[str, str] = {}
-    for m in RE_TEAMS.finditer(html):
+    for m in RE_TEAMS.finditer(table_html):
         names.setdefault(m.group(1), " ".join(m.group(2).split()))
-    dates = [(m.group(1), m.start()) for m in RE_DATES.finditer(html)]
-    times = [(m.group(1), m.start()) for m in RE_TIMES.finditer(html)]
-    campos = [(" ".join(m.group(1).split()), m.start()) for m in RE_CAMPO.finditer(html)]
-    # Fecha de la jornada (desplegable): fallback cuando el partido jugado
-    # ya no muestra fecha propia
-    round_dates = {int(n): d for n, d in RE_ROUND_OPT.findall(html)}
+    dates = [(m.group(1), m.start()) for m in RE_DATES.finditer(table_html)]
+    times = [(m.group(1), m.start()) for m in RE_TIMES.finditer(table_html)]
+    campos = [(" ".join(m.group(1).split()), m.start()) for m in RE_CAMPO.finditer(table_html)]
+    round_dates = {int(n): d for n, d in RE_ROUND_OPT.findall(table_html)}
     fallback = round_dates.get(jornada)
+
+    if "portlet-body body_fed" in table_html:
+        parts = re.split(r"portlet-body\s+body_fed", table_html)
+        if len(parts) > 1:
+            out: list[dict] = []
+            for part in parts[1:]:
+                comp_m = RE_COMP.search(part)
+                if not comp_m:
+                    continue
+                e1, e2 = comp_m.group(1), comp_m.group(2)
+                part_names = {m.group(1): " ".join(m.group(2).split()) for m in RE_TEAMS.finditer(part)}
+                found_date = RE_DATES.search(part)
+                found_time = RE_TIMES.search(part)
+                found_campo = RE_CAMPO.search(part)
+                fecha = found_date.group(1) if found_date else fallback
+                hora = found_time.group(1) if found_time else "00:00"
+                venue = " ".join(found_campo.group(1).split()) if found_campo else None
+
+                score = None
+                score_m = RE_RESULTADO_SPAN.search(part)
+                if score_m:
+                    score = (int(score_m.group(1)), int(score_m.group(2)))
+
+                iso = None
+                if fecha:
+                    try:
+                        dt = datetime.strptime(f"{fecha} {hora}", "%d-%m-%Y %H:%M")
+                        iso = dt.strftime("%Y-%m-%dT%H:%M:%S")
+                    except ValueError:
+                        iso = None
+
+                out.append({
+                    "jornada": jornada,
+                    "date": iso,
+                    "venue": venue,
+                    "home_code": e1,
+                    "home_name": part_names.get(e1, names.get(e1, e1)),
+                    "away_code": e2,
+                    "away_name": part_names.get(e2, names.get(e2, e2)),
+                    "we_play": our_code in (e1, e2),
+                    "we_are_home": (e1 == our_code) if our_code in (e1, e2) else None,
+                    "home_goals": score[0] if score else None,
+                    "away_goals": score[1] if score else None,
+                })
+            if out:
+                out_all_codes = sorted(names.keys())
+                for m in out:
+                    m["all_codes"] = out_all_codes
+                return out
 
     comps: list[tuple[str, str, int]] = []
     seen_pairs: set[tuple[str, str]] = set()
-    for m in RE_COMP.finditer(html):
+    for m in RE_COMP.finditer(table_html):
         key = (m.group(1), m.group(2))
         if key not in seen_pairs:
             seen_pairs.add(key)
             comps.append((key[0], key[1], m.start()))
 
-    out: list[dict] = []
+    out = []
     for i, (e1, e2, p) in enumerate(comps):
         lo = comps[i - 1][2] if i > 0 else 0
-        hi = comps[i + 1][2] if i < len(comps) - 1 else len(html)
+        hi = comps[i + 1][2] if i < len(comps) - 1 else len(table_html)
         found_date = nearest(dates, p, lo, hi)
         found_time = nearest(times, p, lo, hi)
         found_campo = nearest(campos, p, lo, hi)
         fecha = found_date[0] if found_date else fallback
         hora = found_time[0] if found_time else "00:00"
         venue = found_campo[0] if found_campo else None
-        # Goles: se buscan solo si el bloque los trae (jornadas jugadas).
-        # Se quitan fechas/horas primero para no confundir "27-09" con un 27-9.
         score = None
-        seg = html[lo:hi]
-        seg = re.sub(r"<select.*?</select>", " ", seg, flags=re.S | re.I)
-        seg = re.sub(r"<[^>]+>", " ", seg)
-        seg = re.sub(r"\d{2}-\d{2}-\d{4}", " ", seg)
-        seg = re.sub(r"\d{2}:\d{2}", " ", seg)
-        m = RE_SCORE.search(seg)
-        if m:
-            score = (int(m.group(1)), int(m.group(2)))
+        score_hi = min(p + 200, hi)
+        score_seg = table_html[lo:score_hi]
+        span_m = RE_RESULTADO_SPAN.search(score_seg)
+        if span_m:
+            score = (int(span_m.group(1)), int(span_m.group(2)))
+        elif "resultado_" not in score_seg:
+            seg = re.sub(r"<select.*?</select>", " ", score_seg, flags=re.S | re.I)
+            seg = re.sub(r"<[^>]+>", " ", seg)
+            seg = re.sub(r"\d{2}-\d{2}-\d{4}", " ", seg)
+            seg = re.sub(r"\d{2}:\d{2}", " ", seg)
+            m = RE_SCORE.search(seg)
+            if m:
+                score = (int(m.group(1)), int(m.group(2)))
         iso = None
         if fecha:
             try:
@@ -229,6 +304,8 @@ def sync_match(api: str, token: str, competition_id: int, m: dict, dry_run: bool
                       if e.get("jornada") in (None, 0)
                       and norm(e.get("rival", "")) == norm(rival)
                       and (e.get("date") or "")[:10] == want_day), None)
+    if match and match.get("manual"):
+        return "manual (ignorado)"
     # Base: lo que ya hay (para no pisar sede/hora puestas a mano)
     base_date = match.get("date") if match else None
     base_loc = match.get("location") if match else None
@@ -250,6 +327,7 @@ def sync_match(api: str, token: str, competition_id: int, m: dict, dry_run: bool
         "rivalGoals": rival_goals if finished else (match.get("rivalGoals") if match else 0),
         "jornada": m["jornada"],
         "competitionId": competition_id,
+        "manual": False,
     }
     if match:
         changed = any(match.get(k) != v for k, v in payload.items() if k != "competitionId")
