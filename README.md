@@ -11,7 +11,7 @@
   [![Coverage](https://img.shields.io/badge/tests-64%2F64%20passed-success.svg?style=for-the-badge)](api-backend/src/test)
   [![License](https://img.shields.io/badge/license-All%20Rights%20Reserved-red.svg?style=for-the-badge)](#-licencia-y-derechos-de-autor)
 
-  [🌐 Ver Web en Producción](https://reallisiados.duckdns.org/) • [📋 Ver Changelog](CHANGELOG.md) • [🚀 Próximas Mejoras](PROXIMAS_MEJORAS.md) • [📖 Documentación TDD](DOCUMENTACION.md)
+  [🌐 Ver Web en Producción](https://reallisiados.duckdns.org/) • [📋 Ver Changelog](CHANGELOG.md) • [🚀 Próximas Mejoras](PROXIMAS_MEJORAS.md)
 
 </div>
 
@@ -157,8 +157,7 @@ RELI-WebApp/
 ├── nas-deploy/                # Manifiestos de despliegue para Synology NAS DSM
 ├── .github/workflows/         # Pipelines de CI (Test/Lint) y CD (Build/Deploy a GHCR)
 ├── CHANGELOG.md               # Registro histórico de versiones
-├── PROXIMAS_MEJORAS.md        # Backlog técnico priorizado
-└── DOCUMENTACION.md           # Documento de diseño técnico y flujo de trabajo
+└── PROXIMAS_MEJORAS.md        # Backlog técnico priorizado
 ```
 
 ---
