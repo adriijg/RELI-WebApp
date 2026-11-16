@@ -19,7 +19,6 @@ import lombok.NoArgsConstructor;
 
 @Data
 @NoArgsConstructor
-@AllArgsConstructor
 @Entity
 @Table(name = "matches", indexes = {
         @Index(name = "idx_match_date_status", columnList = "date, status"),
@@ -60,14 +59,43 @@ public class Match extends BaseEntity {
     @Column(name = "group_name", length = 60)
     private String groupName;
 
+    @Column(nullable = false)
+    private boolean manual = false;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "competition_id", nullable = false)
     private Competition competition;
 
     public Match(Long id, String rival, boolean home, LocalDateTime date, String location, MatchStatus status,
                  Integer ourGoals, Integer rivalGoals, Integer jornada, LocalDateTime scheduleNotifiedAt,
+                 MatchPhase phase, String groupName, boolean manual, Competition competition) {
+        this.id = id;
+        this.rival = rival;
+        this.home = home;
+        this.date = date;
+        this.location = location;
+        this.status = status != null ? status : MatchStatus.SCHEDULED;
+        this.ourGoals = ourGoals;
+        this.rivalGoals = rivalGoals;
+        this.jornada = jornada;
+        this.scheduleNotifiedAt = scheduleNotifiedAt;
+        this.phase = phase;
+        this.groupName = groupName;
+        this.manual = manual;
+        this.competition = competition;
+    }
+
+    public Match(Long id, String rival, boolean home, LocalDateTime date, String location, MatchStatus status,
+                 Integer ourGoals, Integer rivalGoals, Integer jornada, LocalDateTime scheduleNotifiedAt,
                  Competition competition) {
         this(id, rival, home, date, location, status, ourGoals, rivalGoals, jornada, scheduleNotifiedAt,
-                null, null, competition);
+                null, null, false, competition);
+    }
+
+    public Match(Long id, String rival, boolean home, LocalDateTime date, String location, MatchStatus status,
+                 Integer ourGoals, Integer rivalGoals, Integer jornada, LocalDateTime scheduleNotifiedAt,
+                 MatchPhase phase, String groupName, Competition competition) {
+        this(id, rival, home, date, location, status, ourGoals, rivalGoals, jornada, scheduleNotifiedAt,
+                phase, groupName, false, competition);
     }
 }

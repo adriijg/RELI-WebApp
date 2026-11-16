@@ -253,30 +253,42 @@ def main() -> int:
             print(f"CodActa descubierto: {codacta}")
         acta = acta_mod.parse_acta(acta_mod.fetch_acta(session, codacta), codacta)
 
-    # Procesar ambos equipos (local y visitante)
-    sides = []
-    for side_name, side_data, flag in [
-        ("local", acta["local"], "local"),
-        ("visitante", acta["visitante"], "visitante"),
-    ]:
-        if side_data is None:
-            continue
-        sides.append((side_name, side_data, flag))
+    if match is None and args.competition_id:
+        our_name = "REAL LISIADOS"
+        match = find_match(args.api, token, args.competition_id, acta, {"nombre": our_name})
 
-    if not sides:
-        print(f"El acta {acta.get('codacta')} no tiene datos de equipos.", file=sys.stderr)
+    # Determinar UNICAMENTE nuestro equipo (REAL LISIADOS); el rival se ignora siempre
+    local_side = acta.get("local")
+    away_side = acta.get("visitante")
+    local_name = norm(local_side.get("nombre", "") if local_side else "")
+    away_name = norm(away_side.get("nombre", "") if away_side else "")
+
+    is_home = match.get("home") if match else None
+    if "LISIADOS" in local_name or (is_home is True and "LISIADOS" not in away_name):
+        our_side_name, our_side_data, our_flag = "local", local_side, "local"
+    elif "LISIADOS" in away_name or (is_home is False and "LISIADOS" not in local_name):
+        our_side_name, our_side_data, our_flag = "visitante", away_side, "visitante"
+    elif is_home is not None:
+        our_side_name = "local" if is_home else "visitante"
+        our_side_data = local_side if is_home else away_side
+        our_flag = our_side_name
+    else:
+        our_side_name = "local" if "LISIADOS" in local_name else "visitante"
+        our_side_data = local_side if "LISIADOS" in local_name else away_side
+        our_flag = our_side_name
+
+    if our_side_data is None:
+        print(f"El acta {acta.get('codacta')} no contiene los datos del equipo.", file=sys.stderr)
         return 2
 
-    acta["our_side_name"] = sides[0][1]["nombre"]
+    sides = [(our_side_name, our_side_data, our_flag)]
+    acta["our_side_name"] = our_side_data.get("nombre")
 
     if match is None:
         if not args.competition_id:
             print("--competition-id es obligatorio sin --match-id", file=sys.stderr)
             return 2
-        our_name = next(
-            (sd["nombre"] for _, sd, _ in sides if "LISIADOS" in norm(sd.get("nombre", ""))),
-            sides[0][1]["nombre"])
-        match = find_match(args.api, token, args.competition_id, acta, {"nombre": our_name})
+        match = find_match(args.api, token, args.competition_id, acta, {"nombre": our_side_data.get("nombre")})
         if match is None:
             print("No hay partido en la BD para esa jornada/rival.", file=sys.stderr)
             return 2
@@ -308,15 +320,19 @@ def main() -> int:
 
         side_goals = [g for g in acta["goles"] if g.get("equipo") == flag]
         for g in side_goals:
+            g_norm = norm(g.get("jugador"))
             for conv in side_data["titulares"] + side_data["suplentes"]:
-                if norm(conv["nombre"]) == norm(g["jugador"]):
+                c_norm = norm(conv.get("nombre"))
+                if c_norm == g_norm or (g_norm and (g_norm in c_norm or c_norm in g_norm)):
                     per_player[conv["dorsal"]]["goals"].append(g["minuto"])
                     break
 
         side_cards = [t for t in acta["tarjetas"] if t.get("equipo") == flag]
         for t in side_cards:
+            t_norm = norm(t.get("jugador"))
             for conv in side_data["titulares"] + side_data["suplentes"]:
-                if norm(conv["nombre"]) == norm(t["jugador"]):
+                c_norm = norm(conv.get("nombre"))
+                if c_norm == t_norm or (t_norm and (t_norm in c_norm or c_norm in t_norm)):
                     entry = per_player[conv["dorsal"]]
                     if t["tipo"] == "AMARILLA":
                         entry["yellow"] += 1
@@ -355,17 +371,19 @@ def main() -> int:
             if player is None:
                 continue
             pid = player["id"]
-            payload = {"playerId": pid, "matchId": match_id,
-                       "goals": len(agg["goals"]), "assists": 0,
-                       "yellowCards": agg["yellow"], "redCards": agg["red"],
-                       "mvp": False, "attended": True}
             existing = stat_by_player.get(pid)
+            assists_val = existing.get("assists", 0) if existing else 0
+            mvp_val = existing.get("mvp", False) if existing else False
+            payload = {"playerId": pid, "matchId": match_id,
+                       "goals": len(agg["goals"]), "assists": assists_val,
+                       "yellowCards": agg["yellow"], "redCards": agg["red"],
+                       "mvp": mvp_val, "attended": True}
             if existing is None:
                 requests.post(f"{args.api}/stats", json=payload,
                               headers=headers, timeout=30).raise_for_status()
                 total_created["stats"] += 1
             elif any(existing.get(k) != v for k, v in payload.items()
-                     if k not in ("playerId", "matchId")):
+                     if k not in ("playerId", "matchId", "id", "playerName", "rival")):
                 requests.put(f"{args.api}/stats/{existing['id']}", json=payload,
                              headers=headers, timeout=30).raise_for_status()
                 total_created["stats_updated"] += 1

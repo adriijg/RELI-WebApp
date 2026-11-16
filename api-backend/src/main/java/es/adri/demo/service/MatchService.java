@@ -183,6 +183,13 @@ public class MatchService {
         match.setJornada(matchRequestDTO.getJornada());
         match.setPhase(matchRequestDTO.getPhase());
         match.setGroupName(trimToNull(matchRequestDTO.getGroupName()));
+        if (matchRequestDTO.getManual() != null) {
+            match.setManual(matchRequestDTO.getManual());
+        } else if (match.getId() == null) {
+            match.setManual(true);
+        } else {
+            match.setManual(true);
+        }
         match.setCompetition(getCompetitionById(matchRequestDTO.getCompetitionId()));
     }
 
@@ -200,7 +207,8 @@ public class MatchService {
                 match.getCompetition().getId(),
                 match.getCompetition().getName(),
                 match.getPhase(),
-                match.getGroupName()
+                match.getGroupName(),
+                match.isManual()
         );
     }
 

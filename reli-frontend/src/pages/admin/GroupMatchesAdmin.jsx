@@ -40,6 +40,16 @@ const columns = [
       </Badge>
     ),
   },
+  {
+    key: 'manual',
+    label: 'Tipo',
+    className: 'w-24',
+    render: (value) => (
+      value
+        ? <Badge variant="yellow">Manual</Badge>
+        : <Badge variant="outline">FFM</Badge>
+    ),
+  },
 ];
 
 const fields = [
@@ -67,6 +77,13 @@ const fields = [
   },
   { name: 'homeGoals', label: 'Goles local', type: 'number', min: 0 },
   { name: 'awayGoals', label: 'Goles visitante', type: 'number', min: 0 },
+  {
+    name: 'manual',
+    label: 'Protección contra sobreescritura',
+    checkboxLabel: 'Partido manual (no sobreescribir con sincronización federativa)',
+    type: 'checkbox',
+    default: true,
+  },
 ];
 
 export default function GroupMatchesAdmin() {
@@ -145,7 +162,7 @@ export default function GroupMatchesAdmin() {
   }, [load]);
 
   const openCreate = () => {
-    setEditing(null);
+    setEditing({ manual: true });
     setModalOpen(true);
   };
 
@@ -157,6 +174,7 @@ export default function GroupMatchesAdmin() {
       groupName: row.groupName || '',
       date: datePart,
       time: timePart ? timePart.slice(0, 5) : '',
+      manual: row.manual !== undefined ? Boolean(row.manual) : true,
     });
     setModalOpen(true);
   };
@@ -175,6 +193,7 @@ export default function GroupMatchesAdmin() {
       status: values.status,
       homeGoals: values.homeGoals,
       awayGoals: values.awayGoals,
+      manual: values.manual !== undefined ? Boolean(values.manual) : true,
     };
     if (editing?.id) await updateNeutralMatch(editing.id, payload);
     else await saveNeutralMatch(payload);

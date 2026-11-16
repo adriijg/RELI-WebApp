@@ -74,16 +74,27 @@ public class AdminEmailController {
     @PostMapping("/test")
     public ResponseEntity<String> sendTest(@Valid @RequestBody EmailTestRequestDTO request) {
         checkEnabled();
-        emailService.send(request.getTo(), "Correo de prueba RELI", templateService.testMail());
-        return ResponseEntity.ok("Correo de prueba enviado a " + request.getTo());
+        try {
+            emailService.send(request.getTo(), "Correo de prueba RELI", templateService.testMail());
+            return ResponseEntity.ok("Correo de prueba enviado a " + request.getTo());
+        } catch (Exception e) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
+                    "Error al enviar correo de prueba: " + e.getMessage(), e);
+        }
     }
 
     @PostMapping("/next-match-test")
     public ResponseEntity<String> sendNextMatchTest(
             @RequestParam Long competitionId,
             @Valid @RequestBody EmailTestRequestDTO request) {
-        matchNotificationService.sendNextMatchPreview(competitionId, request.getTo());
-        return ResponseEntity.ok("Aviso de prueba del próximo partido enviado a " + request.getTo());
+        checkEnabled();
+        try {
+            matchNotificationService.sendNextMatchPreview(competitionId, request.getTo());
+            return ResponseEntity.ok("Aviso de prueba del próximo partido enviado a " + request.getTo());
+        } catch (Exception e) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
+                    "Error al enviar aviso de próximo partido: " + e.getMessage(), e);
+        }
     }
 
     /**
