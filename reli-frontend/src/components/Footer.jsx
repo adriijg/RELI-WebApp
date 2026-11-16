@@ -12,6 +12,7 @@ const CLUB_LINKS = [
     { label: 'Primer equipo', to: '/jugadores' },
     { label: 'Quinteto ideal', to: '/quinteto' },
     { label: 'Noticias', to: '/noticias' },
+    { label: 'Creador de equipaciones', to: '/equipaciones' },
 ];
 
 const COMPETITION_LINKS = [

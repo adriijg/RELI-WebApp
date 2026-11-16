@@ -5,145 +5,338 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { svgToImage, supportsWebGL } from '../../utils/kit';
 
-const SHIRT_SCALE = 0.01;
-const SHIRT_CENTER = { x: 200, y: 250 };
-const SHIRT_VIEW = { width: 400, height: 520 };
-const SHIRT_DEPTH = 0.18;
-const SHIRT_BEVEL = 0.026;
-const SHIRT_FRONT_Z = SHIRT_DEPTH / 2 + SHIRT_BEVEL;
-const SHIRT_DECAL_Z = SHIRT_FRONT_Z + 0.004;
-const SHIRT_HALF = (SHIRT_VIEW.width / 2) * SHIRT_SCALE;
+const CAMERA_PRESETS = [
+  { id: 'hero', label: '3/4 Estudio', position: [2.6, 0.85, 5.4], target: [0, 0.55, 0] },
+  { id: 'front', label: 'Frontal', position: [0, 0.75, 5.6], target: [0, 0.6, 0] },
+  { id: 'back', label: 'Espalda', position: [0, 0.75, -5.6], target: [0, 0.6, 0] },
+  { id: 'closeup', label: 'Detalle Pecho', position: [0.4, 1.05, 3.2], target: [0, 0.9, 0] },
+  { id: 'full', label: 'Cuerpo Entero', position: [2.8, -0.35, 8.8], target: [0, -0.65, 0] },
+];
 
-const SHORTS_SCALE = 0.011;
-const SHORTS_CENTER = { x: 150, y: 110 };
-const SHORTS_VIEW = { width: 300, height: 220 };
-const SHORTS_DEPTH = 0.16;
-const SHORTS_BEVEL = 0.022;
-const SHORTS_FRONT_Z = SHORTS_DEPTH / 2 + SHORTS_BEVEL;
-const SHORTS_DECAL_Z = SHORTS_FRONT_Z + 0.004;
-const SHORTS_HALF = (SHORTS_VIEW.width / 2) * SHORTS_SCALE;
+const DISPLAY_MODES = [
+  { id: 'shirt', label: 'Camiseta' },
+  { id: 'kit', label: 'Uniforme Completo' },
+];
 
-function shirtPoint(x, y) {
-  return [(x - SHIRT_CENTER.x) * SHIRT_SCALE, (SHIRT_CENTER.y - y) * SHIRT_SCALE];
-}
+/**
+ * Generates an anatomical 3D torso half-shell (front or back) with natural pectoral/lat contours,
+ * waist taper, sloped shoulders, curved neck opening, and cloth drape folds.
+ * UVs map directly to the torso region of ShirtSvg (400x520).
+ */
+function createTorsoHalfGeometry(isFront = true) {
+  const vSegments = 72;
+  const uSegments = 64;
+  const geometry = new THREE.BufferGeometry();
 
-function shortsPoint(x, y) {
-  return [(x - SHORTS_CENTER.x) * SHORTS_SCALE, (SHORTS_CENTER.y - y) * SHORTS_SCALE];
-}
+  const positions = [];
+  const uvs = [];
+  const indices = [];
 
-function shirtBulge(x, y) {
-  const nx = THREE.MathUtils.clamp(x / SHIRT_HALF, -1, 1);
-  const edge = Math.pow(Math.cos((nx * Math.PI) / 2), 1.6);
-  const chest = 0.055 * Math.exp(-Math.pow((y - 0.25) / 0.7, 2));
-  const waist = -0.015 * Math.exp(-Math.pow((y + 0.55) / 0.5, 2));
-  return (0.16 + chest + waist) * edge;
-}
+  const zSign = isFront ? 1 : -1;
 
-function shortsBulge(x) {
-  const nx = THREE.MathUtils.clamp(x / SHORTS_HALF, -1, 1);
-  return 0.075 * Math.pow(Math.cos((nx * Math.PI) / 2), 1.5);
-}
+  for (let iv = 0; iv <= vSegments; iv += 1) {
+    const v = iv / vSegments; // 0 = bottom hem, 1 = top shoulder/collar
+    const yBase = -1.42 + v * 2.84;
 
-function createShirtShape() {
-  const shape = new THREE.Shape();
-  let point = shirtPoint(132, 84);
-  shape.moveTo(point[0], point[1]);
-  shape.bezierCurveTo(...shirtPoint(132, 84), ...shirtPoint(156, 68), ...shirtPoint(200, 68));
-  shape.bezierCurveTo(...shirtPoint(244, 68), ...shirtPoint(268, 84), ...shirtPoint(268, 84));
-  point = shirtPoint(322, 102);
-  shape.lineTo(point[0], point[1]);
-  point = shirtPoint(372, 176);
-  shape.lineTo(point[0], point[1]);
-  point = shirtPoint(330, 206);
-  shape.lineTo(point[0], point[1]);
-  point = shirtPoint(300, 166);
-  shape.lineTo(point[0], point[1]);
-  point = shirtPoint(300, 462);
-  shape.lineTo(point[0], point[1]);
-  shape.bezierCurveTo(...shirtPoint(300, 480), ...shirtPoint(278, 492), ...shirtPoint(200, 492));
-  shape.bezierCurveTo(...shirtPoint(122, 492), ...shirtPoint(100, 480), ...shirtPoint(100, 462));
-  point = shirtPoint(100, 166);
-  shape.lineTo(point[0], point[1]);
-  point = shirtPoint(70, 206);
-  shape.lineTo(point[0], point[1]);
-  point = shirtPoint(28, 176);
-  shape.lineTo(point[0], point[1]);
-  point = shirtPoint(78, 102);
-  shape.lineTo(point[0], point[1]);
-  shape.closePath();
-  return shape;
-}
+    // Anatomical width profile (hip flare -> waist taper -> broad chest/lats -> shoulder slope)
+    const hipWidth = 0.98 * (1 - v);
+    const waistDip = -0.11 * Math.exp(-Math.pow((v - 0.34) / 0.22, 2));
+    const chestBulge = 0.16 * Math.exp(-Math.pow((v - 0.72) / 0.24, 2));
+    let rx = 0.98 + waistDip + chestBulge + hipWidth * 0.04;
 
-function createShortsShape() {
-  const shape = new THREE.Shape();
-  const points = [
-    [70, 20], [230, 20], [238, 80], [205, 80], [198, 200],
-    [158, 200], [150, 112], [142, 200], [102, 200], [95, 80], [62, 80],
-  ];
-  points.forEach(([x, y], index) => {
-    const point = shortsPoint(x, y);
-    if (index === 0) shape.moveTo(point[0], point[1]);
-    else shape.lineTo(point[0], point[1]);
-  });
-  shape.closePath();
-  return shape;
-}
+    // Above v = 0.80, shoulders slope inward toward the neck opening
+    if (v > 0.8) {
+      const tShoulder = (v - 0.8) / 0.2;
+      const smoothS = tShoulder * tShoulder * (3 - 2 * tShoulder);
+      rx = THREE.MathUtils.lerp(rx, 0.44, smoothS);
+    }
 
-function createShellGeometry(shape, depth, bevel, bulgeFn) {
-  const geometry = new THREE.ExtrudeGeometry(shape, {
-    depth,
-    bevelEnabled: true,
-    bevelThickness: bevel,
-    bevelSize: bevel,
-    bevelSegments: 3,
-    curveSegments: 32,
-  });
-  geometry.translate(0, 0, -depth / 2);
-  geometry.computeVertexNormals();
-  const position = geometry.attributes.position;
-  const normal = geometry.attributes.normal;
+    // Anatomical depth profile (chest fullness in front, shoulder blades in back)
+    let rz = 0.52 + 0.14 * Math.exp(-Math.pow((v - 0.68) / 0.28, 2));
+    if (v > 0.82) {
+      const tNeck = (v - 0.82) / 0.18;
+      rz = THREE.MathUtils.lerp(rz, 0.31, tNeck * tNeck);
+    }
 
-  for (let index = 0; index < position.count; index += 1) {
-    const z = position.getZ(index);
-    const nz = normal.getZ(index);
-    const bulge = bulgeFn(position.getX(index), position.getY(index));
-    position.setZ(index, z + nz * bulge);
+    for (let iu = 0; iu <= uSegments; iu += 1) {
+      // s goes from -1 (left seam) to +1 (right seam)
+      const uNorm = iu / uSegments;
+      const s = uNorm * 2 - 1;
+      const angle = s * (Math.PI / 2); // -pi/2 to +pi/2
+
+      const sinA = Math.sin(angle);
+      const cosA = Math.cos(angle);
+
+      // Super-ellipse blend for realistic athletic torso cross-section
+      const x = rx * Math.sign(sinA) * Math.pow(Math.abs(sinA), 0.92);
+      let z = rz * Math.pow(Math.max(0, cosA), 0.88);
+
+      // Pectoral definition on front chest
+      if (isFront) {
+        const pecHeight = Math.exp(-Math.pow((v - 0.66) / 0.14, 2));
+        const pecSide = Math.exp(-Math.pow((Math.abs(s) - 0.36) / 0.26, 2));
+        const sternumValley = -0.022 * Math.exp(-Math.pow(s / 0.12, 2)) * pecHeight;
+        z += (0.045 * pecHeight * pecSide + sternumValley) * cosA;
+      } else {
+        // Upper back trapezius & lat contour, with spine groove
+        const backHeight = Math.exp(-Math.pow((v - 0.68) / 0.18, 2));
+        const spineValley = -0.018 * Math.exp(-Math.pow(s / 0.14, 2)) * backHeight;
+        z += (0.032 * backHeight + spineValley) * cosA;
+      }
+
+      // Natural cloth drape folds (vertical hem ripples + diagonal waist tension creases)
+      const hemFade = Math.exp(-Math.pow(v / 0.35, 2));
+      const hemWave = 0.014 * Math.sin(s * Math.PI * 3.5) * hemFade * cosA;
+      const waistFold =
+        0.01 *
+        Math.sin((v * 14 + Math.abs(s) * 6)) *
+        Math.exp(-Math.pow((v - 0.42) / 0.25, 2)) *
+        cosA;
+
+      z = (z + hemWave + waistFold) * zSign;
+
+      // Neckline dip at the top center (front dips lower than back)
+      let y = yBase;
+      const centerWeight = Math.pow(Math.max(0, 1 - Math.pow(s / 0.65, 2)), 1.4);
+      if (v > 0.72) {
+        const neckFactor = (v - 0.72) / 0.28;
+        const dipDepth = isFront ? 0.29 : 0.09;
+        y -= dipDepth * centerWeight * Math.pow(neckFactor, 1.7);
+      }
+
+      // Drop-tail curved bottom hem
+      if (v < 0.15) {
+        const hemFactor = 1 - v / 0.15;
+        y -= (isFront ? 0.06 : 0.09) * Math.cos(s * (Math.PI / 2)) * hemFactor;
+      }
+
+      positions.push(x, y, z);
+
+      // Map UVs cleanly to the ShirtSvg torso area:
+      // In ShirtSvg (400x520), torso x is [96..304] -> u in [0.24..0.76]
+      // y is [54..486] -> v_svg in [1 - 54/520 .. 1 - 486/520] = [0.896 .. 0.065]
+      const uvU = isFront ? 0.245 + uNorm * 0.51 : 0.755 - uNorm * 0.51;
+      const uvV = 0.07 + v * 0.825;
+      uvs.push(uvU, uvV);
+    }
   }
 
-  position.needsUpdate = true;
+  for (let iv = 0; iv < vSegments; iv += 1) {
+    for (let iu = 0; iu < uSegments; iu += 1) {
+      const a = iv * (uSegments + 1) + iu;
+      const b = a + 1;
+      const c = a + (uSegments + 1);
+      const d = c + 1;
+
+      if (isFront) {
+        indices.push(a, b, d);
+        indices.push(a, d, c);
+      } else {
+        indices.push(a, d, b);
+        indices.push(a, c, d);
+      }
+    }
+  }
+
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  geometry.setIndex(indices);
   geometry.computeVertexNormals();
   return geometry;
 }
 
-function createDecalGeometry(view, scale, bulgeFn, widthSegments, heightSegments) {
-  const geometry = new THREE.PlaneGeometry(
-    view.width * scale,
-    view.height * scale,
-    widthSegments,
-    heightSegments,
-  );
-  const position = geometry.attributes.position;
+/**
+ * Generates a realistic 3D cylindrical/tubular sleeve starting at the deltoid shoulder socket
+ * and angling downward at ~38 degrees with natural arm taper and cloth folds.
+ */
+function createSculptedSleeveGeometry(side = 'left') {
+  const isLeft = side === 'left';
+  const sign = isLeft ? -1 : 1;
+  const lengthSegments = 36;
+  const radialSegments = 48;
+  const geometry = new THREE.BufferGeometry();
 
-  for (let index = 0; index < position.count; index += 1) {
-    position.setZ(index, bulgeFn(position.getX(index), position.getY(index)));
+  const positions = [];
+  const uvs = [];
+  const indices = [];
+
+  for (let il = 0; il <= lengthSegments; il += 1) {
+    const t = il / lengthSegments; // 0 = shoulder socket, 1 = sleeve cuff
+
+    // Spine curve of the sleeve from shoulder socket to cuff
+    const cx = sign * (0.76 + t * 0.94);
+    const cy = 1.02 - t * 0.82 + 0.05 * Math.sin(t * Math.PI);
+    const cz = 0.03 * Math.sin(t * Math.PI);
+
+    // Taper radius from deltoid/armhole to bicep cuff
+    const rVert = THREE.MathUtils.lerp(0.41, 0.26, Math.pow(t, 0.85));
+    const rDepth = THREE.MathUtils.lerp(0.35, 0.25, Math.pow(t, 0.85));
+
+    // Sleeve axis tangent angle (~39 deg downward)
+    const tiltAngle = sign * 0.66;
+    const cosTilt = Math.cos(tiltAngle);
+    const sinTilt = Math.sin(tiltAngle);
+
+    for (let ir = 0; ir <= radialSegments; ir += 1) {
+      const u = ir / radialSegments;
+      const theta = u * Math.PI * 2;
+
+      // Local cross-section circle + subtle cloth crease
+      const fold = 0.008 * Math.sin(theta * 3 + t * 5) * Math.sin(t * Math.PI);
+      const localPerp = (rVert + fold) * Math.cos(theta);
+      const localZ = (rDepth + fold) * Math.sin(theta);
+
+      // Rotate perpendicular vector by sleeve tilt angle
+      const vx = cx - localPerp * sinTilt;
+      const vy = cy + localPerp * cosTilt;
+      const vz = cz + localZ;
+
+      positions.push(vx, vy, vz);
+      uvs.push(t, u);
+    }
   }
 
-  position.needsUpdate = true;
+  for (let il = 0; il < lengthSegments; il += 1) {
+    for (let ir = 0; ir < radialSegments; ir += 1) {
+      const a = il * (radialSegments + 1) + ir;
+      const b = a + 1;
+      const c = a + (radialSegments + 1);
+      const d = c + 1;
+
+      if (isLeft) {
+        indices.push(a, b, d);
+        indices.push(a, d, c);
+      } else {
+        indices.push(a, d, b);
+        indices.push(a, c, d);
+      }
+    }
+  }
+
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  geometry.setIndex(indices);
   geometry.computeVertexNormals();
   return geometry;
 }
 
-function createSurfaceTube(points, pointFn, bulgeFn, zBase, zSign, radius) {
-  const curvePoints = points.map(([x, y]) => {
-    const [worldX, worldY] = pointFn(x, y);
-    return new THREE.Vector3(
-      worldX,
-      worldY,
-      zSign * (zBase + bulgeFn(worldX, worldY) + 0.004),
-    );
-  });
-  const curve = new THREE.CatmullRomCurve3(curvePoints);
-  return new THREE.TubeGeometry(curve, Math.max(12, points.length * 6), radius, 8, false);
+/**
+ * Generates a 3D saddle-shaped collar ring that follows the exact anatomical neckline
+ * (higher on the back nape, dipping down on the front chest).
+ */
+function createCollarGeometry(collarType = 'round') {
+  const radialSegments = 72;
+  const heightSegments = 16;
+  const geometry = new THREE.BufferGeometry();
+
+  const positions = [];
+  const indices = [];
+
+  const isV = collarType === 'vneck' || collarType === 'overlap';
+  const isPolo = collarType === 'polo';
+
+  for (let ih = 0; ih <= heightSegments; ih += 1) {
+    const v = ih / heightSegments; // 0 = neck seam, 1 = top/outer edge of collar
+
+    for (let ir = 0; ir <= radialSegments; ir += 1) {
+      const u = ir / radialSegments;
+      const theta = u * Math.PI * 2; // 0 = right, pi/2 = front, pi = left, 3pi/2 = back
+
+      const frontWeight = Math.max(0, Math.sin(theta));
+      const vSharpness = isV ? Math.pow(frontWeight, 2.6) : Math.pow(frontWeight, 1.5);
+
+      let rx = 0.45;
+      let rz = 0.32;
+
+      if (isPolo) {
+        // Folded polo collar flares outward as v goes from 0.4 to 1
+        const foldFlare = v > 0.45 ? (v - 0.45) * 0.16 : v * 0.04;
+        rx += foldFlare;
+        rz += foldFlare;
+      } else {
+        rx += (1 - v) * 0.025;
+        rz += (1 - v) * 0.025;
+      }
+
+      const x = rx * Math.cos(theta);
+      let z = rz * Math.sin(theta);
+      if (isV && frontWeight > 0) {
+        z += 0.06 * Math.pow(frontWeight, 2);
+      }
+
+      const dipDepth = isV ? 0.31 : 0.25;
+      const baseNeckY = 1.41 - dipDepth * vSharpness - (frontWeight === 0 ? 0.04 * (1 - Math.abs(Math.sin(theta))) : 0);
+      const collarHeight = isPolo ? (v <= 0.5 ? v * 0.22 : 0.11 - (v - 0.5) * 0.18) : v * 0.11;
+      const y = baseNeckY + collarHeight;
+
+      positions.push(x, y, z);
+    }
+  }
+
+  for (let ih = 0; ih < heightSegments; ih += 1) {
+    for (let ir = 0; ir < radialSegments; ir += 1) {
+      const a = ih * (radialSegments + 1) + ir;
+      const b = a + 1;
+      const c = a + (radialSegments + 1);
+      const d = c + 1;
+      indices.push(a, d, b);
+      indices.push(a, c, d);
+    }
+  }
+
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+/**
+ * Generates realistic 3D tubular shorts leg geometry with cloth folds.
+ */
+function createShortsLegGeometry(side = 'left') {
+  const sign = side === 'left' ? -1 : 1;
+  const vSegments = 32;
+  const rSegments = 40;
+  const geometry = new THREE.BufferGeometry();
+  const positions = [];
+  const uvs = [];
+  const indices = [];
+
+  for (let iv = 0; iv <= vSegments; iv += 1) {
+    const v = iv / vSegments; // 0 = bottom leg opening, 1 = hip/waist
+    const y = -1.15 + v * 1.15;
+    const cx = sign * THREE.MathUtils.lerp(0.46, 0.34, Math.pow(v, 1.3));
+    const rx = THREE.MathUtils.lerp(0.43, 0.52, v);
+    const rz = THREE.MathUtils.lerp(0.41, 0.49, v);
+
+    for (let ir = 0; ir <= rSegments; ir += 1) {
+      const u = ir / rSegments;
+      const theta = u * Math.PI * 2;
+      const fold = 0.012 * Math.sin(theta * 5 + v * 4) * (1 - v * 0.5);
+      const x = cx + (rx + fold) * Math.cos(theta);
+      const z = (rz + fold) * Math.sin(theta);
+
+      positions.push(x, y, z);
+      uvs.push(u, v);
+    }
+  }
+
+  for (let iv = 0; iv < vSegments; iv += 1) {
+    for (let ir = 0; ir < rSegments; ir += 1) {
+      const a = iv * (rSegments + 1) + ir;
+      const b = a + 1;
+      const c = a + (rSegments + 1);
+      const d = c + 1;
+      indices.push(a, d, b);
+      indices.push(a, c, d);
+    }
+  }
+
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
 }
 
 function imageToTexture(image) {
@@ -164,7 +357,7 @@ function imageToTexture(image) {
   return texture;
 }
 
-function createFabricBumpTexture() {
+function createMicroFabricNormalTexture() {
   const size = 128;
   const canvas = document.createElement('canvas');
   canvas.width = size;
@@ -174,13 +367,14 @@ function createFabricBumpTexture() {
 
   for (let y = 0; y < size; y += 1) {
     for (let x = 0; x < size; x += 1) {
-      const index = (y * size + x) * 4;
-      const weave = ((x + y) % 4 < 2 ? 18 : 0) + ((x - y + size) % 6 < 3 ? 8 : 0);
-      const value = Math.min(255, 108 + weave + Math.random() * 16);
-      image.data[index] = value;
-      image.data[index + 1] = value;
-      image.data[index + 2] = value;
-      image.data[index + 3] = 255;
+      const idx = (y * size + x) * 4;
+      const knit = Math.sin((x / 2) * Math.PI) * Math.cos((y / 2) * Math.PI) * 18;
+      const pore = (x % 4 === 0 && y % 4 === 0) ? -22 : 0;
+      const val = THREE.MathUtils.clamp(128 + knit + pore, 0, 255);
+      image.data[idx] = val;
+      image.data[idx + 1] = val;
+      image.data[idx + 2] = val;
+      image.data[idx + 3] = 255;
     }
   }
 
@@ -188,7 +382,7 @@ function createFabricBumpTexture() {
   const texture = new THREE.CanvasTexture(canvas);
   texture.wrapS = THREE.RepeatWrapping;
   texture.wrapT = THREE.RepeatWrapping;
-  texture.repeat.set(7, 9);
+  texture.repeat.set(16, 20);
   texture.colorSpace = THREE.NoColorSpace;
   return texture;
 }
@@ -204,7 +398,7 @@ function StudioEnvironment() {
     const room = new RoomEnvironment();
     const texture = pmrem.fromScene(room, 0.04).texture;
     target.environment = texture;
-    target.environmentIntensity = 0.5;
+    target.environmentIntensity = 0.55;
     pmrem.dispose();
 
     return () => {
@@ -213,7 +407,7 @@ function StudioEnvironment() {
       room.traverse((child) => {
         child.geometry?.dispose();
         if (Array.isArray(child.material)) {
-          child.material.forEach((material) => material.dispose());
+          child.material.forEach((m) => m.dispose());
         } else {
           child.material?.dispose();
         }
@@ -224,23 +418,21 @@ function StudioEnvironment() {
   return null;
 }
 
-function Controls() {
+function CameraRig({ preset, autoRotate, displayMode }) {
   const { camera, gl } = useThree();
   const controlsRef = useRef(null);
 
   useEffect(() => {
     const controls = new OrbitControls(camera, gl.domElement);
     controls.enableDamping = true;
-    controls.dampingFactor = 0.08;
-    controls.enablePan = false;
-    controls.minDistance = 9;
-    controls.maxDistance = 20;
-    controls.minPolarAngle = Math.PI / 3.1;
-    controls.maxPolarAngle = Math.PI / 1.85;
-    controls.target.set(0, 0.45, 0);
-    controls.autoRotate = true;
-    controls.autoRotateSpeed = 0.6;
-    controls.update();
+    controls.dampingFactor = 0.07;
+    controls.enablePan = true;
+    controls.minDistance = 2.4;
+    controls.maxDistance = 14;
+    controls.minPolarAngle = Math.PI / 5;
+    controls.maxPolarAngle = Math.PI / 1.65;
+    controls.target.set(0, 0.55, 0);
+    controls.autoRotateSpeed = 0.85;
     controlsRef.current = controls;
 
     return () => {
@@ -248,6 +440,30 @@ function Controls() {
       controlsRef.current = null;
     };
   }, [camera, gl]);
+
+  useEffect(() => {
+    if (controlsRef.current) {
+      controlsRef.current.autoRotate = autoRotate;
+    }
+  }, [autoRotate]);
+
+  useEffect(() => {
+    const targetConfig = CAMERA_PRESETS.find((item) => item.id === preset) || CAMERA_PRESETS[0];
+    if (targetConfig && controlsRef.current) {
+      if (displayMode === 'kit' && preset !== 'closeup') {
+        camera.position.set(
+          targetConfig.position[0] * 1.15,
+          targetConfig.position[1] - 0.6,
+          targetConfig.position[2] * 1.45,
+        );
+        controlsRef.current.target.set(0, -0.45, 0);
+      } else {
+        camera.position.set(...targetConfig.position);
+        controlsRef.current.target.set(...targetConfig.target);
+      }
+      controlsRef.current.update();
+    }
+  }, [camera, preset, displayMode]);
 
   useFrame(() => {
     controlsRef.current?.update();
@@ -269,9 +485,16 @@ function Capture({ onReady, ready }) {
       canvas.width = source.width;
       canvas.height = source.height;
       const context = canvas.getContext('2d');
-      const gradient = context.createLinearGradient(0, 0, canvas.width, canvas.height);
-      gradient.addColorStop(0, '#111827');
-      gradient.addColorStop(1, '#020617');
+      const gradient = context.createRadialGradient(
+        canvas.width / 2,
+        canvas.height * 0.4,
+        50,
+        canvas.width / 2,
+        canvas.height * 0.5,
+        canvas.width * 0.8,
+      );
+      gradient.addColorStop(0, '#161F33');
+      gradient.addColorStop(1, '#050811');
       context.fillStyle = gradient;
       context.fillRect(0, 0, canvas.width, canvas.height);
       context.drawImage(source, 0, 0);
@@ -282,227 +505,200 @@ function Capture({ onReady, ready }) {
   return null;
 }
 
-function Collar({ design }) {
-  return (
-    <group position={[0, 1.83, 0]}>
-      <mesh position={[0, -0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <circleGeometry args={[0.24, 40]} />
-        <meshStandardMaterial color="#05070d" roughness={1} metalness={0} side={THREE.DoubleSide} />
-      </mesh>
-      <mesh position={[0, 0.015, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[0.22, 0.34, 48]} />
-        <meshStandardMaterial color={design.primary} roughness={0.92} metalness={0} side={THREE.DoubleSide} />
-      </mesh>
-      <mesh rotation={[Math.PI / 2, 0, 0]} castShadow>
-        <torusGeometry args={[0.34, 0.045, 14, 64]} />
-        <meshStandardMaterial color={design.accent} roughness={0.62} metalness={0.08} envMapIntensity={0.8} />
-      </mesh>
-    </group>
-  );
-}
+function SculptedShirt3D({ design, textures, fabricBump }) {
+  const frontGeo = useMemo(() => createTorsoHalfGeometry(true), []);
+  const backGeo = useMemo(() => createTorsoHalfGeometry(false), []);
+  const leftSleeveGeo = useMemo(() => createSculptedSleeveGeometry('left'), []);
+  const rightSleeveGeo = useMemo(() => createSculptedSleeveGeometry('right'), []);
+  const collarGeo = useMemo(() => createCollarGeometry(design.collar), [design.collar]);
 
-function ShirtModel({ design, textures, fabricBump }) {
-  const shape = useMemo(() => createShirtShape(), []);
-  const shellGeometry = useMemo(
-    () => createShellGeometry(shape, SHIRT_DEPTH, SHIRT_BEVEL, shirtBulge),
-    [shape],
-  );
-  const decalGeometry = useMemo(
-    () => createDecalGeometry(SHIRT_VIEW, SHIRT_SCALE, shirtBulge, 56, 72),
-    [],
-  );
-  const cuffsFront = useMemo(
-    () => [
-      createSurfaceTube([[330, 206], [351, 191], [372, 176]], shirtPoint, shirtBulge, SHIRT_FRONT_Z, 1, 0.022),
-      createSurfaceTube([[70, 206], [49, 191], [28, 176]], shirtPoint, shirtBulge, SHIRT_FRONT_Z, 1, 0.022),
-    ],
-    [],
-  );
-  const cuffsBack = useMemo(
-    () => [
-      createSurfaceTube([[330, 206], [351, 191], [372, 176]], shirtPoint, shirtBulge, SHIRT_FRONT_Z, -1, 0.022),
-      createSurfaceTube([[70, 206], [49, 191], [28, 176]], shirtPoint, shirtBulge, SHIRT_FRONT_Z, -1, 0.022),
-    ],
-    [],
-  );
-  const hemPoints = useMemo(
-    () => [[100, 462], [120, 480], [160, 490], [200, 492], [240, 490], [280, 480], [300, 462]],
-    [],
-  );
-  const hemFront = useMemo(
-    () => createSurfaceTube(hemPoints, shirtPoint, shirtBulge, SHIRT_FRONT_Z, 1, 0.012),
-    [hemPoints],
-  );
-  const hemBack = useMemo(
-    () => createSurfaceTube(hemPoints, shirtPoint, shirtBulge, SHIRT_FRONT_Z, -1, 0.012),
-    [hemPoints],
-  );
-  const shellColor = useMemo(
-    () => new THREE.Color(design.primary).multiplyScalar(0.68),
+  const sleeveBaseColor =
+    design.sleeveStyle === 'classic'
+      ? design.primary
+      : design.sleeveColor || design.panelColor || design.primary;
+
+  const innerColor = useMemo(
+    () => new THREE.Color(design.primary).multiplyScalar(0.32),
     [design.primary],
   );
 
   return (
-    <group>
-      <mesh geometry={shellGeometry} castShadow receiveShadow>
-        <meshStandardMaterial
-          color={shellColor}
-          roughness={0.95}
-          metalness={0}
-          bumpMap={fabricBump}
-          bumpScale={0.012}
-          envMapIntensity={0.35}
-        />
+    <group position={[0, 0.65, 0]}>
+      {/* Dark interior mannequin core / inner lining so neck & sleeve holes have realistic depth */}
+      <mesh position={[0, 0.05, 0]}>
+        <cylinderGeometry args={[0.42, 0.88, 2.55, 48, 1, false]} />
+        <meshStandardMaterial color={innerColor} roughness={0.98} side={THREE.BackSide} />
       </mesh>
-      <mesh geometry={decalGeometry} position={[0, 0, SHIRT_DECAL_Z]} receiveShadow>
-        <meshStandardMaterial
+
+      {/* Front Sculpted Torso */}
+      <mesh geometry={frontGeo} castShadow receiveShadow>
+        <meshPhysicalMaterial
           map={textures.shirtFront}
-          transparent
-          alphaTest={0.06}
-          roughness={0.92}
-          metalness={0}
+          roughness={0.78}
+          metalness={0.02}
+          sheen={0.35}
+          sheenRoughness={0.75}
+          sheenColor="#ffffff"
           bumpMap={fabricBump}
-          bumpScale={0.006}
-          envMapIntensity={0.25}
+          bumpScale={0.008}
+          side={THREE.DoubleSide}
         />
       </mesh>
-      <mesh geometry={decalGeometry} position={[0, 0, -SHIRT_DECAL_Z]} rotation={[0, Math.PI, 0]} receiveShadow>
-        <meshStandardMaterial
+
+      {/* Back Sculpted Torso */}
+      <mesh geometry={backGeo} castShadow receiveShadow>
+        <meshPhysicalMaterial
           map={textures.shirtBack}
-          transparent
-          alphaTest={0.06}
-          roughness={0.92}
-          metalness={0}
+          roughness={0.78}
+          metalness={0.02}
+          sheen={0.35}
+          sheenRoughness={0.75}
+          sheenColor="#ffffff"
           bumpMap={fabricBump}
-          bumpScale={0.006}
-          envMapIntensity={0.25}
+          bumpScale={0.008}
+          side={THREE.DoubleSide}
         />
       </mesh>
-      {cuffsFront.map((geometry, index) => (
-        <mesh key={`cuff-front-${index}`} geometry={geometry} castShadow>
-          <meshStandardMaterial color={design.accent} roughness={0.62} metalness={0.08} envMapIntensity={0.8} />
-        </mesh>
-      ))}
-      {cuffsBack.map((geometry, index) => (
-        <mesh key={`cuff-back-${index}`} geometry={geometry} castShadow>
-          <meshStandardMaterial color={design.accent} roughness={0.62} metalness={0.08} envMapIntensity={0.8} />
-        </mesh>
-      ))}
-      <mesh geometry={hemFront} castShadow>
-        <meshStandardMaterial color={design.secondary} roughness={0.75} metalness={0} envMapIntensity={0.4} />
+
+      {/* Left Tubular 3D Sleeve */}
+      <mesh geometry={leftSleeveGeo} castShadow receiveShadow>
+        <meshPhysicalMaterial
+          color={sleeveBaseColor}
+          roughness={0.8}
+          metalness={0.02}
+          sheen={0.3}
+          bumpMap={fabricBump}
+          bumpScale={0.009}
+          side={THREE.DoubleSide}
+        />
       </mesh>
-      <mesh geometry={hemBack} castShadow>
-        <meshStandardMaterial color={design.secondary} roughness={0.75} metalness={0} envMapIntensity={0.4} />
+
+      {/* Right Tubular 3D Sleeve */}
+      <mesh geometry={rightSleeveGeo} castShadow receiveShadow>
+        <meshPhysicalMaterial
+          color={sleeveBaseColor}
+          roughness={0.8}
+          metalness={0.02}
+          sheen={0.3}
+          bumpMap={fabricBump}
+          bumpScale={0.009}
+          side={THREE.DoubleSide}
+        />
       </mesh>
-      <Collar design={design} />
+
+      {/* Left & Right 3D Ribbed Cuffs */}
+      <mesh position={[-1.68, 0.21, 0.01]} rotation={[0, 0, -0.91]} castShadow>
+        <torusGeometry args={[0.26, 0.026, 16, 48]} />
+        <meshStandardMaterial color={design.accent} roughness={0.65} />
+      </mesh>
+      <mesh position={[1.68, 0.21, 0.01]} rotation={[0, 0, 0.91]} castShadow>
+        <torusGeometry args={[0.26, 0.026, 16, 48]} />
+        <meshStandardMaterial color={design.accent} roughness={0.65} />
+      </mesh>
+
+      {/* Optional Captain Armband on Left 3D Sleeve */}
+      {design.captainArmband && (
+        <mesh position={[-1.38, 0.48, 0.02]} rotation={[0, 0, -0.91]} castShadow>
+          <cylinderGeometry args={[0.315, 0.30, 0.22, 40, 1, true]} />
+          <meshStandardMaterial color={design.captainColor || '#FACC15'} roughness={0.5} side={THREE.DoubleSide} />
+        </mesh>
+      )}
+
+      {/* 3D Saddle Collar */}
+      <mesh geometry={collarGeo} castShadow receiveShadow>
+        <meshStandardMaterial
+          color={design.accent}
+          roughness={0.68}
+          metalness={0.04}
+          bumpMap={fabricBump}
+          bumpScale={0.005}
+          side={THREE.DoubleSide}
+        />
+      </mesh>
     </group>
   );
 }
 
-function ShortsModel({ design, textures, fabricBump }) {
-  const shape = useMemo(() => createShortsShape(), []);
-  const shellGeometry = useMemo(
-    () => createShellGeometry(shape, SHORTS_DEPTH, SHORTS_BEVEL, shortsBulge),
-    [shape],
-  );
-  const decalGeometry = useMemo(
-    () => createDecalGeometry(SHORTS_VIEW, SHORTS_SCALE, shortsBulge, 48, 36),
-    [],
-  );
-  const waistbandFront = useMemo(
-    () => createSurfaceTube([[70, 20], [150, 20], [230, 20]], shortsPoint, shortsBulge, SHORTS_FRONT_Z, 1, 0.018),
-    [],
-  );
-  const waistbandBack = useMemo(
-    () => createSurfaceTube([[70, 20], [150, 20], [230, 20]], shortsPoint, shortsBulge, SHORTS_FRONT_Z, -1, 0.018),
-    [],
-  );
-  const hemsFront = useMemo(
-    () => [
-      createSurfaceTube([[102, 200], [122, 200], [142, 200]], shortsPoint, shortsBulge, SHORTS_FRONT_Z, 1, 0.01),
-      createSurfaceTube([[158, 200], [178, 200], [198, 200]], shortsPoint, shortsBulge, SHORTS_FRONT_Z, 1, 0.01),
-    ],
-    [],
-  );
-  const hemsBack = useMemo(
-    () => [
-      createSurfaceTube([[102, 200], [122, 200], [142, 200]], shortsPoint, shortsBulge, SHORTS_FRONT_Z, -1, 0.01),
-      createSurfaceTube([[158, 200], [178, 200], [198, 200]], shortsPoint, shortsBulge, SHORTS_FRONT_Z, -1, 0.01),
-    ],
-    [],
-  );
-  const shellColor = useMemo(
-    () => new THREE.Color(design.shortsColor).multiplyScalar(0.68),
-    [design.shortsColor],
-  );
+function SculptedShortsAndSocks3D({ design, fabricBump }) {
+  const leftLegGeo = useMemo(() => createShortsLegGeometry('left'), []);
+  const rightLegGeo = useMemo(() => createShortsLegGeometry('right'), []);
 
   return (
-    <group>
-      <mesh geometry={shellGeometry} castShadow receiveShadow>
+    <group position={[0, -0.82, 0]}>
+      {/* Gathered elastic waistband */}
+      <mesh position={[0, 0.02, 0]} scale={[1, 1, 0.58]} castShadow>
+        <cylinderGeometry args={[0.92, 0.95, 0.2, 56]} />
         <meshStandardMaterial
-          color={shellColor}
-          roughness={0.95}
-          metalness={0}
+          color={design.shortsColor}
+          roughness={0.82}
           bumpMap={fabricBump}
-          bumpScale={0.012}
-          envMapIntensity={0.35}
+          bumpScale={0.01}
         />
       </mesh>
-      <mesh geometry={decalGeometry} position={[0, 0, SHORTS_DECAL_Z]} receiveShadow>
-        <meshStandardMaterial
-          map={textures.shortsFront}
-          transparent
-          alphaTest={0.06}
-          roughness={0.92}
-          metalness={0}
-          bumpMap={fabricBump}
-          bumpScale={0.006}
-          envMapIntensity={0.25}
-        />
-      </mesh>
-      <mesh geometry={decalGeometry} position={[0, 0, -SHORTS_DECAL_Z]} rotation={[0, Math.PI, 0]} receiveShadow>
-        <meshStandardMaterial
-          map={textures.shortsBack}
-          transparent
-          alphaTest={0.06}
-          roughness={0.92}
-          metalness={0}
-          bumpMap={fabricBump}
-          bumpScale={0.006}
-          envMapIntensity={0.25}
-        />
-      </mesh>
-      <mesh geometry={waistbandFront} castShadow>
-        <meshStandardMaterial color={design.accent} roughness={0.7} metalness={0.05} envMapIntensity={0.6} />
-      </mesh>
-      <mesh geometry={waistbandBack} castShadow>
-        <meshStandardMaterial color={design.accent} roughness={0.7} metalness={0.05} envMapIntensity={0.6} />
-      </mesh>
-      {hemsFront.map((geometry, index) => (
-        <mesh key={`hem-front-${index}`} geometry={geometry} castShadow>
-          <meshStandardMaterial color={design.secondary} roughness={0.78} metalness={0} envMapIntensity={0.4} />
-        </mesh>
-      ))}
-      {hemsBack.map((geometry, index) => (
-        <mesh key={`hem-back-${index}`} geometry={geometry} castShadow>
-          <meshStandardMaterial color={design.secondary} roughness={0.78} metalness={0} envMapIntensity={0.4} />
-        </mesh>
-      ))}
-    </group>
-  );
-}
 
-function Podium() {
-  return (
-    <group position={[0, -3.45, 0]}>
-      <mesh receiveShadow>
-        <cylinderGeometry args={[2.7, 2.85, 0.3, 72]} />
-        <meshStandardMaterial color="#0a1220" roughness={0.52} metalness={0.4} envMapIntensity={0.7} />
+      {/* Left & Right Tubular Shorts Legs */}
+      <mesh geometry={leftLegGeo} castShadow receiveShadow>
+        <meshPhysicalMaterial
+          color={design.shortsColor}
+          roughness={0.8}
+          sheen={0.28}
+          bumpMap={fabricBump}
+          bumpScale={0.009}
+          side={THREE.DoubleSide}
+        />
       </mesh>
-      <mesh position={[0, 0.155, 0]} rotation={[Math.PI / 2, 0, 0]}>
-        <torusGeometry args={[2.68, 0.018, 8, 96]} />
-        <meshStandardMaterial color="#C19A5B" roughness={0.32} metalness={0.85} envMapIntensity={1.1} />
+      <mesh geometry={rightLegGeo} castShadow receiveShadow>
+        <meshPhysicalMaterial
+          color={design.shortsColor}
+          roughness={0.8}
+          sheen={0.28}
+          bumpMap={fabricBump}
+          bumpScale={0.009}
+          side={THREE.DoubleSide}
+        />
       </mesh>
+
+      {/* Shorts Hem Accent Rings */}
+      <mesh position={[-0.46, -1.13, 0]} rotation={[Math.PI / 2, 0, 0]} scale={[1, 0.95, 1]}>
+        <torusGeometry args={[0.43, 0.018, 12, 48]} />
+        <meshStandardMaterial color={design.accent} roughness={0.65} />
+      </mesh>
+      <mesh position={[0.46, -1.13, 0]} rotation={[Math.PI / 2, 0, 0]} scale={[1, 0.95, 1]}>
+        <torusGeometry args={[0.43, 0.018, 12, 48]} />
+        <meshStandardMaterial color={design.accent} roughness={0.65} />
+      </mesh>
+
+      {/* Anatomical Calves & Socks */}
+      {[-0.46, 0.46].map((xPos, idx) => (
+        <group key={idx} position={[xPos, -1.25, 0]}>
+          {/* Top Sock Fold Cuff */}
+          <mesh position={[0, -0.12, 0]} castShadow>
+            <cylinderGeometry args={[0.22, 0.215, 0.24, 36]} />
+            <meshStandardMaterial color={design.socksStripeColor || design.secondary} roughness={0.85} />
+          </mesh>
+          {/* Accent Stripe */}
+          <mesh position={[0, -0.25, 0]} rotation={[Math.PI / 2, 0, 0]}>
+            <torusGeometry args={[0.214, 0.014, 12, 36]} />
+            <meshStandardMaterial color={design.accent} roughness={0.6} />
+          </mesh>
+          {/* Main Anatomical Calf Sock */}
+          <mesh position={[0, -0.82, 0]} castShadow receiveShadow>
+            <cylinderGeometry args={[0.21, 0.145, 1.15, 36]} />
+            <meshPhysicalMaterial
+              color={design.socksColor}
+              roughness={0.85}
+              sheen={0.25}
+              bumpMap={fabricBump}
+              bumpScale={0.008}
+            />
+          </mesh>
+          {/* Sleek Sculpted Foot Form (organic capsule, not a blocky box) */}
+          <mesh position={[0, -1.42, 0.12]} rotation={[Math.PI / 2.15, 0, 0]} castShadow>
+            <capsuleGeometry args={[0.135, 0.28, 16, 28]} />
+            <meshStandardMaterial color={design.socksColor} roughness={0.82} />
+          </mesh>
+        </group>
+      ))}
     </group>
   );
 }
@@ -519,8 +715,11 @@ export default function KitPreview3D({
 }) {
   const [textures, setTextures] = useState(null);
   const [textureError, setTextureError] = useState(false);
+  const [preset, setPreset] = useState('hero');
+  const [displayMode, setDisplayMode] = useState('shirt');
+  const [autoRotate, setAutoRotate] = useState(true);
   const texturesRef = useRef(null);
-  const fabricBump = useMemo(() => createFabricBumpTexture(), []);
+  const fabricBump = useMemo(() => createMicroFabricNormalTexture(), []);
   const webgl = useMemo(() => supportsWebGL(), []);
 
   useEffect(() => () => fabricBump.dispose(), [fabricBump]);
@@ -529,18 +728,16 @@ export default function KitPreview3D({
     let cancelled = false;
 
     const timer = window.setTimeout(async () => {
-      if (!shirtFrontRef.current || !shirtBackRef.current || !shortsFrontRef.current || !shortsBackRef.current) {
+      if (!shirtFrontRef.current || !shirtBackRef.current) {
         return;
       }
 
       setTextureError(false);
 
       try {
-        const [frontImage, backImage, shortsFrontImage, shortsBackImage] = await Promise.all([
-          svgToImage(shirtFrontRef.current, 900, 1170),
-          svgToImage(shirtBackRef.current, 900, 1170),
-          svgToImage(shortsFrontRef.current, 660, 484),
-          svgToImage(shortsBackRef.current, 660, 484),
+        const [frontImage, backImage] = await Promise.all([
+          svgToImage(shirtFrontRef.current, 1024, 1330),
+          svgToImage(shirtBackRef.current, 1024, 1330),
         ]);
 
         if (cancelled) return;
@@ -548,8 +745,6 @@ export default function KitPreview3D({
         const nextTextures = {
           shirtFront: imageToTexture(frontImage),
           shirtBack: imageToTexture(backImage),
-          shortsFront: imageToTexture(shortsFrontImage),
-          shortsBack: imageToTexture(shortsBackImage),
         };
 
         if (texturesRef.current) {
@@ -560,7 +755,7 @@ export default function KitPreview3D({
       } catch {
         if (!cancelled) setTextureError(true);
       }
-    }, 140);
+    }, 90);
 
     return () => {
       cancelled = true;
@@ -568,98 +763,143 @@ export default function KitPreview3D({
     };
   }, [crestDataUrl, design, shirtBackRef, shirtFrontRef, shortsBackRef, shortsFrontRef]);
 
-  useEffect(() => () => {
-    if (texturesRef.current) {
-      Object.values(texturesRef.current).forEach((texture) => texture.dispose());
-      texturesRef.current = null;
-    }
-  }, []);
+  useEffect(
+    () => () => {
+      if (texturesRef.current) {
+        Object.values(texturesRef.current).forEach((texture) => texture.dispose());
+        texturesRef.current = null;
+      }
+    },
+    [],
+  );
 
   if (!webgl) {
     return (
       <div className="flex h-full min-h-[420px] items-center justify-center rounded-2xl border border-dashed border-card-border bg-muted/5 p-6 text-center">
         <p className="max-w-sm text-sm font-bold text-muted-foreground">
-          Tu navegador no tiene WebGL activo. La vista 2D sigue disponible.
+          Tu navegador no tiene WebGL activo. La vista 2D fotorrealista sigue disponible.
         </p>
       </div>
     );
   }
 
   return (
-    <div className={`relative h-full min-h-[520px] overflow-hidden rounded-2xl bg-[radial-gradient(circle_at_50%_22%,rgba(226,29,44,0.16),transparent_58%),linear-gradient(145deg,rgba(15,23,42,0.96),rgba(2,6,23,0.99))] ${className}`}>
+    <div
+      className={`relative h-full min-h-[560px] overflow-hidden rounded-2xl bg-[radial-gradient(circle_at_50%_30%,rgba(30,41,59,0.85),rgba(5,8,17,0.98)_72%)] ${className}`}
+    >
+      {/* Subtle FIFA Kit Creator studio vignette & floor reflection */}
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_18%,rgba(217,25,41,0.12),transparent_55%)]" />
+
       <Canvas
         shadows
-        dpr={[1, 1.6]}
-        camera={{ position: [4.2, 1.3, 12.5], fov: 34, near: 0.1, far: 100 }}
+        dpr={[1, 1.75]}
+        camera={{ position: [2.6, 0.85, 5.4], fov: 32, near: 0.1, far: 100 }}
         gl={{ antialias: true, alpha: true, preserveDrawingBuffer: true, powerPreference: 'high-performance' }}
         onCreated={({ gl }) => {
           gl.toneMapping = THREE.ACESFilmicToneMapping;
-          gl.toneMappingExposure = 1.06;
+          gl.toneMappingExposure = 1.08;
           gl.shadowMap.type = THREE.PCFSoftShadowMap;
         }}
       >
         <StudioEnvironment />
-        <Controls />
-        <ambientLight intensity={0.32} />
+        <CameraRig preset={preset} autoRotate={autoRotate} displayMode={displayMode} />
+
+        {/* 3-Point Studio Garment Lighting */}
+        <ambientLight intensity={0.42} />
         <directionalLight
           castShadow
-          position={[4.5, 7.5, 6]}
-          intensity={2.6}
+          position={[4, 6, 5]}
+          intensity={2.4}
           shadow-mapSize-width={1536}
           shadow-mapSize-height={1536}
-          shadow-camera-near={1}
-          shadow-camera-far={30}
-          shadow-camera-left={-6}
-          shadow-camera-right={6}
-          shadow-camera-top={8}
-          shadow-camera-bottom={-6}
-          shadow-normalBias={0.03}
+          shadow-normalBias={0.02}
         />
-        <directionalLight position={[-5, 3, -4]} intensity={1.25} color="#C19A5B" />
-        <directionalLight position={[-4, 4, -7]} intensity={1.6} color="#BFDBFE" />
-        <pointLight position={[0, -2, 5]} intensity={0.55} color="#FFFFFF" />
-        <spotLight position={[0, 8, 1]} angle={0.55} penumbra={1} intensity={1.1} color="#FFFFFF" />
+        <directionalLight position={[-4.5, 3, -3.5]} intensity={1.35} color="#E2E8F0" />
+        <directionalLight position={[3.5, 2, -4.5]} intensity={1.1} color="#C9A259" />
+        <pointLight position={[0, -1.5, 3.5]} intensity={0.45} color="#FFFFFF" />
 
         {textures ? (
-          <>
-            <group position={[0, 2.2, 0]}>
-              <ShirtModel design={design} textures={textures} fabricBump={fabricBump} />
-            </group>
-            <group position={[0, -0.85, 0]}>
-              <ShortsModel design={design} textures={textures} fabricBump={fabricBump} />
-            </group>
-          </>
+          <group>
+            <SculptedShirt3D design={design} textures={textures} fabricBump={fabricBump} />
+            {displayMode === 'kit' && (
+              <SculptedShortsAndSocks3D design={design} fabricBump={fabricBump} />
+            )}
+          </group>
         ) : null}
-
-        <Podium />
-
-        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -3.29, 0]} receiveShadow>
-          <planeGeometry args={[7, 7]} />
-          <shadowMaterial transparent opacity={0.24} />
-        </mesh>
 
         <Capture onReady={onCaptureReady} ready={Boolean(textures)} />
       </Canvas>
 
+      {/* Top-Left Camera Angle Bar */}
+      <div className="absolute left-3 top-3 z-10 flex flex-wrap items-center gap-1 rounded-xl border border-white/10 bg-slate-950/80 p-1 backdrop-blur-md">
+        {CAMERA_PRESETS.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => setPreset(item.id)}
+            className={`rounded-lg px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.14em] transition ${
+              preset === item.id
+                ? 'bg-re-rojo text-white shadow-sm'
+                : 'text-white/65 hover:bg-white/10 hover:text-white'
+            }`}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Top-Right Display Mode (Shirt vs Full Kit) + Auto-Rotate */}
+      <div className="absolute right-3 top-3 z-10 flex flex-wrap items-center gap-1.5">
+        <div className="flex rounded-xl border border-white/10 bg-slate-950/80 p-1 backdrop-blur-md">
+          {DISPLAY_MODES.map((mode) => (
+            <button
+              key={mode.id}
+              type="button"
+              onClick={() => setDisplayMode(mode.id)}
+              className={`rounded-lg px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.14em] transition ${
+                displayMode === mode.id
+                  ? 'bg-white/15 text-white'
+                  : 'text-white/55 hover:text-white'
+              }`}
+            >
+              {mode.label}
+            </button>
+          ))}
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setAutoRotate((prev) => !prev)}
+          className={`flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.14em] backdrop-blur-md transition ${
+            autoRotate
+              ? 'border-emerald-500/30 bg-emerald-500/15 text-emerald-300'
+              : 'border-white/10 bg-slate-950/80 text-white/65 hover:text-white'
+          }`}
+        >
+          <span className={`h-1.5 w-1.5 rounded-full ${autoRotate ? 'animate-pulse bg-emerald-400' : 'bg-white/40'}`} />
+          {autoRotate ? 'Giro 360°' : 'Pausado'}
+        </button>
+      </div>
+
       {!textures && !textureError ? (
-        <div className="absolute inset-0 flex items-center justify-center bg-slate-950/20 backdrop-blur-[1px]">
-          <div className="flex items-center gap-3 rounded-full border border-white/10 bg-slate-950/70 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-white/80">
+        <div className="absolute inset-0 flex items-center justify-center bg-slate-950/30 backdrop-blur-[2px]">
+          <div className="flex items-center gap-3 rounded-full border border-white/10 bg-slate-950/80 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-white/85">
             <span className="h-4 w-4 animate-spin rounded-full border-2 border-re-dorado border-t-transparent" />
-            Preparando 3D
+            Renderizando tejido 3D...
           </div>
         </div>
       ) : null}
 
       {textureError ? (
-        <div className="absolute inset-0 flex items-center justify-center bg-slate-950/70 p-6 text-center">
+        <div className="absolute inset-0 flex items-center justify-center bg-slate-950/75 p-6 text-center">
           <p className="max-w-sm text-sm font-bold text-white/80">
-            No se pudo generar la textura 3D. Prueba a recargar o usa la vista 2D.
+            No se pudo generar la textura 3D. Cambia a la vista 2D o recarga la página.
           </p>
         </div>
       ) : null}
 
-      <div className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full border border-white/10 bg-black/30 px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.18em] text-white/60 backdrop-blur-sm">
-        Arrastra para girar
+      <div className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full border border-white/10 bg-black/45 px-3.5 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-white/55 backdrop-blur-sm">
+        Arrastra para rotar · Rueda para zoom · Clic derecho para desplazar
       </div>
     </div>
   );
