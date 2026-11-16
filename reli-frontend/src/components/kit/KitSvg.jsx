@@ -790,11 +790,25 @@ function FrontPrint({ design, crestDataUrl, id }) {
   const scale = clamp((design.sponsorScale || 100) / 100, 0.6, 1.5);
   const baseSponsorSize = fitTextSize(design.sponsor, 178, 30, 13);
   const sponsorSize = Math.round(baseSponsorSize * scale);
-  const sponsorY = clamp(design.sponsorY || 265, 210, 340);
+  const sponsorCenterY = clamp(design.sponsorY || 256, 210, 330);
+  const sponsorTextY = Math.round(sponsorCenterY + sponsorSize * 0.35);
 
-  const crestX = design.crestPosition === 'right' ? 228 : design.crestPosition === 'center' ? 176 : 124;
-  const brandX = design.crestPosition === 'right' ? 128 : design.crestPosition === 'center' ? 181 : 238;
-  const brandY = design.crestPosition === 'center' ? 124 : 158;
+  // Perfectly symmetrical chest coordinates around x = 200:
+  // Left chest center = 148, Center chest = 200, Right chest center = 252
+  const crestWidth = 46;
+  const crestHeight = 56;
+  const brandWidth = 36;
+  const brandHeight = 24;
+  const chestCenterY = 166;
+
+  const crestCenterX = design.crestPosition === 'right' ? 252 : design.crestPosition === 'center' ? 200 : 148;
+  const brandCenterX = design.crestPosition === 'right' ? 148 : design.crestPosition === 'center' ? 200 : 252;
+  const brandCenterY = design.crestPosition === 'center' ? 124 : chestCenterY;
+
+  const crestX = crestCenterX - crestWidth / 2;
+  const crestY = chestCenterY - crestHeight / 2;
+  const brandX = brandCenterX - brandWidth / 2;
+  const brandY = brandCenterY - brandHeight / 2;
 
   const hasSponsor = design.sponsorStyle !== 'none' && (Boolean(design.sponsor) || Boolean(design.customSponsorUrl));
   const bandText = contrasting(design.secondary);
@@ -802,7 +816,15 @@ function FrontPrint({ design, crestDataUrl, id }) {
   return (
     <g>
       {/* Crest */}
-      <CrestBadge design={design} crestDataUrl={crestDataUrl} id={id} x={crestX} y="142" width="48" height="58" />
+      <CrestBadge
+        design={design}
+        crestDataUrl={crestDataUrl}
+        id={id}
+        x={crestX}
+        y={crestY}
+        width={crestWidth}
+        height={crestHeight}
+      />
 
       {/* Technical Brand Logo */}
       {design.showBrand && design.brand !== 'none' && (
@@ -811,20 +833,19 @@ function FrontPrint({ design, crestDataUrl, id }) {
           color={design.brandColor || design.accent}
           x={brandX}
           y={brandY}
-          width="38"
-          height="26"
+          width={brandWidth}
+          height={brandHeight}
         />
       )}
 
-      {/* Optional Front Small Number */}
+      {/* Optional Front Small Number (centered between chest logos or below center crest) */}
       {design.showFrontNumber && (
         <text
-          x={design.crestPosition === 'center' ? 200 : 200}
-          y={design.crestPosition === 'center' ? 222 : 186}
+          x="200"
+          y={design.crestPosition === 'center' ? 216 : chestCenterY + 10}
           textAnchor="middle"
-          fontSize="30"
+          fontSize="28"
           fontWeight="900"
-          fontStyle="italic"
           fill={design.numberColor}
           stroke={design.showNumberOutline ? design.accent : 'none'}
           strokeWidth={design.showNumberOutline ? 2 : 0}
@@ -835,21 +856,21 @@ function FrontPrint({ design, crestDataUrl, id }) {
         </text>
       )}
 
-      {/* Main Sponsor */}
+      {/* Main Sponsor (centered on x = 200 and sponsorCenterY) */}
       {hasSponsor && (
         <g>
           {design.sponsorStyle === 'band' && (
             <>
-              <rect x="98" y={sponsorY - 34} width="204" height="52" fill={design.secondary} opacity="0.96" />
-              <rect x="98" y={sponsorY - 34} width="204" height="3.5" fill={design.accent} />
-              <rect x="98" y={sponsorY + 14.5} width="204" height="3.5" fill={design.accent} />
+              <rect x="96" y={sponsorCenterY - 26} width="208" height="52" fill={design.secondary} opacity="0.96" />
+              <rect x="96" y={sponsorCenterY - 26} width="208" height="3.5" fill={design.accent} />
+              <rect x="96" y={sponsorCenterY + 22.5} width="208" height="3.5" fill={design.accent} />
             </>
           )}
 
           {design.sponsorStyle === 'box' && (
             <rect
               x="114"
-              y={sponsorY - 32}
+              y={sponsorCenterY - 24}
               width="172"
               height="48"
               rx="8"
@@ -862,7 +883,7 @@ function FrontPrint({ design, crestDataUrl, id }) {
           {design.sponsorStyle === 'frame' && (
             <rect
               x="114"
-              y={sponsorY - 32}
+              y={sponsorCenterY - 24}
               width="172"
               height="48"
               rx="6"
@@ -877,7 +898,7 @@ function FrontPrint({ design, crestDataUrl, id }) {
             <image
               href={design.customSponsorUrl}
               x={200 - 80 * scale}
-              y={sponsorY - 32 * scale}
+              y={sponsorCenterY - 26 * scale}
               width={160 * scale}
               height={52 * scale}
               preserveAspectRatio="xMidYMid meet"
@@ -885,11 +906,10 @@ function FrontPrint({ design, crestDataUrl, id }) {
           ) : (
             <text
               x="200"
-              y={sponsorY}
+              y={sponsorTextY}
               textAnchor="middle"
               fontSize={sponsorSize}
               fontWeight="900"
-              fontStyle="italic"
               letterSpacing="1"
               fill={design.sponsorStyle === 'band' || design.sponsorStyle === 'box' ? bandText : design.text}
               stroke={design.sponsorStyle === 'text' ? darken(design.primary, 0.45) : 'none'}
@@ -922,22 +942,35 @@ function FrontPrint({ design, crestDataUrl, id }) {
 
 function BackPrint({ design, arcId }) {
   const font = getFont(design.fontFamily);
-  const straightSize = fitTextSize(design.teamName, 158, 23, 10, 0.62);
-  const archedSize = fitTextSize(design.teamName, 165, 20, 9, 0.62);
+  const straightSize = fitTextSize(design.teamName, 164, 23, 10, 0.62);
+  const archedSize = fitTextSize(design.teamName, 170, 20, 9, 0.62);
   const numScale = clamp((design.numberScale || 100) / 100, 0.7, 1.3);
-  const baseNumSize = design.number.length > 1 ? 124 : 148;
+  const baseNumSize = design.number.length > 1 ? 122 : 142;
   const numberSize = Math.round(baseNumSize * numScale);
   const numberStroke = design.showNumberOutline ? design.accent : 'none';
-  const numberY = design.nameStyle === 'bottom' ? 318 : 352;
+
+  // Exact visual vertical center of the dorsal number on the back torso
+  const numberCenterY = design.nameStyle === 'bottom' ? 248 : 272;
+  const numberBaselineY = Math.round(numberCenterY + numberSize * 0.355);
+  const boxHeight = Math.round(numberSize * 1.24);
+  const boxWidth = 172;
 
   return (
     <g>
-      {/* Optional UEFA-style solid back box for striped/patterned jerseys */}
+      {/* Optional UEFA-style solid back box centered on the dorsal number */}
       {design.pattern !== 'solid' && design.backBoxSolid && (
-        <rect x="118" y="198" width="164" height="196" rx="14" fill={design.primary} opacity="0.92" />
+        <rect
+          x={200 - boxWidth / 2}
+          y={numberCenterY - boxHeight / 2}
+          width={boxWidth}
+          height={boxHeight}
+          rx="14"
+          fill={design.primary}
+          opacity="0.93"
+        />
       )}
 
-      {/* Player / Team Name */}
+      {/* Player / Team Name (centered at x = 200, upright) */}
       {design.nameStyle === 'arched' ? (
         <text
           fontSize={archedSize}
@@ -957,7 +990,7 @@ function BackPrint({ design, arcId }) {
       ) : design.nameStyle === 'bottom' ? (
         <text
           x="200"
-          y="394"
+          y={Math.round(numberCenterY + boxHeight / 2 + 28)}
           textAnchor="middle"
           fontSize={straightSize}
           fontWeight="900"
@@ -973,7 +1006,7 @@ function BackPrint({ design, arcId }) {
       ) : (
         <text
           x="200"
-          y="174"
+          y="158"
           textAnchor="middle"
           fontSize={straightSize}
           fontWeight="900"
@@ -988,14 +1021,13 @@ function BackPrint({ design, arcId }) {
         </text>
       )}
 
-      {/* Drop shadow of number */}
+      {/* Subtle centered drop shadow of number */}
       <text
-        x="203"
-        y={numberY + 5}
+        x="200"
+        y={numberBaselineY + 4}
         textAnchor="middle"
         fontSize={numberSize}
         fontWeight="900"
-        fontStyle="italic"
         fill="#000000"
         opacity="0.24"
         fontFamily={font}
@@ -1003,14 +1035,13 @@ function BackPrint({ design, arcId }) {
         {design.number}
       </text>
 
-      {/* Main Back Number */}
+      {/* Main Back Number (upright, dead-center at x = 200) */}
       <text
         x="200"
-        y={numberY}
+        y={numberBaselineY}
         textAnchor="middle"
         fontSize={numberSize}
         fontWeight="900"
-        fontStyle="italic"
         fill={design.numberColor}
         stroke={numberStroke}
         strokeWidth={design.showNumberOutline ? 6 : 0}
@@ -1024,11 +1055,10 @@ function BackPrint({ design, arcId }) {
       {design.showNumberBackDetail && (
         <text
           x="200"
-          y={numberY}
+          y={numberBaselineY}
           textAnchor="middle"
           fontSize={numberSize}
           fontWeight="900"
-          fontStyle="italic"
           fill="none"
           stroke={design.primary}
           strokeWidth="1.6"
@@ -1042,7 +1072,7 @@ function BackPrint({ design, arcId }) {
       {/* Bottom Season Tag */}
       <text
         x="200"
-        y="452"
+        y="448"
         textAnchor="middle"
         fontSize="11"
         fontWeight="800"
@@ -1061,15 +1091,15 @@ const LEFT_SIDE_PANEL = 'M 96 154 L 114 162 C 114 260, 112 365, 110 478 L 94 474
 const RIGHT_SIDE_PANEL = 'M 304 154 L 286 162 C 286 260, 288 365, 290 478 L 306 474 C 302 380, 298 260, 304 154 Z';
 
 export const ShirtSvg = forwardRef(function ShirtSvg(
-  { design, side = 'front', crestDataUrl, className = '' },
+  { design, side = 'front', crestDataUrl, textureMode = false, className = '' },
   ref,
 ) {
   const rawId = useId();
   const id = rawId.replace(/:/g, '');
   const isFront = side === 'front';
-  const outerClip = `url(#${id}-outer-clip)`;
-  const torsoClip = `url(#${id}-torso-clip)`;
-  const patternClip = design.patternOnSleeves ? outerClip : torsoClip;
+  const outerClip = textureMode ? undefined : `url(#${id}-outer-clip)`;
+  const torsoClip = textureMode ? undefined : `url(#${id}-torso-clip)`;
+  const patternClip = textureMode ? undefined : design.patternOnSleeves ? outerClip : torsoClip;
   const showPattern = isFront || design.patternOnBack !== false;
 
   const sleeveFill =
@@ -1093,15 +1123,19 @@ export const ShirtSvg = forwardRef(function ShirtSvg(
         <clipPath id={`${id}-torso-clip`}>
           <path d={SHIRT_TORSO_PATH} />
         </clipPath>
-        <path id={`${id}-arc`} d="M 88 188 Q 200 132 312 188" />
+        <path id={`${id}-arc`} d="M 84 168 Q 200 116 316 168" />
         <CommonDefs id={id} design={design} />
       </defs>
 
       {/* Base Torso Fill */}
-      <path d={SHIRT_OUTER_PATH} fill={design.primary} />
+      {textureMode ? (
+        <rect x="0" y="0" width="400" height="520" fill={design.primary} />
+      ) : (
+        <path d={SHIRT_OUTER_PATH} fill={design.primary} />
+      )}
 
-      {/* Sleeves Base Fill (when independent from pattern) */}
-      {!design.patternOnSleeves && (
+      {/* Sleeves Base Fill (when independent from pattern in 2D view) */}
+      {!textureMode && !design.patternOnSleeves && (
         <g clipPath={outerClip}>
           <path d={LEFT_SLEEVE_PATH} fill={sleeveFill} />
           <path d={RIGHT_SLEEVE_PATH} fill={sleeveFill} />
@@ -1135,17 +1169,19 @@ export const ShirtSvg = forwardRef(function ShirtSvg(
       )}
 
       {/* Shoulder Stripes & Piping */}
-      <ShoulderDetails design={design} clipPath={outerClip} />
+      {!textureMode && <ShoulderDetails design={design} clipPath={outerClip} />}
 
       {/* Sleeve Badges & Captain Armband */}
-      <SleeveExtras design={design} clipPath={outerClip} />
+      {!textureMode && <SleeveExtras design={design} clipPath={outerClip} />}
 
       {/* Twin-needle coverstitching details */}
-      <g clipPath={outerClip} fill="none" stroke={contrasting(design.primary)} opacity="0.22" strokeDasharray="3 3" strokeWidth="1.1">
-        <path d="M 124 60 C 114 96, 104 128, 96 154" />
-        <path d="M 276 60 C 286 96, 296 128, 304 154" />
-        <path d="M 96 462 C 132 478, 268 478, 304 462" />
-      </g>
+      {!textureMode && (
+        <g clipPath={outerClip} fill="none" stroke={contrasting(design.primary)} opacity="0.22" strokeDasharray="3 3" strokeWidth="1.1">
+          <path d="M 124 60 C 114 96, 104 128, 96 154" />
+          <path d="M 276 60 C 286 96, 296 128, 304 154" />
+          <path d="M 96 462 C 132 478, 268 478, 304 462" />
+        </g>
+      )}
 
       {/* Prints (Crest, Sponsor, Name, Number) */}
       <g clipPath={outerClip}>
@@ -1156,19 +1192,32 @@ export const ShirtSvg = forwardRef(function ShirtSvg(
         )}
       </g>
 
+      {/* In 3D textureMode, draw Polo placket / V-neck lower accent on chest */}
+      {textureMode && isFront && design.collar === 'polo' && (
+        <g>
+          <rect x="193" y="88" width="14" height="44" rx="2" fill={design.accent} />
+          <circle cx="200" cy="104" r="2.2" fill={design.secondary} />
+          <circle cx="200" cy="120" r="2.2" fill={design.secondary} />
+        </g>
+      )}
+
       {/* Sleeve Cuffs */}
-      <g clipPath={outerClip}>
-        <SleeveCuffs design={design} />
-      </g>
+      {!textureMode && (
+        <g clipPath={outerClip}>
+          <SleeveCuffs design={design} />
+        </g>
+      )}
 
-      {/* Realistic 3D Cloth Folds & Studio Lighting Overlay */}
-      <GarmentDrapeShading id={id} clipPath={outerClip} />
+      {/* Realistic 3D Cloth Folds & Studio Lighting Overlay (2D view only) */}
+      {!textureMode && <GarmentDrapeShading id={id} clipPath={outerClip} />}
 
-      {/* Collar & Inner Neck Cavity */}
-      <RealisticCollar design={design} isFront={isFront} />
+      {/* Collar & Inner Neck Cavity (2D view only) */}
+      {!textureMode && <RealisticCollar design={design} isFront={isFront} />}
 
-      {/* Outer silhouette crisp anti-aliased rim */}
-      <path d={SHIRT_OUTER_PATH} fill="none" stroke="#000000" strokeOpacity="0.24" strokeWidth="1.5" />
+      {/* Outer silhouette crisp anti-aliased rim (2D view only) */}
+      {!textureMode && (
+        <path d={SHIRT_OUTER_PATH} fill="none" stroke="#000000" strokeOpacity="0.24" strokeWidth="1.5" />
+      )}
     </svg>
   );
 });
@@ -1239,19 +1288,18 @@ export const ShortsSvg = forwardRef(function ShortsSvg(
             <path d="M145 36 C142 56, 140 70, 143 82" stroke={design.secondary} strokeWidth="2.6" strokeLinecap="round" fill="none" />
             <path d="M155 36 C158 56, 160 70, 157 82" stroke={design.secondary} strokeWidth="2.6" strokeLinecap="round" fill="none" />
             {design.shortsCrest !== false && (
-              <CrestBadge design={design} crestDataUrl={crestDataUrl} id={id} x="82" y="132" width="34" height="42" />
+              <CrestBadge design={design} crestDataUrl={crestDataUrl} id={id} x="85" y="130" width="34" height="42" />
             )}
             {design.showBrand && design.brand !== 'none' && (
-              <BrandLogo brand={design.brand} color={design.brandColor || design.accent} x={84} y="98" width="26" height="18" />
+              <BrandLogo brand={design.brand} color={design.brandColor || design.accent} x="89" y="102" width="26" height="18" />
             )}
             {design.shortsNumber && (
               <text
                 x="198"
-                y="168"
+                y="165"
                 textAnchor="middle"
                 fontSize={numberSize}
                 fontWeight="900"
-                fontStyle="italic"
                 fill={design.numberColor}
                 stroke={design.showNumberOutline ? design.accent : 'none'}
                 strokeWidth={design.showNumberOutline ? 2.5 : 0}

@@ -170,6 +170,8 @@ export default function KitCreator() {
 
   const shirtFrontRef = useRef(null);
   const shirtBackRef = useRef(null);
+  const shirtFront3DRef = useRef(null);
+  const shirtBack3DRef = useRef(null);
   const shortsFrontRef = useRef(null);
   const shortsBackRef = useRef(null);
   const socksRef = useRef(null);
@@ -1170,10 +1172,8 @@ export default function KitCreator() {
                   <KitPreview3D
                     design={design}
                     crestDataUrl={crestDataUrl}
-                    shirtFrontRef={shirtFrontRef}
-                    shirtBackRef={shirtBackRef}
-                    shortsFrontRef={shortsFrontRef}
-                    shortsBackRef={shortsBackRef}
+                    shirtFrontRef={shirtFront3DRef}
+                    shirtBackRef={shirtBack3DRef}
                     onCaptureReady={handleCaptureReady}
                     className="h-full"
                   />
@@ -1200,6 +1200,8 @@ export default function KitCreator() {
       >
         <ShirtSvg ref={shirtFrontRef} design={design} side="front" crestDataUrl={crestDataUrl} />
         <ShirtSvg ref={shirtBackRef} design={design} side="back" crestDataUrl={crestDataUrl} />
+        <ShirtSvg ref={shirtFront3DRef} design={design} side="front" crestDataUrl={crestDataUrl} textureMode />
+        <ShirtSvg ref={shirtBack3DRef} design={design} side="back" crestDataUrl={crestDataUrl} textureMode />
         <ShortsSvg ref={shortsFrontRef} design={design} side="front" crestDataUrl={crestDataUrl} />
         <ShortsSvg ref={shortsBackRef} design={design} side="back" crestDataUrl={crestDataUrl} />
         <SocksSvg ref={socksRef} design={design} />
